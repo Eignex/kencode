@@ -2,6 +2,20 @@ package com.eignex.kencode
 
 import java.nio.ByteBuffer
 
+/**
+ * Abstraction for byte→string and string→byte encoders.
+ *
+ * Requirements:
+ * - Implementations must define `encode(byte[], offset, length)` and `decode(CharSequence)`.
+ *
+ * Additional utilities:
+ * - Encoding/decoding from `ByteBuffer`.
+ * - Encoding/decoding of UTF-8 strings.
+ * - Encoding/decoding of signed Int/Long with proper sign extension.
+ *
+ * Encoders may produce variable-length or fixed-length text outputs,
+ * but decoding must deterministically reconstruct the original bytes.
+ */
 interface ByteCodec {
 
     fun encode(

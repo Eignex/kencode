@@ -2,6 +2,25 @@ package com.eignex.kencode
 
 const val BASE_32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
+/**
+ * RFC 4648–compatible Base32 encoder/decoder.
+ *
+ * Features:
+ * - Uses a configurable 32-character alphabet.
+ * - Accepts uppercase and lowercase input during decoding.
+ * - Implements padding using '=' to align output to 8-character blocks.
+ * - Produces canonical Base32 output that always rounds to full 40-bit groups.
+ *
+ * Encoding:
+ * - Processes input in 5-byte groups → 8 Base32 characters.
+ * - Final partial group is padded to 8 characters.
+ *
+ * Decoding:
+ * - Accepts input only if length is a multiple of 8.
+ * - Verifies allowed padding sizes per RFC 4648 (0, 1, 3, 4, 6).
+ *
+ * @property alphabet the 32-symbol Base32 alphabet.
+ */
 open class Base32(val alphabet: CharArray) : ByteCodec {
 
     companion object Default : Base32(BASE_32.toCharArray())

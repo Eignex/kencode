@@ -6,17 +6,23 @@ val Z85 =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#"
 
 /**
- * Generic Base85 encoder/decoder using a custom 85-character alphabet.
+ * Generic Base85 encoder/decoder supporting both ASCII85 and ZeroMQ Z85.
  *
- * This implementation supports:
- * - ASCII85-style encoding (using [ASCII85] alphabet):
+ * Modes:
+ * - ASCII85:
  *   - 4 input bytes → 5 output chars.
- *   - Final partial chunk of 1–3 bytes encodes to (n+1) chars (n = number of bytes).
- *   - No special 'z' compression, no <~ ~> delimiters.
+ *   - Allows final partial group (1–3 bytes → 2–4 chars).
+ *   - No 'z' compression, no <~ ~> delimiters.
  *
- * - Z85-style encoding (using [Z85] alphabet):
- *   - Input length must be a multiple of 4 bytes.
- *   - Output length will be a multiple of 5 chars.
+ * - Z85:
+ *   - Input must be a multiple of 4 bytes.
+ *   - Output always a multiple of 5 chars.
+ *   - Uses the official Z85 alphabet.
+ *
+ * Detection:
+ * - Alphabet identity determines whether to use ASCII85 or Z85 rules.
+ *
+ * @property alphabet the 85-character encoding alphabet.
  */
 open class Base85(
     private val alphabet: CharArray

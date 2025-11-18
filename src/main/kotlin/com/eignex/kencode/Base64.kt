@@ -3,6 +3,21 @@ package com.eignex.kencode
 const val BASE_64 =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+/**
+ * RFC 4648–compatible Base64 encoder/decoder.
+ *
+ * Features:
+ * - Uses a configurable 64-character alphabet.
+ * - Produces '=' padding to align output to 4-character blocks.
+ * - Handles input in 3-byte groups → 4 Base64 characters.
+ *
+ * Decoding:
+ * - Accepts only input lengths divisible by 4.
+ * - Validates and strips up to two padding characters.
+ * - Throws on encountering non-alphabet characters.
+ *
+ * @property alphabet the 64-symbol Base64 alphabet.
+ */
 open class Base64(val alphabet: CharArray) : ByteCodec {
 
     companion object Default : Base64(BASE_64.toCharArray())

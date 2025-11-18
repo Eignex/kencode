@@ -1,16 +1,21 @@
 package com.eignex.kencode
 
 /**
- * CRC implementation for CRC-16 class algorithms.
- * Defaults parameters implement the X25 method.
+ * CRC-16 implementation with configurable polynomial and parameters.
  *
- * Parameters are the standard ones from CRC catalogues:
- * - poly: generator polynomial (width bits, top bit implicit)
- * - init: initial register value
- * - refin: reflect (reverse) each input byte bit order
- * - refout: reflect final CRC bits
- * - xorOut: XOR applied to final CRC value
- * - width: number of CRC bits (16 for all below)
+ * Default configuration implements the X.25 CRC.
+ *
+ * Parameters:
+ * @param poly generator polynomial (high bit implicit).
+ * @param init initial CRC register value.
+ * @param refin whether to reflect bits of each input byte.
+ * @param refout whether to reflect the final CRC value.
+ * @param xorOut final XOR mask.
+ * @param width number of CRC bits (typically 16).
+ *
+ * Output:
+ * - Returned as big-endian byte array.
+ * - Internal representation uses reflected form.
  */
 class Crc16(
     poly: Int = 0x1021,
@@ -67,16 +72,21 @@ class Crc16(
 }
 
 /**
- * CRC implementation for CRC-32 class algorithms.
- * Default parameters implement CRC-32/ISO-HDLC (a.k.a. "standard" CRC-32).
+ * CRC-32 implementation with configurable polynomial and parameters.
  *
- * Parameters are the standard ones from CRC catalogues:
- * - poly: generator polynomial (width bits, top bit implicit)
- * - init: initial register value
- * - refin: reflect (reverse) each input byte bit order
- * - refout: reflect final CRC bits
- * - xorOut: XOR applied to final CRC value
- * - width: number of CRC bits (32 for all below)
+ * Default configuration implements CRC-32/ISO-HDLC.
+ *
+ * Parameters:
+ * @param poly generator polynomial (top bit implicit).
+ * @param init initial CRC register value.
+ * @param refin whether to reflect input bytes.
+ * @param refout whether to reflect output CRC.
+ * @param xorOut XOR mask applied to final CRC.
+ * @param width number of CRC bits (typically 32).
+ *
+ * Output:
+ * - Returned as big-endian byte array of length 4.
+ * - Internal representation uses reflected form.
  */
 class Crc32(
     poly: Int = 0x04C11DB7, // canonical CRC-32 poly

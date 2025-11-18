@@ -1,5 +1,15 @@
 package com.eignex.kencode
 
+/**
+ * Utility for bit-level packing and encoding primitives.
+ *
+ * Functions include:
+ * - Boolean flag packing/unpacking into integers.
+ * - ZigZag encoding for signed integers (as used in protobuf and varints).
+ * - Varint and varlong (LEB128-style) encoding/decoding.
+ *
+ * All methods are placeholders and must be implemented.
+ */
 class BitPacking {
 
     // flags -> int/long

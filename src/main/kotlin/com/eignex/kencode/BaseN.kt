@@ -8,31 +8,35 @@ import kotlin.math.min
 const val BASE_62: String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 /**
- * Base62 encoder/decoder using [BASE_62] alphabet.
+ * Base62 encoder/decoder using digits, lowercase, then uppercase characters.
  */
 object Base62 : BaseN(BASE_62)
 
+
 /**
- * Base36 encoder/decoder using the first 36 characters of [BASE_62].
+ * Base36 encoder/decoder using digits and lowercase characters.
  */
 object Base36 : BaseN(BASE_62.take(36))
 
-
 /**
- * Generic base-N encoder/decoder for binary data using a custom alphabet.
+ * Generic base-N encoder/decoder for binary data using arbitrary alphabets.
  *
- * The algorithm:
- * - Splits input bytes into fixed-size "chunks" of at most [chunkSize] bytes.
- * - Interprets each chunk as a big-endian integer.
- * - Encodes the integer into base-x where x is the alphabet length.
- * - Uses precomputed mappings to ensure that each input chunk length maps to a
- *   unique encoded length, so decoding is unambiguous.
+ * Concept:
+ * - Processes data in fixed-size chunks (default 32 bytes).
+ * - Treats each chunk as a big-endian integer.
+ * - Converts that integer into base-N using the provided alphabet.
  *
- * The alphabet must:
- * - Contain at least 2 characters.
- * - Contain no duplicate characters.
+ * Guarantees:
+ * - Deterministic chunk-to-length mapping for unambiguous decoding.
+ * - Strictly increasing encoded length per input chunk size.
+ * - Supports any alphabet of length ≥ 2 with no repeated characters.
  *
- * Encoding is big-endian.
+ * Usage:
+ * - Specializations include Base36 and Base62.
+ * - Suitable for compact identifiers or opaque byte-to-text encoding.
+ *
+ * @property alphabet the symbol set used for encoding.
+ * @property chunkSize maximum bytes processed per chunk.
  */
 open class BaseN(
     private val alphabet: String,
