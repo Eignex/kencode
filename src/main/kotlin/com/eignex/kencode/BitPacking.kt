@@ -43,6 +43,14 @@ object BitPacking {
     fun zigZagDecodeLong(value: Long): Long =
         (value ushr 1) xor -(value and 1L)
 
+    fun writeShort(value: Short, out: ByteArrayOutputStream) {
+        var v = value.toInt()
+        repeat(2) {
+            out.write((v and 0xFF))
+            v = v ushr 2
+        }
+    }
+
     fun writeVarInt(value: Int, out: ByteArrayOutputStream) {
         var v = value
         while (true) {
@@ -56,6 +64,14 @@ object BitPacking {
         }
     }
 
+    fun writeInt(value: Int, out: ByteArrayOutputStream) {
+        var v = value
+        repeat(4) {
+            out.write((v and 0xFF))
+            v = v ushr 4
+        }
+    }
+
     fun writeVarLong(value: Long, out: ByteArrayOutputStream) {
         var v = value
         while (true) {
@@ -66,6 +82,14 @@ object BitPacking {
                 out.write(((v and 0x7F) or 0x80).toInt())
                 v = v ushr 7
             }
+        }
+    }
+
+    fun writeLong(value: Long, out: ByteArrayOutputStream) {
+        var v = value
+        repeat(8) {
+            out.write((v and 0xFF).toInt())
+            v = v ushr 8
         }
     }
 
