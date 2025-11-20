@@ -2,10 +2,7 @@ package com.eignex.kencode
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -26,12 +23,8 @@ class BitPackedEncoder(
     private var booleanIndices: IntArray = intArrayOf()
     private lateinit var booleanValues: BooleanArray
 
-    // Buffer for non-boolean field data
+    // Buffer for non-boolean field data (for structures)
     private val dataBuffer = ByteArrayOutputStream()
-
-    // ---------------------------------------------------------------------
-    // Encoder (single-value) API
-    // ---------------------------------------------------------------------
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) error("Nested objects are not supported")
@@ -49,57 +42,83 @@ class BitPackedEncoder(
     }
 
     override fun encodeBoolean(value: Boolean) {
-        val idx = currentIndex
-        if (idx < 0) error("Boolean outside of structure is not supported")
-        encodeBooleanElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeBooleanElement(currentDescriptor, currentIndex, value)
+        } else {
+            output.write(if (value) 1 else 0)
+        }
     }
 
     override fun encodeByte(value: Byte) {
-        val idx = currentIndex
-        if (idx < 0) error("Byte outside of structure is not supported")
-        encodeByteElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeByteElement(currentDescriptor, currentIndex, value)
+        } else {
+            output.write(value.toInt() and 0xFF)
+        }
     }
 
     override fun encodeShort(value: Short) {
-        val idx = currentIndex
-        if (idx < 0) error("Short outside of structure is not supported")
-        encodeShortElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeShortElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeShort(value, output)
+        }
     }
 
     override fun encodeInt(value: Int) {
-        val idx = currentIndex
-        if (idx < 0) error("Int outside of structure is not supported")
-        encodeIntElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeIntElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeInt(value, output)
+        }
     }
 
     override fun encodeLong(value: Long) {
-        val idx = currentIndex
-        if (idx < 0) error("Long outside of structure is not supported")
-        encodeLongElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeLongElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeLong(value, output)
+        }
     }
 
     override fun encodeFloat(value: Float) {
-        val idx = currentIndex
-        if (idx < 0) error("Float outside of structure is not supported")
-        encodeFloatElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeFloatElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeInt(
+                java.lang.Float.floatToRawIntBits(value),
+                output
+            )
+        }
     }
 
     override fun encodeDouble(value: Double) {
-        val idx = currentIndex
-        if (idx < 0) error("Double outside of structure is not supported")
-        encodeDoubleElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeDoubleElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeLong(
+                java.lang.Double.doubleToRawLongBits(value),
+                output
+            )
+        }
     }
 
     override fun encodeChar(value: Char) {
-        val idx = currentIndex
-        if (idx < 0) error("Char outside of structure is not supported")
-        encodeCharElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeCharElement(currentDescriptor, currentIndex, value)
+        } else {
+            BitPacking.writeShort(value.code.toShort(), output)
+        }
     }
 
     override fun encodeString(value: String) {
-        val idx = currentIndex
-        if (idx < 0) error("String outside of structure is not supported")
-        encodeStringElement(currentDescriptor, idx, value)
+        if (inStructure) {
+            encodeStringElement(currentDescriptor, currentIndex, value)
+        } else {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            BitPacking.writeVarInt(bytes.size, output)
+            output.write(bytes)
+        }
     }
 
     @ExperimentalSerializationApi
@@ -125,10 +144,6 @@ class BitPackedEncoder(
         return this
     }
 
-    // ---------------------------------------------------------------------
-    // CompositeEncoder API
-    // ---------------------------------------------------------------------
-
     override fun endStructure(descriptor: SerialDescriptor) {
         check(inStructure && descriptor == currentDescriptor)
 
@@ -136,7 +151,7 @@ class BitPackedEncoder(
             if (booleanIndices.isEmpty()) 0
             else BitPacking.packFlagsToInt(*booleanValues)
 
-        // Write varint flags directly into final output without temp ByteArray
+        // Write varint flags directly into final output
         BitPacking.writeVarInt(flagsInt, output)
 
         // Then write the accumulated non-boolean field data
@@ -160,35 +175,8 @@ class BitPackedEncoder(
         value: Boolean
     ) {
         val pos = booleanPos(index)
-        if (pos < 0) error("Boolean element at index $index not registered as boolean")
         booleanValues[pos] = value
     }
-
-    // ---------------------------------------------------------------------
-    // Helpers for annotations and fixed-size primitives
-    // ---------------------------------------------------------------------
-
-    private fun List<Annotation>.hasVarInt(): Boolean = any { it is VarInt }
-    private fun List<Annotation>.hasZigZag(): Boolean = any { it is ZigZag }
-
-    private fun writeFixedIntLE(value: Int) {
-        dataBuffer.write(value and 0xFF)
-        dataBuffer.write((value ushr 8) and 0xFF)
-        dataBuffer.write((value ushr 16) and 0xFF)
-        dataBuffer.write((value ushr 24) and 0xFF)
-    }
-
-    private fun writeFixedLongLE(value: Long) {
-        var v = value
-        repeat(8) {
-            dataBuffer.write((v and 0xFF).toInt())
-            v = v ushr 8
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // Primitive element encoders
-    // ---------------------------------------------------------------------
 
     override fun encodeIntElement(
         descriptor: SerialDescriptor,
@@ -201,10 +189,9 @@ class BitPackedEncoder(
 
         if (varInt) {
             val v = if (zigZag) BitPacking.zigZagEncodeInt(value) else value
-            // Directly write varint into dataBuffer
             BitPacking.writeVarInt(v, dataBuffer)
         } else {
-            writeFixedIntLE(value)
+            BitPacking.writeInt(value, dataBuffer)
         }
     }
 
@@ -219,10 +206,9 @@ class BitPackedEncoder(
 
         if (varInt) {
             val v = if (zigZag) BitPacking.zigZagEncodeLong(value) else value
-            // Directly write varint into dataBuffer
             BitPacking.writeVarLong(v, dataBuffer)
         } else {
-            writeFixedLongLE(value)
+            BitPacking.writeLong(value, dataBuffer)
         }
     }
 
@@ -239,9 +225,7 @@ class BitPackedEncoder(
         index: Int,
         value: Short
     ) {
-        val v = value.toInt()
-        dataBuffer.write(v and 0xFF)
-        dataBuffer.write((v ushr 8) and 0xFF)
+        BitPacking.writeShort(value, dataBuffer)
     }
 
     override fun encodeCharElement(
@@ -249,9 +233,7 @@ class BitPackedEncoder(
         index: Int,
         value: Char
     ) {
-        val v = value.code
-        dataBuffer.write(v and 0xFF)
-        dataBuffer.write((v ushr 8) and 0xFF)
+        BitPacking.writeShort(value.code.toShort(), dataBuffer)
     }
 
     override fun encodeFloatElement(
@@ -259,7 +241,7 @@ class BitPackedEncoder(
         index: Int,
         value: Float
     ) {
-        writeFixedIntLE(java.lang.Float.floatToRawIntBits(value))
+        BitPacking.writeInt(java.lang.Float.floatToRawIntBits(value), dataBuffer)
     }
 
     override fun encodeDoubleElement(
@@ -267,7 +249,7 @@ class BitPackedEncoder(
         index: Int,
         value: Double
     ) {
-        writeFixedLongLE(java.lang.Double.doubleToRawLongBits(value))
+        BitPacking.writeLong(java.lang.Double.doubleToRawLongBits(value), dataBuffer)
     }
 
     override fun encodeStringElement(
@@ -276,14 +258,9 @@ class BitPackedEncoder(
         value: String
     ) {
         val bytes = value.toByteArray(Charsets.UTF_8)
-        // Write length as varint directly to dataBuffer
         BitPacking.writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
-
-    // ---------------------------------------------------------------------
-    // Inline / nested serializers
-    // ---------------------------------------------------------------------
 
     @ExperimentalSerializationApi
     override fun encodeInlineElement(
