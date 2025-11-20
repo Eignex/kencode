@@ -17,7 +17,7 @@ package com.eignex.kencode
  * - Returned as big-endian byte array.
  * - Internal representation uses reflected form.
  */
-class Crc16(
+open class Crc16(
     poly: Int = 0x1021,
     init: Int = 0xFFFF,
     private val refin: Boolean = true,
@@ -25,6 +25,8 @@ class Crc16(
     private val xorOut: Int = 0xFFFF,
     private val width: Int = 16
 ) : Checksum {
+
+    companion object Default : Crc16()
 
     private val mask = (1 shl width) - 1
 
@@ -88,7 +90,7 @@ class Crc16(
  * - Returned as big-endian byte array of length 4.
  * - Internal representation uses reflected form.
  */
-class Crc32(
+open class Crc32(
     poly: Int = 0x04C11DB7, // canonical CRC-32 poly
     init: Int = 0xFFFFFFFF.toInt(),
     private val refin: Boolean = true,
@@ -96,6 +98,8 @@ class Crc32(
     private val xorOut: Int = 0xFFFFFFFF.toInt(),
     private val width: Int = 32
 ) : Checksum {
+
+    companion object Default : Crc32()
 
     private val mask: Long =
         if (width == 32) 0xFFFFFFFFL
