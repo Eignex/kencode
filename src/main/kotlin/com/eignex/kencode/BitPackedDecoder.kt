@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+import BitPacking
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
@@ -34,7 +35,8 @@ class BitPackedDecoder(
 
         val (flagsInt, bytesRead) = BitPacking.decodeVarInt(input, position)
         position += bytesRead
-        booleanValues = BitPacking.unpackFlagsFromInt(flagsInt, booleanIndices.size)
+        booleanValues =
+            BitPacking.unpackFlagsFromInt(flagsInt, booleanIndices.size)
 
         return this
     }
@@ -117,7 +119,15 @@ class BitPackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeEnum(enumDescriptor: SerialDescriptor): Int {
-        error("Enums are not supported in this format")
+        return if (inStructure) {
+            val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
+            position += bytesRead
+            v
+        } else {
+            val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
+            position += bytesRead
+            v
+        }
     }
 
     @ExperimentalSerializationApi
@@ -133,9 +143,6 @@ class BitPackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeInline(descriptor: SerialDescriptor): Decoder {
-        if (!inStructure || currentIndex < 0) {
-            error("Top-level inline or inline outside element is not supported")
-        }
         return this
     }
 
@@ -170,13 +177,13 @@ class BitPackedDecoder(
         index: Int
     ): Int {
         val anns = descriptor.getElementAnnotations(index)
-        val varUInt = anns.hasVarUInt()
-        val varInt = anns.hasVarInt() || varUInt
+        val zigZag = anns.hasVarInt()
+        val varInt = anns.hasVarUInt() || zigZag
 
         return if (varInt) {
             val (raw, bytesRead) = BitPacking.decodeVarInt(input, position)
             position += bytesRead
-            if (varUInt) BitPacking.zigZagDecodeInt(raw) else raw
+            if (zigZag) BitPacking.zigZagDecodeInt(raw) else raw
         } else {
             readIntPos()
         }
@@ -187,13 +194,13 @@ class BitPackedDecoder(
         index: Int
     ): Long {
         val anns = descriptor.getElementAnnotations(index)
-        val varUInt = anns.hasVarUInt()
-        val varInt = anns.hasVarInt() || varUInt
+        val zigZag = anns.hasVarInt()
+        val varInt = anns.hasVarUInt() || zigZag
 
         return if (varInt) {
             val (raw, bytesRead) = BitPacking.decodeVarLong(input, position)
             position += bytesRead
-            if (varUInt) BitPacking.zigZagDecodeLong(raw) else raw
+            if (zigZag) BitPacking.zigZagDecodeLong(raw) else raw
         } else {
             readLongPos()
         }
@@ -262,14 +269,16 @@ class BitPackedDecoder(
     ): T {
         currentIndex = index
 
-        val kind = deserializer.descriptor.kind
-        if (kind is StructureKind.CLASS ||
-            kind is StructureKind.OBJECT ||
-            kind is StructureKind.LIST ||
-            kind is StructureKind.MAP ||
-            kind is PolymorphicKind
-        ) {
-            error("Nested objects/collections are not supported")
+        if (!deserializer.descriptor.isInline) {
+            val kind = deserializer.descriptor.kind
+            if (kind is StructureKind.CLASS ||
+                kind is StructureKind.OBJECT ||
+                kind is StructureKind.LIST ||
+                kind is StructureKind.MAP ||
+                kind is PolymorphicKind
+            ) {
+                error("Nested objects/collections are not supported")
+            }
         }
 
         val value = deserializer.deserialize(this)

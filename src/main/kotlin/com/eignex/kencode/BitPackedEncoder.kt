@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+import BitPacking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.*
@@ -123,7 +124,11 @@ class BitPackedEncoder(
 
     @ExperimentalSerializationApi
     override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) {
-        error("Enums are not supported in this format")
+        if (inStructure) {
+            BitPacking.writeVarInt(index, dataBuffer)
+        } else {
+            BitPacking.writeVarInt(index, output)
+        }
     }
 
     @ExperimentalSerializationApi
@@ -138,9 +143,6 @@ class BitPackedEncoder(
 
     @ExperimentalSerializationApi
     override fun encodeInline(descriptor: SerialDescriptor): Encoder {
-        if (!inStructure || currentIndex < 0) {
-            error("Top-level inline or inline outside element is not supported")
-        }
         return this
     }
 
@@ -184,11 +186,11 @@ class BitPackedEncoder(
         value: Int
     ) {
         val anns = descriptor.getElementAnnotations(index)
-        val varUInt = anns.hasVarUInt()
-        val varInt = anns.hasVarInt() || varUInt
+        val zigZag = anns.hasVarInt()
+        val varInt = anns.hasVarUInt() || zigZag
 
         if (varInt) {
-            val v = if (varUInt) BitPacking.zigZagEncodeInt(value) else value
+            val v = if (zigZag) BitPacking.zigZagEncodeInt(value) else value
             BitPacking.writeVarInt(v, dataBuffer)
         } else {
             BitPacking.writeInt(value, dataBuffer)
@@ -201,11 +203,11 @@ class BitPackedEncoder(
         value: Long
     ) {
         val anns = descriptor.getElementAnnotations(index)
-        val varUInt = anns.hasVarUInt()
-        val varInt = anns.hasVarInt() || varUInt
+        val zigZag = anns.hasVarInt()
+        val varInt = anns.hasVarUInt() || zigZag
 
         if (varInt) {
-            val v = if (varUInt) BitPacking.zigZagEncodeLong(value) else value
+            val v = if (zigZag) BitPacking.zigZagEncodeLong(value) else value
             BitPacking.writeVarLong(v, dataBuffer)
         } else {
             BitPacking.writeLong(value, dataBuffer)
@@ -241,7 +243,10 @@ class BitPackedEncoder(
         index: Int,
         value: Float
     ) {
-        BitPacking.writeInt(java.lang.Float.floatToRawIntBits(value), dataBuffer)
+        BitPacking.writeInt(
+            java.lang.Float.floatToRawIntBits(value),
+            dataBuffer
+        )
     }
 
     override fun encodeDoubleElement(
@@ -249,7 +254,10 @@ class BitPackedEncoder(
         index: Int,
         value: Double
     ) {
-        BitPacking.writeLong(java.lang.Double.doubleToRawLongBits(value), dataBuffer)
+        BitPacking.writeLong(
+            java.lang.Double.doubleToRawLongBits(value),
+            dataBuffer
+        )
     }
 
     override fun encodeStringElement(
@@ -279,14 +287,16 @@ class BitPackedEncoder(
     ) {
         currentIndex = index
 
-        val kind = serializer.descriptor.kind
-        if (kind is StructureKind.CLASS ||
-            kind is StructureKind.OBJECT ||
-            kind is StructureKind.LIST ||
-            kind is StructureKind.MAP ||
-            kind is PolymorphicKind
-        ) {
-            error("Nested objects/collections are not supported")
+        if (!serializer.descriptor.isInline) {
+            val kind = serializer.descriptor.kind
+            if (kind is StructureKind.CLASS ||
+                kind is StructureKind.OBJECT ||
+                kind is StructureKind.LIST ||
+                kind is StructureKind.MAP ||
+                kind is PolymorphicKind
+            ) {
+                error("Nested objects/collections are not supported")
+            }
         }
 
         serializer.serialize(this, value)

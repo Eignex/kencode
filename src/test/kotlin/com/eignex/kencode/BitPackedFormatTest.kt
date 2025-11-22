@@ -3,6 +3,7 @@ package com.eignex.kencode
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlinx.serialization.Serializable
 
 class BitPackedFormatRoundtripTest {
 
