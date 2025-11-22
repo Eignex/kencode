@@ -24,6 +24,9 @@ class BitPackedEncoder(
     private var booleanIndices: IntArray = intArrayOf()
     private lateinit var booleanValues: BooleanArray
 
+    private var nullableIndices: IntArray = intArrayOf()
+    private lateinit var nullValues: BooleanArray
+
     // Buffer for non-boolean field data (for structures)
     private val dataBuffer = ByteArrayOutputStream()
 
@@ -34,9 +37,14 @@ class BitPackedEncoder(
 
         val boolIdx = (0 until descriptor.elementsCount)
             .filter { descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN }
-
         booleanIndices = boolIdx.toIntArray()
         booleanValues = BooleanArray(booleanIndices.size)
+
+        val nullableIdx = (0 until descriptor.elementsCount)
+            .filter { descriptor.getElementDescriptor(it).isNullable }
+        nullableIndices = nullableIdx.toIntArray()
+        nullValues = BooleanArray(nullableIndices.size)
+
         dataBuffer.reset()
 
         return this
@@ -133,12 +141,12 @@ class BitPackedEncoder(
 
     @ExperimentalSerializationApi
     override fun encodeNull() {
-        error("Null is not supported in this format")
+        error("Null is not supported as a standalone value in this format")
     }
 
     @ExperimentalSerializationApi
     override fun encodeNotNullMark() {
-        // null not supported
+        // null not supported as standalone; element nullability is handled via flags
     }
 
     @ExperimentalSerializationApi
@@ -149,12 +157,23 @@ class BitPackedEncoder(
     override fun endStructure(descriptor: SerialDescriptor) {
         check(inStructure && descriptor == currentDescriptor)
 
-        val flagsInt =
-            if (booleanIndices.isEmpty()) 0
-            else BitPacking.packFlagsToInt(*booleanValues)
+        val totalFlagsCount = booleanValues.size + nullValues.size
+        val flagsLong =
+            if (totalFlagsCount == 0) {
+                0
+            } else {
+                val combined = BooleanArray(totalFlagsCount)
+                if (booleanValues.isNotEmpty()) {
+                    booleanValues.copyInto(combined, 0)
+                }
+                if (nullValues.isNotEmpty()) {
+                    nullValues.copyInto(combined, booleanValues.size)
+                }
+                BitPacking.packFlagsToLong(*combined)
+            }
 
         // Write varint flags directly into final output
-        BitPacking.writeVarInt(flagsInt, output)
+        BitPacking.writeVarLong(flagsLong, output)
 
         // Then write the accumulated non-boolean field data
         output.write(dataBuffer.toByteArray())
@@ -162,11 +181,19 @@ class BitPackedEncoder(
         inStructure = false
         currentIndex = -1
         booleanIndices = intArrayOf()
+        nullableIndices = intArrayOf()
     }
 
     private fun booleanPos(index: Int): Int {
         for (i in booleanIndices.indices) {
             if (booleanIndices[i] == index) return i
+        }
+        return -1
+    }
+
+    private fun nullablePos(index: Int): Int {
+        for (i in nullableIndices.indices) {
+            if (nullableIndices[i] == index) return i
         }
         return -1
     }
@@ -177,6 +204,7 @@ class BitPackedEncoder(
         value: Boolean
     ) {
         val pos = booleanPos(index)
+        if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
     }
 
@@ -310,8 +338,16 @@ class BitPackedEncoder(
         serializer: SerializationStrategy<T>,
         value: T?
     ) {
+        val pos = nullablePos(index)
         if (value == null) {
-            error("Null values are not supported in this format")
+            if (pos == -1) error("Element $index is not declared nullable in descriptor")
+            nullValues[pos] = true
+            // No payload written
+            return
+        }
+
+        if (pos != -1) {
+            nullValues[pos] = false
         }
         encodeSerializableElement(descriptor, index, serializer, value)
     }

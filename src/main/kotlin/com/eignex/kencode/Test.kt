@@ -19,10 +19,8 @@ enum class PayloadType {
 }
 
 fun main() {
-    val bytes = BitPackedFormat.encodeToByteArray(
-        Payload(
-            123u, -2, true, false, true, PayloadType.TYPE1
-        )
+    val bytes = BitPackedFormat.encodeToByteArray<Payload?>(
+       null
     )
     println(bytes.size)
     println(BitPackedFormat.decodeFromByteArray<Payload>(bytes))

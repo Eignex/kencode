@@ -2,18 +2,18 @@ import java.io.ByteArrayOutputStream
 
 object BitPacking {
     // flags -> int/long
-    fun packFlagsToInt(vararg flags: Boolean): Int {
-        var result = 0
+    fun packFlagsToLong(vararg flags: Boolean): Long {
+        var result = 0L
         for (i in flags.indices) {
-            if (flags[i]) result = result or (1 shl i)
+            if (flags[i]) result = result or (1L shl i)
         }
         return result
     }
 
-    fun unpackFlagsFromInt(bits: Int, count: Int): BooleanArray {
+    fun unpackFlagsFromLong(bits: Long, count: Int): BooleanArray {
         val result = BooleanArray(count)
         for (i in 0 until count) {
-            result[i] = (bits and (1 shl i)) != 0
+            result[i] = (bits and (1L shl i)) != 0L
         }
         return result
     }

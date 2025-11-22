@@ -24,6 +24,9 @@ class BitPackedDecoder(
     private var booleanIndices: IntArray = intArrayOf()
     private lateinit var booleanValues: BooleanArray
 
+    private var nullableIndices: IntArray = intArrayOf()
+    private lateinit var nullValues: BooleanArray
+
     override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
         if (inStructure) error("Nested objects are not supported")
         inStructure = true
@@ -33,10 +36,30 @@ class BitPackedDecoder(
             .filter { descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN }
         booleanIndices = boolIdx.toIntArray()
 
-        val (flagsInt, bytesRead) = BitPacking.decodeVarInt(input, position)
+        val nullableIdx = (0 until descriptor.elementsCount)
+            .filter { descriptor.getElementDescriptor(it).isNullable }
+        nullableIndices = nullableIdx.toIntArray()
+
+        val (flagsLong, bytesRead) = BitPacking.decodeVarLong(input, position)
         position += bytesRead
-        booleanValues =
-            BitPacking.unpackFlagsFromInt(flagsInt, booleanIndices.size)
+
+        val totalFlags = booleanIndices.size + nullableIndices.size
+        if (totalFlags == 0) {
+            booleanValues = BooleanArray(0)
+            nullValues = BooleanArray(0)
+        } else {
+            val allFlags = BitPacking.unpackFlagsFromLong(flagsLong, totalFlags)
+            booleanValues = if (booleanIndices.isEmpty()) {
+                BooleanArray(0)
+            } else {
+                allFlags.copyOfRange(0, booleanIndices.size)
+            }
+            nullValues = if (nullableIndices.isEmpty()) {
+                BooleanArray(0)
+            } else {
+                allFlags.copyOfRange(booleanIndices.size, totalFlags)
+            }
+        }
 
         return this
     }
@@ -119,26 +142,24 @@ class BitPackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeEnum(enumDescriptor: SerialDescriptor): Int {
-        return if (inStructure) {
-            val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
-            position += bytesRead
-            v
-        } else {
-            val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
-            position += bytesRead
-            v
-        }
+        val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
+        position += bytesRead
+        return v
     }
 
     @ExperimentalSerializationApi
     override fun decodeNull(): Nothing {
-        error("Null is not supported in this format")
+        error("Null is not supported as a standalone value in this format")
     }
 
     @ExperimentalSerializationApi
     override fun decodeNotNullMark(): Boolean {
-        // Nullable not supported; always treat as non-null (caller then fails if expecting null).
-        return true
+        if (!inStructure) return true
+        val idx = currentIndex
+        if (idx < 0) return true
+        val pos = nullablePos(idx)
+        if (pos == -1) return true
+        return !nullValues[pos]
     }
 
     @ExperimentalSerializationApi
@@ -150,6 +171,7 @@ class BitPackedDecoder(
         inStructure = false
         currentIndex = -1
         booleanIndices = intArrayOf()
+        nullableIndices = intArrayOf()
     }
 
     override fun decodeSequentially(): Boolean = true
@@ -164,11 +186,19 @@ class BitPackedDecoder(
         return -1
     }
 
+    private fun nullablePos(index: Int): Int {
+        for (i in nullableIndices.indices) {
+            if (nullableIndices[i] == index) return i
+        }
+        return -1
+    }
+
     override fun decodeBooleanElement(
         descriptor: SerialDescriptor,
         index: Int
     ): Boolean {
         val pos = booleanPos(index)
+        if (pos == -1) error("Element $index is not a boolean")
         return booleanValues[pos]
     }
 
@@ -292,8 +322,25 @@ class BitPackedDecoder(
         index: Int,
         deserializer: DeserializationStrategy<T?>,
         previousValue: T?
-    ): T {
-        error("Nullable elements are not supported in this format")
+    ): T? {
+        val pos = nullablePos(index)
+        if (pos == -1) {
+            // Not declared nullable; treat as non-null
+            currentIndex = index
+            val value = deserializer.deserialize(this)
+            currentIndex = -1
+            return value
+        }
+
+        if (nullValues[pos]) {
+            // Is null, no payload
+            return null
+        }
+
+        currentIndex = index
+        val value = deserializer.deserialize(this)
+        currentIndex = -1
+        return value
     }
 
     private fun readShortPos(): Short {
