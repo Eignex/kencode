@@ -107,6 +107,7 @@ object BitPacking {
         var shift = 0
         var pos = offset
         while (true) {
+            if (pos >= input.size) error("Unexpected EOF while decoding VarInt")
             val b = input[pos++].toInt() and 0xFF
             result = result or ((b and 0x7F) shl shift)
             if (b and 0x80 == 0) {
@@ -122,6 +123,7 @@ object BitPacking {
         var shift = 0
         var pos = offset
         while (true) {
+            if (pos >= input.size) error("Unexpected EOF while decoding VarLong")
             val b = input[pos++].toInt() and 0xFF
             result = result or ((b and 0x7F).toLong() shl shift)
             if (b and 0x80 == 0) {
