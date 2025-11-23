@@ -78,10 +78,6 @@ open class BaseN(
     private val zeroChar: Char
         get() = charFromIndex(0)
 
-    // ------------------------------------------------------------
-    // Chunk length tables
-    // ------------------------------------------------------------
-
     /**
      * Encoded lengths for input chunks of size 1..[chunkSize].
      *
@@ -128,10 +124,6 @@ open class BaseN(
 
     private fun decodedBytesForLength(encodedLength: Int): Int =
         invLengths[encodedLength - 1]
-
-    // ------------------------------------------------------------
-    // Public API: byte array encode/decode
-    // ------------------------------------------------------------
 
     /**
      * Encode the given [input] byte array range into a base-[alphabetSize] string.
