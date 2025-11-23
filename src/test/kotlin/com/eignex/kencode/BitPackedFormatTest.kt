@@ -1,190 +1,292 @@
 package com.eignex.kencode
 
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
-class BitPackedFormatRoundtripTest {
+class BitPackedFormatTest {
 
-    @Test
-    fun encode_decode_top_level_int_big_endian() {
-        val out = java.io.ByteArrayOutputStream()
-        val encoder = BitPackedEncoder(out)
-
-        // Not in structure -> fixed-width int
-        encoder.encodeInt(0x01020304)
-        val bytes = out.toByteArray()
-
-        assertContentEquals(
-            byteArrayOf(0x01, 0x02, 0x03, 0x04),
-            bytes
-        )
-
-        val decoder = BitPackedDecoder(bytes)
-        val decoded = decoder.decodeInt()
-        assertEquals(0x01020304, decoded)
-    }
-
-    @Test
-    fun encode_decode_top_level_boolean_and_string() {
-        val out = java.io.ByteArrayOutputStream()
-        val encoder = BitPackedEncoder(out)
-
-        encoder.encodeBoolean(true)
-        encoder.encodeBoolean(false)
-        encoder.encodeString("Hi")
-
-        val bytes = out.toByteArray()
-        val decoder = BitPackedDecoder(bytes)
-
-        val b1 = decoder.decodeBoolean()
-        val b2 = decoder.decodeBoolean()
-        val s = decoder.decodeString()
-
-        assertEquals(true, b1)
-        assertEquals(false, b2)
-        assertEquals("Hi", s)
-    }
+    // ---------- Test models ----------
 
     @Serializable
-    data class PayloadSimple(
+    data class SimpleIntsAndBooleans(
         val id: Int,
         val score: Int,
         val active: Boolean,
-        val deleted: Boolean,
-        val title: String
+        val deleted: Boolean
     )
 
     @Serializable
-    data class PayloadBooleansOnly(
-        val a: Boolean,
-        val b: Boolean,
-        val c: Boolean,
-        val d: Boolean
+    data class AllPrimitiveTypes(
+        val intVal: Int,
+        val longVal: Long,
+        val shortVal: Short,
+        val byteVal: Byte,
+        val floatVal: Float,
+        val doubleVal: Double,
+        val charVal: Char,
+        val boolVal: Boolean,
+        val stringVal: String
     )
 
     @Serializable
-    data class PayloadNoBooleans(
+    data class NoBooleansNoNulls(
         val x: Int,
         val y: Long,
         val msg: String
     )
 
+    enum class Status {
+        NEW,
+        IN_PROGRESS,
+        DONE
+    }
+
+    @Serializable
+    data class EnumPayload(
+        val id: Int,
+        val status: Status,
+        val secondaryStatus: Status?
+    )
+
+    @Serializable
+    data class NullableFieldsPayload(
+        val maybeId: Int?,
+        val maybeName: String?,
+        val maybeScore: Long?,
+        val maybeFlag: Boolean?
+    )
+
+    @Serializable
+    data class NullableBooleansAndNonBooleans(
+        val flag1: Boolean?,
+        val flag2: Boolean,
+        val flag3: Boolean?,
+        val count: Int?,
+        val label: String
+    )
+
+    @Serializable
+    data class StringHeavyPayload(
+        val a: String,
+        val b: String,
+        val c: String,
+        val d: String?
+    )
+
+    // ---------- Generic helper ----------
+
+    private fun <T> roundtrip(
+        serializer: KSerializer<T>,
+        value: T
+    ) {
+        val bytes = BitPackedFormat.encodeToByteArray(serializer, value)
+        val decoded = BitPackedFormat.decodeFromByteArray(serializer, bytes)
+        assertEquals(value, decoded)
+    }
+
+    // ---------- Tests (one per model) ----------
+
     @Test
-    fun roundtrip_simple_payload() {
-        val payload = PayloadSimple(
-            id = 123,
-            score = 456,
-            active = true,
-            deleted = false,
-            title = "Hello"
+    fun `simple ints and booleans roundtrip`() {
+        val serializer = SimpleIntsAndBooleans.serializer()
+        val cases = listOf(
+            SimpleIntsAndBooleans(
+                id = 1,
+                score = 100,
+                active = true,
+                deleted = false
+            ),
+            SimpleIntsAndBooleans(
+                id = Int.MAX_VALUE,
+                score = Int.MIN_VALUE,
+                active = false,
+                deleted = true
+            ),
+            SimpleIntsAndBooleans(
+                id = 0,
+                score = 0,
+                active = false,
+                deleted = false
+            )
         )
 
-        val bytes = BitPackedFormat.encodeToByteArray(
-            PayloadSimple.serializer(),
-            payload
-        )
-
-        val decoded = BitPackedFormat.decodeFromByteArray(
-            PayloadSimple.serializer(),
-            bytes
-        )
-
-        assertEquals(payload, decoded)
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
     }
 
     @Test
-    fun roundtrip_booleans_only_payload() {
-        val payload = PayloadBooleansOnly(
-            a = true,
-            b = false,
-            c = true,
-            d = true
+    fun `all primitive types roundtrip`() {
+        val serializer = AllPrimitiveTypes.serializer()
+        val cases = listOf(
+            AllPrimitiveTypes(
+                intVal = 123,
+                longVal = 456L,
+                shortVal = 7,
+                byteVal = 8,
+                floatVal = 3.5f,
+                doubleVal = 2.75,
+                charVal = 'A',
+                boolVal = true,
+                stringVal = "Hello"
+            ),
+            AllPrimitiveTypes(
+                intVal = Int.MIN_VALUE,
+                longVal = Long.MAX_VALUE,
+                shortVal = Short.MIN_VALUE,
+                byteVal = Byte.MAX_VALUE,
+                floatVal = -1.0f,
+                doubleVal = 1.0,
+                charVal = 'Ω',
+                boolVal = false,
+                stringVal = "Unicode ✓ and longer text"
+            )
         )
 
-        val bytes = BitPackedFormat.encodeToByteArray(
-            PayloadBooleansOnly.serializer(),
-            payload
-        )
-
-        val decoded = BitPackedFormat.decodeFromByteArray(
-            PayloadBooleansOnly.serializer(),
-            bytes
-        )
-
-        assertEquals(payload, decoded)
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
     }
 
     @Test
-    fun roundtrip_payload_without_booleans() {
-        val payload = PayloadNoBooleans(
-            x = 42,
-            y = 123456789L,
-            msg = "No flags here"
+    fun `no booleans and no nulls roundtrip`() {
+        val serializer = NoBooleansNoNulls.serializer()
+        val cases = listOf(
+            NoBooleansNoNulls(
+                x = 42,
+                y = 123_456_789L,
+                msg = "No flags here"
+            ),
+            NoBooleansNoNulls(
+                x = -1,
+                y = Long.MIN_VALUE,
+                msg = ""
+            )
         )
 
-        val bytes = BitPackedFormat.encodeToByteArray(
-            PayloadNoBooleans.serializer(),
-            payload
-        )
-
-        val decoded = BitPackedFormat.decodeFromByteArray(
-            PayloadNoBooleans.serializer(),
-            bytes
-        )
-
-        assertEquals(payload, decoded)
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
     }
 
     @Test
-    fun roundtrip_float_and_double() {
-        @Serializable
-        data class FloatDoublePayload(
-            val f: Float,
-            val d: Double,
-            val ok: Boolean
+    fun `enum payload roundtrip`() {
+        val serializer = EnumPayload.serializer()
+        val cases = listOf(
+            EnumPayload(
+                id = 1,
+                status = Status.NEW,
+                secondaryStatus = null
+            ),
+            EnumPayload(
+                id = 2,
+                status = Status.IN_PROGRESS,
+                secondaryStatus = Status.DONE
+            ),
+            EnumPayload(
+                id = 3,
+                status = Status.DONE,
+                secondaryStatus = Status.NEW
+            )
         )
 
-        val payload = FloatDoublePayload(
-            f = 3.14159f,
-            d = 2.718281828,
-            ok = true
-        )
-
-        val bytes = BitPackedFormat.encodeToByteArray(
-            FloatDoublePayload.serializer(),
-            payload
-        )
-
-        val decoded = BitPackedFormat.decodeFromByteArray(
-            FloatDoublePayload.serializer(),
-            bytes
-        )
-
-        // Floating-point equality is acceptable here because it's raw bits roundtrip
-        assertEquals(payload, decoded)
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
     }
 
     @Test
-    fun manual_encoder_decoder_roundtrip_for_payload() {
-        val payload = PayloadSimple(
-            id = 999,
-            score = -1,     // still fixed-width; no zigzag/varint here
-            active = true,
-            deleted = true,
-            title = "Manual"
+    fun `nullable fields payload roundtrip`() {
+        val serializer = NullableFieldsPayload.serializer()
+        val cases = listOf(
+            NullableFieldsPayload(
+                maybeId = null,
+                maybeName = null,
+                maybeScore = null,
+                maybeFlag = null
+            ),
+            NullableFieldsPayload(
+                maybeId = 10,
+                maybeName = "Alice",
+                maybeScore = 999L,
+                maybeFlag = true
+            ),
+            NullableFieldsPayload(
+                maybeId = -5,
+                maybeName = "",
+                maybeScore = null,
+                maybeFlag = false
+            )
         )
 
-        val out = java.io.ByteArrayOutputStream()
-        val encoder = BitPackedEncoder(out)
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
+    }
 
-        encoder.encodeSerializableValue(PayloadSimple.serializer(), payload)
-        val bytes = out.toByteArray()
+    @Test
+    fun `nullable booleans and non booleans roundtrip`() {
+        val serializer = NullableBooleansAndNonBooleans.serializer()
+        val cases = listOf(
+            // All nullable booleans are null, flag2 false
+            NullableBooleansAndNonBooleans(
+                flag1 = null,
+                flag2 = false,
+                flag3 = null,
+                count = null,
+                label = "all-null-bools"
+            ),
+            // Mixed values, including true/false and non-null count
+            NullableBooleansAndNonBooleans(
+                flag1 = true,
+                flag2 = true,
+                flag3 = false,
+                count = 123,
+                label = "mixed"
+            ),
+            // Another combination to exercise flag positions
+            NullableBooleansAndNonBooleans(
+                flag1 = false,
+                flag2 = true,
+                flag3 = null,
+                count = -1,
+                label = "different"
+            )
+        )
 
-        val decoder = BitPackedDecoder(bytes)
-        val decoded = decoder.decodeSerializableValue(PayloadSimple.serializer())
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
+    }
 
-        assertEquals(payload, decoded)
+    @Test
+    fun `string heavy payload roundtrip`() {
+        val serializer = StringHeavyPayload.serializer()
+        val cases = listOf(
+            StringHeavyPayload(
+                a = "",
+                b = "",
+                c = "",
+                d = null
+            ),
+            StringHeavyPayload(
+                a = "short",
+                b = "a bit longer string",
+                c = "even longer string with unicode ✓✓✓",
+                d = "nullable-but-present"
+            ),
+            StringHeavyPayload(
+                a = "line1\nline2\nline3",
+                b = "with\ttabs\tand\tspaces",
+                c = "JSON-like: {\"k\":\"v\"}",
+                d = ""
+            )
+        )
+
+        for (value in cases) {
+            roundtrip(serializer, value)
+        }
     }
 }
