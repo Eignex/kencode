@@ -148,13 +148,22 @@ class BitPackedDecoder(
     }
 
     @ExperimentalSerializationApi
-    override fun decodeNull(): Nothing {
-        error("Null is not supported as a standalone value in this format")
+    override fun decodeNull(): Nothing? {
+        return null
     }
 
     @ExperimentalSerializationApi
     override fun decodeNotNullMark(): Boolean {
-        if (!inStructure) return true
+        if (!inStructure) {
+            // Standalone / top-level nullable value.
+            // We encode a single flagsLong here where:
+            // bit 0 = 1 -> null, bit 0 = 0 -> non-null.
+            val (flags, bytesRead) = BitPacking.decodeVarLong(input, position)
+            position += bytesRead
+            return (flags and 1L) == 0L
+        }
+
+        // Inside a structure, nullability is driven by the per-field nullValues bitmask.
         val idx = currentIndex
         if (idx < 0) return true
         val pos = nullablePos(idx)

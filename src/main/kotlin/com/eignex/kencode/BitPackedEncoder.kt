@@ -141,12 +141,19 @@ class BitPackedEncoder(
 
     @ExperimentalSerializationApi
     override fun encodeNull() {
-        error("Null is not supported as a standalone value in this format")
+        if (inStructure) {
+            error("encodeNull should not be used inside structures; nullable elements are encoded via the null bitmask")
+        } else {
+            BitPacking.writeVarLong(1L, output)
+        }
     }
 
     @ExperimentalSerializationApi
     override fun encodeNotNullMark() {
-        // null not supported as standalone; element nullability is handled via flags
+        if (!inStructure) {
+            BitPacking.writeVarLong(0L, output)
+        }
+        // Inside structures, nullability is handled via the per-field null bitmask; no-op here.
     }
 
     @ExperimentalSerializationApi
@@ -172,7 +179,7 @@ class BitPackedEncoder(
                 BitPacking.packFlagsToLong(*combined)
             }
 
-        // Write varint flags directly into final output
+        // Write varlong flags directly into final output
         BitPacking.writeVarLong(flagsLong, output)
 
         // Then write the accumulated non-boolean field data
