@@ -1,6 +1,5 @@
 package com.eignex.kencode
 
-import BitPacking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.*
@@ -11,7 +10,7 @@ import kotlinx.serialization.modules.SerializersModule
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalSerializationApi::class)
-class BitPackedEncoder(
+class PackedEncoder(
     private val output: ByteArrayOutputStream
 ) : Encoder, CompositeEncoder {
 
@@ -70,7 +69,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeShortElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeShort(value, output)
+            PackedUtils.writeShort(value, output)
         }
     }
 
@@ -78,7 +77,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeIntElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeInt(value, output)
+            PackedUtils.writeInt(value, output)
         }
     }
 
@@ -86,7 +85,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeLongElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeLong(value, output)
+            PackedUtils.writeLong(value, output)
         }
     }
 
@@ -94,7 +93,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeFloatElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeInt(
+            PackedUtils.writeInt(
                 java.lang.Float.floatToRawIntBits(value),
                 output
             )
@@ -105,7 +104,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeDoubleElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeLong(
+            PackedUtils.writeLong(
                 java.lang.Double.doubleToRawLongBits(value),
                 output
             )
@@ -116,7 +115,7 @@ class BitPackedEncoder(
         if (inStructure) {
             encodeCharElement(currentDescriptor, currentIndex, value)
         } else {
-            BitPacking.writeShort(value.code.toShort(), output)
+            writeUtf8Char(value, output)
         }
     }
 
@@ -125,7 +124,7 @@ class BitPackedEncoder(
             encodeStringElement(currentDescriptor, currentIndex, value)
         } else {
             val bytes = value.toByteArray(Charsets.UTF_8)
-            BitPacking.writeVarInt(bytes.size, output)
+            PackedUtils.writeVarInt(bytes.size, output)
             output.write(bytes)
         }
     }
@@ -133,9 +132,9 @@ class BitPackedEncoder(
     @ExperimentalSerializationApi
     override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) {
         if (inStructure) {
-            BitPacking.writeVarInt(index, dataBuffer)
+            PackedUtils.writeVarInt(index, dataBuffer)
         } else {
-            BitPacking.writeVarInt(index, output)
+            PackedUtils.writeVarInt(index, output)
         }
     }
 
@@ -144,14 +143,14 @@ class BitPackedEncoder(
         if (inStructure) {
             error("encodeNull should not be used inside structures; nullable elements are encoded via the null bitmask")
         } else {
-            BitPacking.writeVarLong(1L, output)
+            PackedUtils.writeVarLong(1L, output)
         }
     }
 
     @ExperimentalSerializationApi
     override fun encodeNotNullMark() {
         if (!inStructure) {
-            BitPacking.writeVarLong(0L, output)
+            PackedUtils.writeVarLong(0L, output)
         }
         // Inside structures, nullability is handled via the per-field null bitmask; no-op here.
     }
@@ -176,11 +175,11 @@ class BitPackedEncoder(
                 if (nullValues.isNotEmpty()) {
                     nullValues.copyInto(combined, booleanValues.size)
                 }
-                BitPacking.packFlagsToLong(*combined)
+                PackedUtils.packFlagsToLong(*combined)
             }
 
         // Write varlong flags directly into final output
-        BitPacking.writeVarLong(flagsLong, output)
+        PackedUtils.writeVarLong(flagsLong, output)
 
         // Then write the accumulated non-boolean field data
         output.write(dataBuffer.toByteArray())
@@ -225,10 +224,10 @@ class BitPackedEncoder(
         val varInt = anns.hasVarUInt() || zigZag
 
         if (varInt) {
-            val v = if (zigZag) BitPacking.zigZagEncodeInt(value) else value
-            BitPacking.writeVarInt(v, dataBuffer)
+            val v = if (zigZag) PackedUtils.zigZagEncodeInt(value) else value
+            PackedUtils.writeVarInt(v, dataBuffer)
         } else {
-            BitPacking.writeInt(value, dataBuffer)
+            PackedUtils.writeInt(value, dataBuffer)
         }
     }
 
@@ -242,10 +241,10 @@ class BitPackedEncoder(
         val varInt = anns.hasVarUInt() || zigZag
 
         if (varInt) {
-            val v = if (zigZag) BitPacking.zigZagEncodeLong(value) else value
-            BitPacking.writeVarLong(v, dataBuffer)
+            val v = if (zigZag) PackedUtils.zigZagEncodeLong(value) else value
+            PackedUtils.writeVarLong(v, dataBuffer)
         } else {
-            BitPacking.writeLong(value, dataBuffer)
+            PackedUtils.writeLong(value, dataBuffer)
         }
     }
 
@@ -262,7 +261,7 @@ class BitPackedEncoder(
         index: Int,
         value: Short
     ) {
-        BitPacking.writeShort(value, dataBuffer)
+        PackedUtils.writeShort(value, dataBuffer)
     }
 
     override fun encodeCharElement(
@@ -270,7 +269,7 @@ class BitPackedEncoder(
         index: Int,
         value: Char
     ) {
-        BitPacking.writeShort(value.code.toShort(), dataBuffer)
+        writeUtf8Char(value, dataBuffer)
     }
 
     override fun encodeFloatElement(
@@ -278,7 +277,7 @@ class BitPackedEncoder(
         index: Int,
         value: Float
     ) {
-        BitPacking.writeInt(
+        PackedUtils.writeInt(
             java.lang.Float.floatToRawIntBits(value),
             dataBuffer
         )
@@ -289,7 +288,7 @@ class BitPackedEncoder(
         index: Int,
         value: Double
     ) {
-        BitPacking.writeLong(
+        PackedUtils.writeLong(
             java.lang.Double.doubleToRawLongBits(value),
             dataBuffer
         )
@@ -301,7 +300,7 @@ class BitPackedEncoder(
         value: String
     ) {
         val bytes = value.toByteArray(Charsets.UTF_8)
-        BitPacking.writeVarInt(bytes.size, dataBuffer)
+        PackedUtils.writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
 
@@ -357,5 +356,10 @@ class BitPackedEncoder(
             nullValues[pos] = false
         }
         encodeSerializableElement(descriptor, index, serializer, value)
+    }
+
+    private fun writeUtf8Char(value: Char, out: ByteArrayOutputStream) {
+        val bytes = value.toString().toByteArray(Charsets.UTF_8)
+        out.write(bytes)
     }
 }

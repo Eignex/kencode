@@ -1,12 +1,12 @@
-import com.eignex.kencode.BitPackedDecoder
-import com.eignex.kencode.BitPackedEncoder
+import com.eignex.kencode.PackedDecoder
+import com.eignex.kencode.PackedEncoder
 import kotlinx.serialization.*
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalSerializationApi::class)
-object BitPackedFormat : BinaryFormat {
+object PackedFormat : BinaryFormat {
 
     override val serializersModule: SerializersModule = EmptySerializersModule()
 
@@ -15,7 +15,7 @@ object BitPackedFormat : BinaryFormat {
         value: T
     ): ByteArray {
         val out = ByteArrayOutputStream()
-        val encoder = BitPackedEncoder(out)
+        val encoder = PackedEncoder(out)
         encoder.encodeSerializableValue(serializer, value)
         return out.toByteArray()
     }
@@ -24,7 +24,7 @@ object BitPackedFormat : BinaryFormat {
         deserializer: DeserializationStrategy<T>,
         bytes: ByteArray
     ): T {
-        val decoder = BitPackedDecoder(bytes)
+        val decoder = PackedDecoder(bytes)
         return decoder.decodeSerializableValue(deserializer)
     }
 }

@@ -1,6 +1,5 @@
 package com.eignex.kencode
 
-import BitPacking
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
@@ -10,7 +9,7 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
 @OptIn(ExperimentalSerializationApi::class)
-class BitPackedDecoder(
+class PackedDecoder(
     private val input: ByteArray
 ) : Decoder, CompositeDecoder {
 
@@ -40,7 +39,7 @@ class BitPackedDecoder(
             .filter { descriptor.getElementDescriptor(it).isNullable }
         nullableIndices = nullableIdx.toIntArray()
 
-        val (flagsLong, bytesRead) = BitPacking.decodeVarLong(input, position)
+        val (flagsLong, bytesRead) = PackedUtils.decodeVarLong(input, position)
         position += bytesRead
 
         val totalFlags = booleanIndices.size + nullableIndices.size
@@ -48,7 +47,7 @@ class BitPackedDecoder(
             booleanValues = BooleanArray(0)
             nullValues = BooleanArray(0)
         } else {
-            val allFlags = BitPacking.unpackFlagsFromLong(flagsLong, totalFlags)
+            val allFlags = PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
             booleanValues = if (booleanIndices.isEmpty()) {
                 BooleanArray(0)
             } else {
@@ -124,7 +123,7 @@ class BitPackedDecoder(
         return if (inStructure) {
             decodeCharElement(currentDescriptor, currentIndex)
         } else {
-            readShortPos().toInt().toChar()
+            readUtf8Char()
         }
     }
 
@@ -132,7 +131,7 @@ class BitPackedDecoder(
         return if (inStructure) {
             decodeStringElement(currentDescriptor, currentIndex)
         } else {
-            val (len, bytesRead) = BitPacking.decodeVarInt(input, position)
+            val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
             position += bytesRead
             val bytes = input.copyOfRange(position, position + len)
             position += len
@@ -142,7 +141,7 @@ class BitPackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeEnum(enumDescriptor: SerialDescriptor): Int {
-        val (v, bytesRead) = BitPacking.decodeVarInt(input, position)
+        val (v, bytesRead) = PackedUtils.decodeVarInt(input, position)
         position += bytesRead
         return v
     }
@@ -158,7 +157,7 @@ class BitPackedDecoder(
             // Standalone / top-level nullable value.
             // We encode a single flagsLong here where:
             // bit 0 = 1 -> null, bit 0 = 0 -> non-null.
-            val (flags, bytesRead) = BitPacking.decodeVarLong(input, position)
+            val (flags, bytesRead) = PackedUtils.decodeVarLong(input, position)
             position += bytesRead
             return (flags and 1L) == 0L
         }
@@ -220,9 +219,9 @@ class BitPackedDecoder(
         val varInt = anns.hasVarUInt() || zigZag
 
         return if (varInt) {
-            val (raw, bytesRead) = BitPacking.decodeVarInt(input, position)
+            val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
             position += bytesRead
-            if (zigZag) BitPacking.zigZagDecodeInt(raw) else raw
+            if (zigZag) PackedUtils.zigZagDecodeInt(raw) else raw
         } else {
             readIntPos()
         }
@@ -237,9 +236,9 @@ class BitPackedDecoder(
         val varInt = anns.hasVarUInt() || zigZag
 
         return if (varInt) {
-            val (raw, bytesRead) = BitPacking.decodeVarLong(input, position)
+            val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
             position += bytesRead
-            if (zigZag) BitPacking.zigZagDecodeLong(raw) else raw
+            if (zigZag) PackedUtils.zigZagDecodeLong(raw) else raw
         } else {
             readLongPos()
         }
@@ -263,7 +262,7 @@ class BitPackedDecoder(
         descriptor: SerialDescriptor,
         index: Int
     ): Char {
-        return readShortPos().toInt().toChar()
+        return readUtf8Char()
     }
 
     override fun decodeFloatElement(
@@ -284,7 +283,7 @@ class BitPackedDecoder(
         descriptor: SerialDescriptor,
         index: Int
     ): String {
-        val (len, bytesRead) = BitPacking.decodeVarInt(input, position)
+        val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
         position += bytesRead
         val bytes = input.copyOfRange(position, position + len)
         position += len
@@ -353,20 +352,75 @@ class BitPackedDecoder(
     }
 
     private fun readShortPos(): Short {
-        return BitPacking.readShort(input, position).also {
+        return PackedUtils.readShort(input, position).also {
             position += 2
         }
     }
 
     private fun readIntPos(): Int {
-        return BitPacking.readInt(input, position).also {
+        return PackedUtils.readInt(input, position).also {
             position += 4
         }
     }
 
     private fun readLongPos(): Long {
-        return BitPacking.readLong(input, position).also {
+        return PackedUtils.readLong(input, position).also {
             position += 8
         }
     }
+
+
+    private fun readUtf8Char(): Char {
+        if (position >= input.size) {
+            error("Unexpected EOF while decoding UTF-8 char")
+        }
+
+        val b0 = input[position].toInt() and 0xFF
+
+        val (len, cp) = when {
+            // 1-byte: 0xxxxxxx
+            (b0 and 0b1000_0000) == 0 -> {
+                1 to b0
+            }
+
+            // 2-byte: 110xxxxx 10xxxxxx
+            (b0 and 0b1110_0000) == 0b1100_0000 -> {
+                if (position + 2 > input.size) error("Unexpected EOF in 2-byte UTF-8 char")
+                val b1 = input[position + 1].toInt() and 0xFF
+                if ((b1 and 0b1100_0000) != 0b1000_0000) {
+                    error("Invalid UTF-8 continuation byte: 0x${b1.toString(16)}")
+                }
+                val codePoint =
+                    ((b0 and 0b0001_1111) shl 6) or
+                            (b1 and 0b0011_1111)
+                2 to codePoint
+            }
+
+            // 3-byte: 1110xxxx 10xxxxxx 10xxxxxx
+            (b0 and 0b1111_0000) == 0b1110_0000 -> {
+                if (position + 3 > input.size) error("Unexpected EOF in 3-byte UTF-8 char")
+                val b1 = input[position + 1].toInt() and 0xFF
+                val b2 = input[position + 2].toInt() and 0xFF
+                if ((b1 and 0b1100_0000) != 0b1000_0000 ||
+                    (b2 and 0b1100_0000) != 0b1000_0000
+                ) {
+                    error("Invalid UTF-8 continuation byte in 3-byte char")
+                }
+                val codePoint =
+                    ((b0 and 0b0000_1111) shl 12) or
+                            ((b1 and 0b0011_1111) shl 6) or
+                            (b2 and 0b0011_1111)
+                3 to codePoint
+            }
+
+            else -> error("UTF-8 sequence too long for Char (leading byte: 0x${b0.toString(16)})")
+        }
+
+        position += len
+
+        // At this level we accept any 0..0xFFFF, including surrogate values,
+        // since Char is a UTF-16 code unit.
+        return cp.toChar()
+    }
+
 }
