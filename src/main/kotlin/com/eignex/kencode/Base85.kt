@@ -2,22 +2,13 @@ package com.eignex.kencode
 
 val ASCII85 =
     "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstu"
-val Z85 =
-    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#"
 
 /**
  * Generic Base85 encoder/decoder supporting both ASCII85 and ZeroMQ Z85.
  *
- * Modes:
- * - ASCII85:
- *   - 4 input bytes → 5 output chars.
- *   - Allows final partial group (1–3 bytes → 2–4 chars).
- *   - No 'z' compression, no <~ ~> delimiters.
- *
- * - Z85:
- *   - Input must be a multiple of 4 bytes.
- *   - Output always a multiple of 5 chars.
- *   - Uses the official Z85 alphabet.
+ *  - 4 input bytes → 5 output chars.
+ *  - Allows final partial group (1–3 bytes → 2–4 chars).
+ *  - No 'z' compression, no <~ ~> delimiters.
  *
  * Detection:
  * - Alphabet identity determines whether to use ASCII85 or Z85 rules.
@@ -26,21 +17,9 @@ val Z85 =
  */
 open class Base85(
     private val alphabet: CharArray
-) : ByteCodec {
+) : ByteEncoding {
 
-    companion object {
-        /**
-         * ASCII85-style codec using [ASCII85] alphabet.
-         */
-        val Ascii85: Base85 = Base85(ASCII85.toCharArray())
-
-        /**
-         * Z85 codec using [Z85] alphabet.
-         */
-        val Z85Codec: Base85 = Base85(Z85.toCharArray())
-
-        val Default = Ascii85
-    }
+    companion object Default : Base85(ASCII85.toCharArray())
 
     init {
         require(alphabet.size == 85) { "Base85 requires an alphabet of length 85" }
@@ -52,21 +31,8 @@ open class Base85(
         }
     }
 
-    // Heuristic: treat the exact provided Z85 alphabet as Z85 variant.
-    private val isZ85: Boolean = run {
-        if (alphabet.size != Z85.length) {
-            false
-        } else {
-            // Compare contents
-            val z = Z85.toCharArray()
-            alphabet.indices.all { alphabet[it] == z[it] }
-        }
-    }
-
     override fun encode(
-        input: ByteArray,
-        offset: Int,
-        length: Int
+        input: ByteArray, offset: Int, length: Int
     ): String {
         require(offset >= 0 && length >= 0 && offset + length <= input.size) {
             "Invalid offset/length for input of size ${input.size}"
@@ -78,108 +44,34 @@ open class Base85(
 
         var pos = offset
 
-        if (isZ85) {
-            // Z85: exact 4-byte groups, no partials.
-            require(length % 4 == 0) {
-                "Z85 encoding requires input length to be a multiple of 4 bytes"
+        while (pos < end) {
+            val remaining = end - pos
+            val chunkLen = if (remaining >= 4) 4 else remaining
+
+            var value = 0L
+            for (i in 0 until 4) {
+                val b =
+                    if (i < chunkLen) (input[pos + i].toInt() and 0xFF) else 0
+                value = (value shl 8) or (b.toLong() and 0xFFL)
+            }
+            pos += chunkLen
+
+            val tmp = CharArray(5)
+            for (i in 4 downTo 0) {
+                val digit = (value % 85L).toInt()
+                tmp[i] = alphabet[digit]
+                value /= 85L
             }
 
-            while (pos < end) {
-                var value = 0L
-                for (i in 0 until 4) {
-                    value = (value shl 8) or (input[pos + i].toLong() and 0xFFL)
-                }
-                pos += 4
-
-                val chunk = CharArray(5)
-                for (i in 4 downTo 0) {
-                    val digit = (value % 85L).toInt()
-                    chunk[i] = alphabet[digit]
-                    value /= 85L
-                }
-                out.append(chunk)
-            }
-        } else {
-            // ASCII85-style: allow partial final chunk.
-            while (pos < end) {
-                val remaining = end - pos
-                val chunkLen = if (remaining >= 4) 4 else remaining
-
-                var value = 0L
-                for (i in 0 until 4) {
-                    val b =
-                        if (i < chunkLen) (input[pos + i].toInt() and 0xFF) else 0
-                    value = (value shl 8) or (b.toLong() and 0xFFL)
-                }
-                pos += chunkLen
-
-                val tmp = CharArray(5)
-                for (i in 4 downTo 0) {
-                    val digit = (value % 85L).toInt()
-                    tmp[i] = alphabet[digit]
-                    value /= 85L
-                }
-
-                // Full chunk: 5 chars; partial chunk (1–3 bytes): (chunkLen + 1) chars
-                val outLen = if (chunkLen == 4) 5 else chunkLen + 1
-                out.append(tmp, 0, outLen)
-            }
+            // Full chunk: 5 chars; partial chunk (1–3 bytes): (chunkLen + 1) chars
+            val outLen = if (chunkLen == 4) 5 else chunkLen + 1
+            out.append(tmp, 0, outLen)
         }
 
         return out.toString()
     }
 
     override fun decode(input: CharSequence): ByteArray {
-        val len = input.length
-        if (len == 0) return ByteArray(0)
-
-        return if (isZ85) {
-            decodeZ85(input)
-        } else {
-            decodeAscii85(input)
-        }
-    }
-
-    // ------------------------------------------------------------
-    // Internal helpers
-    // ------------------------------------------------------------
-
-    private fun decodeChar(c: Char): Int {
-        val code = c.code
-        val value =
-            if (code < decodeTable.size) decodeTable[code] else -1
-        require(value >= 0) { "Invalid Base85 character: '$c'" }
-        return value
-    }
-
-    private fun decodeZ85(input: CharSequence): ByteArray {
-        val len = input.length
-        require(len % 5 == 0) { "Z85 input length must be a multiple of 5" }
-
-        val out = ByteArray(len / 5 * 4)
-        var inPos = 0
-        var outPos = 0
-
-        while (inPos < len) {
-            var value = 0L
-            repeat(5) {
-                val c = input[inPos++]
-                val digit = decodeChar(c)
-                value = value * 85L + digit
-            }
-
-            // Extract 4 bytes big-endian
-            for (i in 3 downTo 0) {
-                out[outPos + i] = (value and 0xFFL).toByte()
-                value = value shr 8
-            }
-            outPos += 4
-        }
-
-        return out
-    }
-
-    private fun decodeAscii85(input: CharSequence): ByteArray {
         val len = input.length
         if (len == 0) return ByteArray(0)
 
@@ -238,5 +130,12 @@ open class Base85(
         }
 
         return out
+    }
+
+    private fun decodeChar(c: Char): Int {
+        val code = c.code
+        val value = if (code < decodeTable.size) decodeTable[code] else -1
+        require(value >= 0) { "Invalid Base85 character: '$c'" }
+        return value
     }
 }
