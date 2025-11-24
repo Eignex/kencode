@@ -356,6 +356,6 @@ For all the implementations you can customize the alphabet if needed.
 ### Base36 / Base62 / custom alphabets
 
 Backed by `BaseRadix`, these encoders operate in fixed-size blocks with
-deterministic lengths for safe decoding. A naïve implementation without blocks
-is simpler but has an `O(n^2)` run time, where `n` is the length of the bytes
-to encode.
+deterministic lengths for safe decoding. No padding is used. A naïve
+implementation without blocks is simpler but has an `O(n^2)` run time, where `n`
+is the length of the bytes to encode.
