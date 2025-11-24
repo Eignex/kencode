@@ -5,8 +5,8 @@
 ![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)
 ![License](https://img.shields.io/github/license/eignex/kencode)
 
-**Compact, efficient binary–text codecs and bit-packed serialization for Kotlin.
-**
+**Compact, efficient binary–text codecs and bit-packed serialization for
+Kotlin.**
 Provides high-performance Base-N encoders, Base64 variants, ASCII85/Z85,
 checksummed string formats, and a minimal-size binary serializer.
 
@@ -117,6 +117,7 @@ assert(payload == decoded)
 ```
 
 ## Standard encodings
+
 You can use just the encoding implementations.
 
 ```kotlin
