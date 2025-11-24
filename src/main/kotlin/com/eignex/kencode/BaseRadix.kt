@@ -10,25 +10,25 @@ const val BASE_62: String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO
 /**
  * Base62 encoder/decoder using digits, lowercase, then uppercase characters.
  */
-object Base62 : BaseN(BASE_62)
+object Base62 : BaseRadix(BASE_62)
 
 
 /**
  * Base36 encoder/decoder using digits and lowercase characters.
  */
-object Base36 : BaseN(BASE_62.take(36))
+object Base36 : BaseRadix(BASE_62.take(36))
 
 /**
  * Generic base-N encoder/decoder for binary data using arbitrary alphabets.
  *
  * Concept:
- * - Processes data in fixed-size chunks (default 32 bytes).
- * - Treats each chunk as a big-endian integer.
+ * - Processes data in fixed-size blocks (default 32 bytes).
+ * - Treats each block as a big-endian integer.
  * - Converts that integer into base-N using the provided alphabet.
  *
  * Guarantees:
- * - Deterministic chunk-to-length mapping for unambiguous decoding.
- * - Strictly increasing encoded length per input chunk size.
+ * - Deterministic block-to-length mapping for unambiguous decoding.
+ * - Strictly increasing encoded length per input block size.
  * - Supports any alphabet of length ≥ 2 with no repeated characters.
  *
  * Usage:
@@ -36,12 +36,12 @@ object Base36 : BaseN(BASE_62.take(36))
  * - Suitable for compact identifiers or opaque byte-to-text encoding.
  *
  * @property alphabet the symbol set used for encoding.
- * @property chunkSize maximum bytes processed per chunk.
+ * @property blockSize maximum bytes processed per block.
  */
-open class BaseN(
+open class BaseRadix(
     private val alphabet: String,
-    val chunkSize: Int = 32
-) : ByteCodec {
+    val blockSize: Int = 32
+) : ByteEncoding {
 
     init {
         require(alphabet.length > 1) { "Alphabet must contain at least 2 characters." }
@@ -79,12 +79,12 @@ open class BaseN(
         get() = charFromIndex(0)
 
     /**
-     * Encoded lengths for input chunks of size 1..[chunkSize].
+     * Encoded lengths for input blocks of size 1..[blockSize].
      *
      * `lengths[i]` = encoded length for `i + 1` input bytes.
      */
-    private val lengths: IntArray = IntArray(chunkSize) { chunkIndex ->
-        val bytesCount = chunkIndex + 1
+    private val lengths: IntArray = IntArray(blockSize) { blockIndex ->
+        val bytesCount = blockIndex + 1
         ceil((bytesCount * 8) / logBase).toInt()
     }.also { arr ->
         // Ensure strictly increasing encoded length for each additional input byte,
@@ -98,7 +98,7 @@ open class BaseN(
     }
 
     /**
-     * Inverse mapping from encoded length to input chunk length.
+     * Inverse mapping from encoded length to input block length.
      *
      * `invLengths[y - 1]` = number of decoded bytes for an encoded length `y`.
      */
@@ -113,10 +113,10 @@ open class BaseN(
         }
     }
 
-    private val maxEncodedChunkLength: Int
+    private val maxEncodedBlockLength: Int
         get() = lengths.last()
 
-    private val maxDecodedChunkLength: Int
+    private val maxDecodedBlockLength: Int
         get() = invLengths.last()
 
     private fun encodedLengthForBytes(byteCount: Int): Int =
@@ -143,9 +143,9 @@ open class BaseN(
         var outPos = 0
 
         while (remaining > 0) {
-            val inLen = min(chunkSize, remaining)
+            val inLen = min(blockSize, remaining)
             val outLen = encodedLengthForBytes(inLen)
-            encodeChunk(input, inPos, inLen, output, outPos, outLen)
+            encodeBlock(input, inPos, inLen, output, outPos, outLen)
             inPos += inLen
             remaining -= inLen
             outPos += outLen
@@ -162,38 +162,38 @@ open class BaseN(
     /**
      * Decode the given [input] base-[alphabetSize] string back into a byte array.
      *
-     * @throws IllegalArgumentException if an invalid character or chunk is encountered.
+     * @throws IllegalArgumentException if an invalid character or block is encountered.
      */
     override fun decode(input: CharSequence): ByteArray {
         if (input.isEmpty()) return ByteArray(0)
 
-        // Validate and segment length: full chunks + optional final partial chunk.
-        val fullChunkLen = maxEncodedChunkLength
-        val fullChunks = input.length / fullChunkLen
-        val lastChunkLen = input.length % fullChunkLen
+        // Validate and segment length: full blocks + optional final partial block.
+        val fullBlockLen = maxEncodedBlockLength
+        val fullBlocks = input.length / fullBlockLen
+        val lastBlockLen = input.length % fullBlockLen
 
-        if (lastChunkLen != 0 && lastChunkLen !in lengths) {
+        if (lastBlockLen != 0 && lastBlockLen !in lengths) {
             throw IllegalArgumentException("Invalid encoded length: ${input.length}")
         }
 
-        val capacityRatio = ceil(maxDecodedChunkLength / maxEncodedChunkLength.toDouble()).toInt()
+        val capacityRatio = ceil(maxDecodedBlockLength / maxEncodedBlockLength.toDouble()).toInt()
         val output = ByteArray(input.length * capacityRatio)
 
         var inPos = 0
         var outPos = 0
 
-        repeat(fullChunks) {
-            val inLen = fullChunkLen
+        repeat(fullBlocks) {
+            val inLen = fullBlockLen
             val outLen = decodedBytesForLength(inLen)
-            decodeChunk(input, inPos, inLen, output, outPos, outLen)
+            decodeBlock(input, inPos, inLen, output, outPos, outLen)
             inPos += inLen
             outPos += outLen
         }
 
-        if (lastChunkLen != 0) {
-            val inLen = lastChunkLen
+        if (lastBlockLen != 0) {
+            val inLen = lastBlockLen
             val outLen = decodedBytesForLength(inLen)
-            decodeChunk(input, inPos, inLen, output, outPos, outLen)
+            decodeBlock(input, inPos, inLen, output, outPos, outLen)
             outPos += outLen
         }
 
@@ -201,19 +201,19 @@ open class BaseN(
     }
 
     // ------------------------------------------------------------
-    // Chunk-level encode/decode
+    // Block-level encode/decode
     // ------------------------------------------------------------
 
     /**
-     * Encode a single chunk of [inLen] bytes from [input] starting at [inPos] into [output].
+     * Encode a single block of [inLen] bytes from [input] starting at [inPos] into [output].
      *
-     * The encoded chunk is written starting at [outPos] and occupies exactly [outLen] characters.
+     * The encoded block is written starting at [outPos] and occupies exactly [outLen] characters.
      */
-    fun encodeChunk(
+    fun encodeBlock(
         input: ByteArray,
         inPos: Int = 0,
         inLen: Int = input.size,
-        output: StringBuilder = StringBuilder(maxEncodedChunkLength),
+        output: StringBuilder = StringBuilder(maxEncodedBlockLength),
         outPos: Int = 0,
         outLen: Int = encodedLengthForBytes(inLen)
     ): StringBuilder {
@@ -236,13 +236,13 @@ open class BaseN(
     }
 
     /**
-     * Decode a single encoded chunk of [inLen] characters from [input] starting at [inPos] into [output].
+     * Decode a single encoded block of [inLen] characters from [input] starting at [inPos] into [output].
      *
      * The decoded bytes are written starting at [outPos] and occupy exactly [outLen] bytes.
      *
-     * @throws IllegalArgumentException if invalid characters or inconsistent chunks are found.
+     * @throws IllegalArgumentException if invalid characters or inconsistent blocks are found.
      */
-    fun decodeChunk(
+    fun decodeBlock(
         input: CharSequence,
         inPos: Int = 0,
         inLen: Int = input.length,
@@ -257,8 +257,8 @@ open class BaseN(
             val c = input[i]
             val index = indexOfChar(c)
             if (index < 0) {
-                val chunk = input.substring(inPos, inPos + inLen)
-                throw IllegalArgumentException("Not an encoding char: '$c' in chunk '$chunk'.")
+                val block = input.substring(inPos, inPos + inLen)
+                throw IllegalArgumentException("Not an encoding char: '$c' in block '$block'.")
             }
             n = n.multiply(base).add(BigInteger.valueOf(index.toLong()))
         }
@@ -269,10 +269,10 @@ open class BaseN(
             n = n.shiftRight(8)
         }
 
-        // If we still have a non-zero number, the chunk did not fit in outLen bytes
+        // If we still have a non-zero number, the block did not fit in outLen bytes
         if (n != bigZero) {
-            val chunk = input.substring(inPos, inPos + inLen)
-            throw IllegalArgumentException("Invalid encoding chunk: '$chunk'.")
+            val block = input.substring(inPos, inPos + inLen)
+            throw IllegalArgumentException("Invalid encoding block: '$block'.")
         }
 
         return output
