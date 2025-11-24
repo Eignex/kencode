@@ -1,6 +1,8 @@
+package com.eignex.kencode
+
 import java.io.ByteArrayOutputStream
 
-object BitPacking {
+object PackedUtils {
     // flags -> int/long
     fun packFlagsToLong(vararg flags: Boolean): Long {
         var result = 0L
@@ -102,7 +104,7 @@ object BitPacking {
         }
     }
 
-    fun decodeVarInt(input: ByteArray, offset: Int = 0): Pair<Int, Int> {
+    fun decodeVarInt(input: ByteArray, offset: Int): Pair<Int, Int> {
         var result = 0
         var shift = 0
         var pos = offset
@@ -118,7 +120,7 @@ object BitPacking {
         }
     }
 
-    fun decodeVarLong(input: ByteArray, offset: Int = 0): Pair<Long, Int> {
+    fun decodeVarLong(input: ByteArray, offset: Int): Pair<Long, Int> {
         var result = 0L
         var shift = 0
         var pos = offset
