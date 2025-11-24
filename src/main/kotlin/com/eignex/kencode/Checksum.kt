@@ -15,9 +15,5 @@ interface Checksum {
     /**
      * Compute checksum over data[offset until offset+length].
      */
-    fun compute(
-        data: ByteArray,
-        offset: Int = 0,
-        length: Int = data.size - offset
-    ): ByteArray
+    fun digest(data: ByteArray): ByteArray
 }

@@ -36,15 +36,11 @@ open class Crc16(
 
     override val size: Int = (width + 7) / 8
 
-    override fun compute(
-        data: ByteArray,
-        offset: Int,
-        length: Int
-    ): ByteArray {
+    override fun digest(data: ByteArray): ByteArray {
         var crc = refInit and mask
 
-        for (i in 0 until length) {
-            val raw = data[offset + i].toInt() and 0xFF
+        for (i in data.indices) {
+            val raw = data[i].toInt() and 0xFF
             val b = if (refin) raw else raw.reverseBits8()
 
             crc = crc xor b
@@ -111,15 +107,11 @@ open class Crc32(
 
     override val size: Int = (width + 7) / 8
 
-    override fun compute(
-        data: ByteArray,
-        offset: Int,
-        length: Int
-    ): ByteArray {
+    override fun digest(data: ByteArray): ByteArray {
         var crc = refInit
 
-        for (i in 0 until length) {
-            val raw = data[offset + i].toInt() and 0xFF
+        for (i in data.indices) {
+            val raw = data[i].toInt() and 0xFF
             val b = if (refin) raw else raw.reverseBits8()
 
             crc = crc xor (b.toLong() and 0xFFL)
