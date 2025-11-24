@@ -3,7 +3,7 @@ package com.eignex.kencode
 /**
  * Abstraction for byte→string and string→byte encoders.
  */
-interface ByteCodec {
+interface ByteEncoding {
 
     fun encode(
         input: ByteArray,
