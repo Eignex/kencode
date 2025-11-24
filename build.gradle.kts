@@ -29,7 +29,10 @@ java {
 
 dependencies {
     testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
+    testImplementation("org.bouncycastle:bcprov-jdk18on:1.80")
 }
 
 tasks.test { useJUnitPlatform() }
