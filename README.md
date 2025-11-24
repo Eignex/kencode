@@ -17,7 +17,7 @@ checksummed string formats, and a minimal-size binary serializer.
 KEncode supplies:
 
 * Alpha-numeric radix based encoders: Base36, Base62
-* Other more compact encoders: Base64, Base85 (ASCII85)
+* Other more compact encoders: Base64, Base85 (ASCII85-style)
 * Compact bit-packed serialization using `kotlinx.serialization`
 * Optional CRC-16 / CRC-32 checksums
 * Varint/varuint and zig-zag encoding
@@ -46,56 +46,40 @@ in those cases.
 ## Installation
 
 ```kotlin
-implementation("com.eignex:kencode:1.0.0")
-```
-
-To use the serialization component from KEncode you also need to enable
-serialization:
-
-```kotlin
-plugins {
-    kotlin("plugin.serialization") version "2.2.21"
-}
-
 dependencies {
+    implementation("com.eignex:kencode:1.0.0")
+
+    // For serialization support
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
 }
-```
+````
+
+You also need to load the serialization plugin.
 
 ---
 
 ## Full serialization example
 
-Here is a full example of using the library with serialization as intended.
+Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 
 ```kotlin
 @Serializable
 data class Payload(
-
-    // VarUInt on Int/Long only uses as many bytes as needed.
-    // For numbers that span close to the whole 2^32/64 there is no benefit.
-    // So good for sequential ids but bad for snowflake ids.
     @VarUInt
-    val id: ULong,
+    val id: ULong,       // varuint
 
-    // The signed version VarInt does zig-zag,
-    // so that small negative values can encoded efficiently.
     @VarInt
-    val delta: Int,
+    val delta: Int,      // zig-zag + varint
 
-    // All booleans and nullable-field flags are packed into a bitset
     val urgent: Boolean,
     val sensitive: Boolean,
     val external: Boolean,
-    val handledAt: Instant?,
+    val handledAt: Instant?,  // nullable, tracked via bitmask
 
-    // This is encoded the same as VarUInt
-    val type: PayloadType
+    val type: PayloadType     // enum, encoded as varuint ordinal
 )
 
-enum class PayloadType {
-    TYPE1, TYPE2, TYPE3
-}
+enum class PayloadType { TYPE1, TYPE2, TYPE3 }
 
 val payload = Payload(
     id = 123u,
@@ -107,62 +91,271 @@ val payload = Payload(
     type = PayloadType.TYPE1
 )
 
-// This particular example fits in 4-bytes of data.
+val encoded = EncodedFormat.encodeToString(payload)
+println(encoded)
+// Example: 0fiXYI (this specific payload fits in 4 raw bytes)
 
-println(EncodedFormat.encodeToString(payload))
-// > 0fiXYI
-
-val decoded = EncodedFormat.decodeFromString("0fiXYI")
+val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 assert(payload == decoded)
 ```
 
+---
+
 ## Standard encodings
 
-You can use just the encoding implementations.
+You can use the encoders standalone on raw byte arrays.
 
 ```kotlin
-Base62.encode("any byte data".encodeByteArray())
-``` 
+
+val bytes = "any byte data".encodeToByteArray()
+
+println(Base36.encode(bytes))
+// 0ksef5o4kvegb70nre15t
+
+println(Base62.encode(bytes))
+// 2BVj6VHhfNlsGmoMQF
+
+println(Base64.encode(bytes))
+// YW55IGJ5dGUgZGF0YQ==
+
+println(Base85.encode(bytes))
+// @;^?5@X3',+Cno&@/
+```
+
+Decoding is symmetric:
+
+```kotlin
+val back = Base62.decode("2BVj6VHhfNlsGmoMQF")
+assert(back.contentEquals(bytes))
+```
+
+---
 
 ## ProtoBuf serialization
 
+For more complex payloads (nested types, lists, maps) use `ProtoBuf` as the
+binary format and still get compact, ASCII-safe strings:
+
+```kotlin
+
+@Serializable
+data class ProtoBufRequired(val map: Map<String, Int>)
+
+val payload = ProtoBufRequired(
+    mapOf("k1" to 1285, "k2" to 9681)
+)
+
+val format = EncodedFormat(binaryFormat = ProtoBuf)
+
+val encoded = format.encodeToString(payload)
+println(encoded)
+// 05cAKYGWf6gBgtZVpkqPEWOYH
+
+val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
+assert(decoded == payload)
+```
+
+---
+
 ## Encryption
+
+Typical pattern when you need confidentiality:
+
+1. Serialize (PackedFormat or ProtoBuf).
+2. Encrypt with your crypto library.
+3. Encode ciphertext using Base62/Base64/etc.
+
+This is an example with a stream cipher from Bouncy Castle.
+
+```kotlin
+@Serializable
+data class SecretPayload(val id: Long)
+
+// Initialization
+Security.addProvider(BouncyCastleProvider())
+val random = SecureRandom()
+
+// This key is stored permanently so we can read payloads after jvm restart
+val keyBytes = ByteArray(16)
+random.nextBytes(keyBytes)
+val key = SecretKeySpec(keyBytes, "XTEA")
+val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
+
+// Encrypt one payload
+// we use 8 bytes as the initialization vector
+val payload = SensitiveData(random.nextLong())
+val iv8 = ByteArray(8)
+random.nextBytes(iv8)
+cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv8))
+
+// This particular encryption adds 16-bytes in an initialization vector
+// regardless of how big the payload is.
+val encrypted =
+    iv8 + cipher.doFinal(PackedFormat.encodeToByteArray(payload))
+val encoded = Base62.encode(encrypted)
+println(encoded)
+
+// This recovers the initial payload
+val iv8received = encrypted.copyOfRange(0, 8)
+val received = encrypted.copyOfRange(8, encrypted.size)
+cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv8received))
+val decoded = Base62.decode(encoded)
+val decrypted = cipher.doFinal(received)
+val result: SensitiveData = PackedFormat.decodeFromByteArray(decrypted)
+println(result)
+
+assertEquals(payload, result)
+```
+
+---
 
 ## Checksums
 
-* CRC-16 (default X.25)
-* CRC-32 (default ISO-HDLC)
+You can add a CRC checksum at the string boundary. On decode, a mismatch
+throws, so you get a simple integrity check on the serialized payload.
 
-Checksum mismatch automatically throws.
+```kotlin
+
+@Serializable
+data class Command(val id: Int, val payload: String)
+
+val format = EncodedFormat(
+    checksum = Crc32,    // or Crc16
+)
+
+val original = Command(42, "restart-worker")
+val encoded = format.encodeToString(original)
+println(encoded)
+
+// Tampering will fail:
+// val corrupted = encoded.dropLast(1) + "x"
+// format.decodeFromString<Command>(corrupted) // throws "Checksum mismatch."
+
+val decoded = format.decodeFromString<Command>(encoded)
+assert(decoded == original)
+```
 
 ---
 
-## PackedEncoder Format explanation
+## PackedFormat explanation
 
-* One bitmask for all booleans
-* One bitmask for all nullability bits
-* Sequential fixed-width primitive payloads
-* Varints, varuints, zig-zag for compact integers
-* Inline type support
-* Minimal-length output, no nested structures
+`PackedFormat` is a `BinaryFormat` optimized for small, flat structures:
 
-BitPackedFormat supports:
+* No nested objects, lists, or maps.
+* Booleans and nullability encoded as bitmasks.
+* Optional varint / zig-zag for `Int`/`Long` via annotations.
 
-* Packed boolean bitmasks
-* Packed nullability bitmasks
-* Varints, varuints, zig-zag integers
-* Fixed-width primitives
-* Inline types (UInt, Duration, Instant)
-* Flat object structures (no nested classes or collections)
+### Field layout
+
+For a single class:
+
+1. **Flags varlong**:
+
+    * First `N` bits for booleans (in declaration order).
+    * Next `M` bits for nullable fields (in declaration order).
+    * Boolean bit = `true`/`false`.
+      Nullable bit = `1` means `null`, `0` means non-null.
+
+2. **Payload bytes** (non-boolean fields only, in declaration order):
+
+    * Fixed-size primitives: `Byte`, `Short`, `Int`, `Long`, `Float`, `Double`.
+    * `String`: `[varint length][UTF-8 bytes]`.
+    * `Char`: UTF-8 encoding of a single `Char`.
+    * Enum: varint ordinal.
+    * Nullable fields:
+        * If null: only the null-bit is set; no payload bytes.
+        * If non-null: encoded exactly like the non-null case.
+
+Top-level nullable values are encoded with one varlong flag:
+
+* Bit 0 = `0` → non-null (value follows).
+* Bit 0 = `1` → null (no payload).
+
+### VarInt / VarUInt annotations
+
+Varint support is opt-in to keep fixed-width behavior as default:
+
+```kotlin
+@Serializable
+data class Counters(
+    @VarUInt val seq: Long,  // good for monotonically increasing IDs
+    @VarInt val delta: Int  // good for small positive/negative changes
+)
+```
+
+Internally:
+
+* `@VarUInt` uses an unsigned varint.
+* `@VarInt` uses zig-zag + varint, so small negative numbers are compact.
+
+### Limitations
+
+If you need:
+
+* Nested objects
+* Lists / arrays / maps
+* Polymorphism
+
+then use `ProtoBuf` or another `BinaryFormat` with `EncodedFormat`.
+
+---
 
 ## EncodedFormat explanation
 
-## Base Encoders
+`EncodedFormat` composes three concerns:
 
-* RFC-compliant Base64, URL-safe Base64
-* ASCII85 with partial chunk support
-* BaseN: any alphabet, deterministic chunked encoding, no padding
+1. **Binary format** (`BinaryFormat`):
+    * Default is `PackedFormat`.
+    * Can be any `BinaryFormat` (ProtoBuf, CBOR, etc.).
+
+2. **Checksum** (`Checksum?`):
+    * Optional CRC-16 or CRC-32, or a custom implementation.
+    * Appended to the binary payload and verified on decode.
+
+3. **Text codec** (`ByteEncoding`):
+    * Base62 by default, but you can swap `Base36`, `Base64`, `Base64UrlSafe`,
+      `Base85`, or custom.
+
+Typical customization:
+
+```kotlin
+
+@Serializable
+data class Event(val id: Long, val name: String)
+
+val format = EncodedFormat(
+    codec = Base36,      // file-name friendly
+    checksum = Crc16,    // short checksum
+    binaryFormat = ProtoBuf
+)
+
+val token = format.encodeToString(Event(1L, "startup"))
+val back = format.decodeFromString<Event>(token)
+```
 
 ---
 
-## Fun bonus: char-n-grams
+## Base encoders
+
+KEncode does not intend to support ALL encoding variants, just the useful ones.
+They are the standard Base64, compact Base85, and alphanumeric only Base36/62.
+For all the implementations you can customize the alphabet if needed.
+
+### Base64 and URL-safe Base64
+
+* RFC 4648–compatible.
+* 3 input bytes → 4 characters, with `=` padding.
+* URL-safe variant (`Base64UrlSafe`) uses `-` and `_` instead of `+` and `/`.
+
+### Base85 (ASCII85 / Z85-style)
+
+* 4 bytes → 5 characters.
+* Supports final partial group (1–3 bytes → 2–4 chars).
+* No delimiters (`<~ ~>`) and no `z` compression.
+
+### Base36 / Base62 / custom alphabets
+
+Backed by `BaseRadix`, these encoders operate in fixed-size blocks with
+deterministic lengths for safe decoding. A naïve implementation without blocks
+is simpler but has an `O(n^2)` run time, where `n` is the length of the bytes
+to encode.

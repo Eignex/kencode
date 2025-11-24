@@ -69,12 +69,22 @@ class Examples {
     fun `protobuf serialization`() {
         // This setup can handle arbitrary payloads (limited by ProtoBuf)
         val payload = ProtoBufRequired(
-            mapOf("k1" to 1285901292, "k2" to 968911021)
+            mapOf("k1" to 1285, "k2" to 9681)
         )
         val format = EncodedFormat(binaryFormat = ProtoBuf)
         val encoded = format.encodeToString(payload)
         val result = format.decodeFromString<ProtoBufRequired>(encoded)
         assertEquals(payload, result)
+        println(encoded)
+    }
+
+    @Test
+    fun `standalone readme`() {
+        val bytes = "any byte data".encodeToByteArray()
+        println(Base36.encode(bytes))
+        println(Base62.encode(bytes))
+        println(Base64.encode(bytes))
+        println(Base85.encode(bytes))
     }
 
     @Serializable
@@ -82,65 +92,40 @@ class Examples {
 
     @Test
     fun `encryption serialization`() {
+
+        // Initialization
+        Security.addProvider(BouncyCastleProvider())
         val random = SecureRandom()
 
-        // This can permanent or generated at startup if you only share with one server
-        val privateKey = ByteArray(16)
-        random.nextBytes(privateKey)
-        val cipher = StreamCipher(privateKey)
+        // This key is stored permanently so we can read payloads after jvm restart
+        val keyBytes = ByteArray(16)
+        random.nextBytes(keyBytes)
+        val key = SecretKeySpec(keyBytes, "XTEA")
+        val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
 
-        // Payload is just 8-byte
+        // Encrypt one payload
+        // we use 8 bytes as the initialization vector
         val payload = SensitiveData(random.nextLong())
+        val iv8 = ByteArray(8)
+        random.nextBytes(iv8)
+        cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv8))
 
         // This particular encryption adds 16-bytes in an initialization vector
         // regardless of how big the payload is.
         val encrypted =
-            cipher.encrypt(PackedFormat.encodeToByteArray(payload), random)
+            iv8 + cipher.doFinal(PackedFormat.encodeToByteArray(payload))
         val encoded = Base62.encode(encrypted)
         println(encoded)
 
         // This recovers the initial payload
+        val iv8received = encrypted.copyOfRange(0, 8)
+        val received = encrypted.copyOfRange(8, encrypted.size)
+        cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv8received))
         val decoded = Base62.decode(encoded)
-        val decrypted = cipher.decrypt(decoded)
+        val decrypted = cipher.doFinal(received)
         val result: SensitiveData = PackedFormat.decodeFromByteArray(decrypted)
         println(result)
+
         assertEquals(payload, result)
-    }
-}
-
-
-class StreamCipher(
-    privateKey: ByteArray
-) {
-    private val key = SecretKeySpec(privateKey, "XTEA")
-
-    private val cipher: Cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
-
-    companion object {
-        init {
-            Security.addProvider(BouncyCastleProvider())
-        }
-    }
-
-    fun encrypt(
-        data: ByteArray,
-        random: SecureRandom
-    ): ByteArray {
-        val iv8 = ByteArray(8)
-        random.nextBytes(iv8)
-        cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv8))
-        val encryptedData = cipher.doFinal(data)
-        return ByteBuffer
-            .allocate(iv8.size + encryptedData.size)
-            .put(iv8)
-            .put(encryptedData)
-            .array()
-    }
-
-    fun decrypt(data: ByteArray): ByteArray {
-        val iv8 = data.copyOfRange(0, 8)
-        val ctReceived = data.copyOfRange(8, data.size)
-        cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv8))
-        return cipher.doFinal(ctReceived)
     }
 }
