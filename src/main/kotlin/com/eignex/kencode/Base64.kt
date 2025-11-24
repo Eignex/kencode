@@ -3,6 +3,11 @@ package com.eignex.kencode
 const val BASE_64 =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+const val BASE_64_URL_SAFE =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+object Base64UrlSafe : Base64(BASE_64_URL_SAFE.toCharArray())
+
 /**
  * RFC 4648–compatible Base64 encoder/decoder.
  *
@@ -18,7 +23,7 @@ const val BASE_64 =
  *
  * @property alphabet the 64-symbol Base64 alphabet.
  */
-open class Base64(val alphabet: CharArray) : ByteCodec {
+open class Base64(val alphabet: CharArray) : ByteEncoding {
 
     companion object Default : Base64(BASE_64.toCharArray())
 
@@ -52,10 +57,11 @@ open class Base64(val alphabet: CharArray) : ByteCodec {
         var outPos = 0
 
         while (inPos < end) {
-            val b0 = input[inPos++].toInt() and 0xFF
+            val remaining = end - inPos
 
-            val b1 = if (inPos < end) input[inPos++].toInt() and 0xFF else 0
-            val b2 = if (inPos < end) input[inPos++].toInt() and 0xFF else 0
+            val b0 = input[inPos++].toInt() and 0xFF
+            val b1 = if (remaining > 1) input[inPos++].toInt() and 0xFF else 0
+            val b2 = if (remaining > 2) input[inPos++].toInt() and 0xFF else 0
 
             val i0 = b0 ushr 2
             val i1 = ((b0 and 0x03) shl 4) or (b1 ushr 4)
@@ -64,12 +70,13 @@ open class Base64(val alphabet: CharArray) : ByteCodec {
 
             out[outPos++] = alphabet[i0]
             out[outPos++] = alphabet[i1]
-            out[outPos++] = if (inPos < end) alphabet[i2] else '='
-            out[outPos++] = if (inPos < end) alphabet[i3] else '='
+            out[outPos++] = if (remaining > 1) alphabet[i2] else '='
+            out[outPos++] = if (remaining > 2) alphabet[i3] else '='
         }
 
         return String(out)
     }
+
 
     override fun decode(input: CharSequence): ByteArray {
         val len = input.length
