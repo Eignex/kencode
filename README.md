@@ -7,7 +7,7 @@
 
 **Compact, efficient binary–text codecs and bit-packed serialization for
 Kotlin.**
-Provides high-performance Base-N encoders, Base64 variants, ASCII85/Z85,
+Provides high-performance  Radix Base encoders, Base64 variants, ASCII85,
 checksummed string formats, and a minimal-size binary serializer.
 
 ---
