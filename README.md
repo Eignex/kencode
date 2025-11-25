@@ -66,17 +66,17 @@ Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 @Serializable
 data class Payload(
     @VarUInt
-    val id: ULong,       // varint
+    val id: ULong,         // varint
 
     @VarInt
-    val delta: Int,      // zig-zag + varint
+    val delta: Int,        // zig-zag + varint
 
-    val urgent: Boolean,   // joined to bitset
+    val urgent: Boolean, // joined to bitset
     val sensitive: Boolean,
     val external: Boolean,
-    val handledAt: Instant?,  // nullable, tracked via bitmask
+    val handled: Instant?, // nullable, tracked via bitset
 
-    val type: PayloadType     // enum, encoded as varuint ordinal
+    val type: PayloadType  // encoded as varint
 )
 
 enum class PayloadType { TYPE1, TYPE2, TYPE3 }
@@ -87,7 +87,7 @@ val payload = Payload(
     urgent = true,
     sensitive = false,
     external = true,
-    handledAt = null,
+    handled = null,
     type = PayloadType.TYPE1
 )
 
