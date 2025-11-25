@@ -150,7 +150,6 @@ println(encoded)
 // 05cAKYGWf6gBgtZVpkqPEWOYH
 
 val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
-assert(decoded == payload)
 ```
 
 This example relies on kotlinx protobuf implementation, which you install: 
