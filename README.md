@@ -52,7 +52,7 @@ dependencies {
     // For serialization support
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
 }
-````
+```
 
 You also need to load the serialization plugin.
 
@@ -71,7 +71,7 @@ data class Payload(
     @VarInt
     val delta: Int,        // zig-zag + varint
 
-    val urgent: Boolean, // joined to bitset
+    val urgent: Boolean,  // joined to bitset
     val sensitive: Boolean,
     val external: Boolean,
     val handled: Instant?, // nullable, tracked via bitset
@@ -126,7 +126,6 @@ Decoding is symmetric:
 
 ```kotlin
 val back = Base62.decode("2BVj6VHhfNlsGmoMQF")
-assert(back.contentEquals(bytes))
 ```
 
 ---
@@ -137,7 +136,6 @@ For more complex payloads (nested types, lists, maps) use `ProtoBuf` as the
 binary format and still get compact, ASCII-safe strings:
 
 ```kotlin
-
 @Serializable
 data class ProtoBufRequired(val map: Map<String, Int>)
 
@@ -154,6 +152,10 @@ println(encoded)
 val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
 assert(decoded == payload)
 ```
+
+This example relies on kotlinx protobuf implementation: 
+```kotlin   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
+````
 
 ---
 
