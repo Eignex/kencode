@@ -153,9 +153,9 @@ val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
 assert(decoded == payload)
 ```
 
-This example relies on kotlinx protobuf implementation: 
+This example relies on kotlinx protobuf implementation:
 ```kotlin   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
-````
+```
 
 ---
 
