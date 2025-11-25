@@ -66,12 +66,12 @@ Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 @Serializable
 data class Payload(
     @VarUInt
-    val id: ULong,       // varuint
+    val id: ULong,       // varint
 
     @VarInt
     val delta: Int,      // zig-zag + varint
 
-    val urgent: Boolean,
+    val urgent: Boolean,   // joined to bitset
     val sensitive: Boolean,
     val external: Boolean,
     val handledAt: Instant?,  // nullable, tracked via bitmask
