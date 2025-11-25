@@ -1,45 +1,38 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em" />
+</p>
+
 # KEncode
+
+**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin.**
 
 ![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
 ![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
 ![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)
 ![License](https://img.shields.io/github/license/eignex/kencode)
 
-**Compact, efficient binary–text codecs and bit-packed serialization for
-Kotlin.**
-Provides high-performance  Radix Base encoders, Base64 variants, ASCII85,
-checksummed string formats, and a minimal-size binary serializer.
+> KEncode produces short, predictable text payloads that fit into environments with strict character or length limits such as URLs, file names, Kubernetes labels, and log keys.
+
+> It provides high-performance radix and base encoders, efficient integer coding, optional checksums, and a compact bit-packed serializer for flat data models.
 
 ---
 
 ## Overview
 
-KEncode supplies:
+KEncode brings together several compact encoding tools: radix formats like Base36 and Base62, dense ASCII-safe formats such as Base64 and ASCII85-style Base85, varint and zig-zag integer coding, CRC-16 and CRC-32 checksums, and a minimal-allocation bit-packed serializer built on `kotlinx.serialization`.
 
-* Alpha-numeric radix based encoders: Base36, Base62
-* Other more compact encoders: Base64, Base85 (ASCII85-style)
-* Compact bit-packed serialization using `kotlinx.serialization`
-* Optional CRC-16 / CRC-32 checksums
-* Varint/varuint and zig-zag encoding
-* Minimal-allocation encoding/decoding and predictable output lengths
+These features help you move structured data through **channels with tight ASCII or size constraints**, including:
 
-It is intended for transferring structured payloads across
-**character-restricted environments**, such as:
-
-* URLs and URL parameters
+* URLs and query parameters
 * File names
-* k8s pod names, labels, and annotations
+* Kubernetes pod names, labels, and annotations
 * HTTP headers and cookies
 * Message queue identifiers
-* Log keys and structured logging metadata
-* Any other system that requires ASCII-safe, short, reversible text encodings
+* Log keys and structured logging fields
 
-If you transfer secret data you still need to encrypt your payload.
+⚠️ Encrypt any payload that contains sensitive information.
 
-The bit-packed serialization package does not handle arbitrary structures. It's
-designed for "flat" structures, so no maps or nested types. You can use
-`ProtoBuf` from `kotlinx.serialization` instead of the provided `PackedFormat`
-in those cases.
+The bit-packed serializer supports only flat structures. Use `ProtoBuf` from `kotlinx.serialization` when you need maps, nested types, or more complex layouts.
 
 ---
 
