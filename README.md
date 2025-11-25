@@ -153,8 +153,9 @@ val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
 assert(decoded == payload)
 ```
 
-This example relies on kotlinx protobuf implementation:
-```kotlin   implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
+This example relies on kotlinx protobuf implementation, which you install: 
+```kotlin
+implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
 ```
 
 ---
@@ -205,8 +206,6 @@ val decoded = Base62.decode(encoded)
 val decrypted = cipher.doFinal(received)
 val result: SensitiveData = PackedFormat.decodeFromByteArray(decrypted)
 println(result)
-
-assertEquals(payload, result)
 ```
 
 ---
@@ -234,7 +233,6 @@ println(encoded)
 // format.decodeFromString<Command>(corrupted) // throws "Checksum mismatch."
 
 val decoded = format.decodeFromString<Command>(encoded)
-assert(decoded == original)
 ```
 
 ---
