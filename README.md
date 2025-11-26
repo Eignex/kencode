@@ -4,7 +4,7 @@
 
 # KEncode
 
-**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin.**
+**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin, ideal for URLs, headers, file names, and other size-limited channels. Produces short and predictable payloads.**
 
 ![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
 ![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
