@@ -87,8 +87,8 @@ open class BaseRadix(
         val bytesCount = blockIndex + 1
         ceil((bytesCount * 8) / logBase).toInt()
     }.also { arr ->
-        // Ensure strictly increasing encoded length for each additional input byte,
-        // to avoid ambiguity when decoding.
+        // Ensure strictly increasing encoded length for each additional input
+        // byte, // to avoid ambiguity when decoding.
         for (i in 1 until arr.size) {
             val prev = arr[i - 1]
             while (arr[i] <= prev) {
