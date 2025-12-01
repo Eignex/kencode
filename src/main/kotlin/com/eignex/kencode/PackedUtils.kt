@@ -2,7 +2,7 @@ package com.eignex.kencode
 
 import java.io.ByteArrayOutputStream
 
-object PackedUtils {
+internal object PackedUtils {
     // flags -> int/long
     fun packFlagsToLong(vararg flags: Boolean): Long {
         var result = 0L
