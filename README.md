@@ -6,7 +6,8 @@
 
 # KEncode
 
-**High-efficiency binary/text codecs with compact bit-packed serialization for Kotlin.**
+**High-efficiency binary/text codecs with compact bit-packed serialization for
+Kotlin.**
 
 ![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
 ![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
@@ -32,15 +33,20 @@ representations:
    data.
 
 2. **Standalone BinaryFormat**: `PackedFormat`  
-   Compact binary serialization for flat structures using bitmasks and
-   varints.  
-   Use `kotlinx.serialization.ProtoBuf` instead when you need nesting, lists, or
-   maps.
+   A binary serializer for flat Kotlin serializable classes. It uses a bitset
+   for booleans and nullability, and varint encodings for integers. It avoids
+   support for nesting or collections in order to keep the layout small and
+   predictable. Use `kotlinx.serialization.ProtoBuf` when hierarchical
+   structures are required.
 
 3. **Standalone StringFormat**: `EncodedFormat`  
-   Adds checksum + text encoding on top of a binary format, providing very short
-   string formats.
+   A wrapper that applies a binary format, optionally appends a checksum, and
+   then encodes the final byte sequence using a chosen `ByteEncoding`. This
+   produces short, deterministic string representations suitable for external
+   identifiers.
 
+These components define explicit data layouts and predictable output lengths,
+enabling efficient transport, storage, and comparison of serialized values.
 ---
 
 ## Installation
@@ -201,13 +207,13 @@ val decoded = format.decodeFromString<Command>(encoded)
 
 ## PackedFormat explanation
 
-`PackedFormat` is a `BinaryFormat` designed to produce very small payloads for *
-*flat** Kotlin data classes. It avoids nesting and collections, allowing a
-compact and deterministic binary layout.
+`PackedFormat` is a `BinaryFormat` designed to produce very small payloads for 
+**flat** Kotlin serializable classes. It avoids nesting and collections, 
+allowing a compact and deterministic binary layout.
 
 ### Field layout
 
-For a single data class, the encoding consists of:
+For a single class, the encoding consists of:
 
 1. **Flags varlong**
 
@@ -250,7 +256,8 @@ data class Counters(
 ASCII-safe tokens by composing three layers:
 
 1. **Binary format**  
-   Default is `PackedFormat`, but any `BinaryFormat` (e.g. ProtoBuf) can be used.
+   Default is `PackedFormat`, but any `BinaryFormat` (e.g. ProtoBuf) can be
+   used.
 
 2. **Checksum (optional)**  
    Supports `Crc16`, `Crc32`, or a custom implementation.  
@@ -286,15 +293,18 @@ KEncode includes a focused set of practical ASCII-safe encoders: `Base36`,
 `Base62`, `Base64`, and `Base85`. All implementations allow custom alphabets.
 
 ### Base64 and URL-safe Base64
+
 * RFC 4648–compatible.
 * 3 bytes → 4 characters (`=` padding).
 * URL-safe variant substitutes `-` and `_`.
 
 ### Base85
+
 * 4 bytes → 5 characters.
 * Supports partial final groups (1–3 bytes).
 * No delimiters or `z` compression.
 
 ### Base36 / Base62 / custom alphabets
+
 Built on `BaseRadix`, these encoders use fixed-size blocks for predictable
 lengths and safe decoding, without padding. Custom alphabets are supported.
