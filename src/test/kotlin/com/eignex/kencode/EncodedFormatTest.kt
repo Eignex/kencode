@@ -1,6 +1,7 @@
 package com.eignex.kencode
 
-import kotlinx.serialization.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.StringFormat
 import kotlin.test.*
 
 class EncodedFormatTest {
@@ -14,23 +15,28 @@ class EncodedFormatTest {
     @Test
     fun `roundtrip without checksum`() {
         val value = Payload(42, "hello")
-        val encoded = formatNoChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = formatNoChecksum.decodeFromString(Payload.serializer(), encoded)
+        val encoded =
+            formatNoChecksum.encodeToString(Payload.serializer(), value)
+        val decoded =
+            formatNoChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
     }
 
     @Test
     fun `roundtrip with checksum`() {
         val value = Payload(-5, "world")
-        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = formatWithChecksum.decodeFromString(Payload.serializer(), encoded)
+        val encoded =
+            formatWithChecksum.encodeToString(Payload.serializer(), value)
+        val decoded =
+            formatWithChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
     }
 
     @Test
     fun `checksum mismatch throws`() {
         val value = Payload(7, "x")
-        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
+        val encoded =
+            formatWithChecksum.encodeToString(Payload.serializer(), value)
         val tampered = encoded.dropLast(1) + when (encoded.last()) {
             'A' -> 'B'
             else -> 'A'

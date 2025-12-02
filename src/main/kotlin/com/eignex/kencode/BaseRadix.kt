@@ -1,11 +1,10 @@
 package com.eignex.kencode
 
 import java.math.BigInteger
-import kotlin.math.ceil
-import kotlin.math.log2
-import kotlin.math.min
+import kotlin.math.*
 
-const val BASE_62: String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const val BASE_62: String =
+    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 /**
  * Base62 encoder/decoder using digits, lowercase, then uppercase characters.
@@ -39,8 +38,7 @@ object Base36 : BaseRadix(BASE_62.take(36))
  * @property blockSize maximum bytes processed per block.
  */
 open class BaseRadix(
-    private val alphabet: String,
-    val blockSize: Int = 32
+    private val alphabet: String, val blockSize: Int = 32
 ) : ByteEncoding {
 
     init {
@@ -62,11 +60,12 @@ open class BaseRadix(
     /**
      * Maps a UTF-16 code unit (Char.code) to its index in [alphabet], or -1 if not present.
      */
-    private val inverseAlphabet: IntArray = IntArray(65536) { -1 }.also { lookup ->
-        alphabet.forEachIndexed { index, c ->
-            lookup[c.code] = index
+    private val inverseAlphabet: IntArray =
+        IntArray(65536) { -1 }.also { lookup ->
+            alphabet.forEachIndexed { index, c ->
+                lookup[c.code] = index
+            }
         }
-    }
 
     private fun charFromIndex(index: Int): Char = alphabet[index]
 
@@ -129,9 +128,7 @@ open class BaseRadix(
      * Encode the given [input] byte array range into a base-[alphabetSize] string.
      */
     override fun encode(
-        input: ByteArray,
-        offset: Int,
-        length: Int
+        input: ByteArray, offset: Int, length: Int
     ): String {
         require(offset >= 0 && length >= 0 && offset + length <= input.size) {
             "Invalid offset/length: offset=$offset, length=$length, size=${input.size}"
@@ -176,7 +173,8 @@ open class BaseRadix(
             throw IllegalArgumentException("Invalid encoded length: ${input.length}")
         }
 
-        val capacityRatio = ceil(maxDecodedBlockLength / maxEncodedBlockLength.toDouble()).toInt()
+        val capacityRatio =
+            ceil(maxDecodedBlockLength / maxEncodedBlockLength.toDouble()).toInt()
         val output = ByteArray(input.length * capacityRatio)
 
         var inPos = 0

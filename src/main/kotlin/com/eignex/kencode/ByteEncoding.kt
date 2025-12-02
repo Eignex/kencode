@@ -29,9 +29,7 @@ interface ByteEncoding {
      * length.
      */
     fun encode(
-        input: ByteArray,
-        offset: Int = 0,
-        length: Int = input.size - offset
+        input: ByteArray, offset: Int = 0, length: Int = input.size - offset
     ): String
 
     /**

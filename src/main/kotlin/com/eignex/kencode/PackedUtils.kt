@@ -5,13 +5,10 @@ import java.io.ByteArrayOutputStream
 internal object PackedUtils {
 
     private fun requireAvailable(
-        data: ByteArray,
-        offset: Int,
-        needed: Int,
-        what: String
+        data: ByteArray, offset: Int, needed: Int, what: String
     ) {
         require(offset >= 0 && needed >= 0 && offset + needed <= data.size) {
-            "Unexpected EOF while decoding $what: need $needed bytes from offset=$offset, size=${data.size}"
+            "Unexpected EOF while decoding $what: need $needed bytes " + "from offset=$offset, size=${data.size}"
         }
     }
 
@@ -31,17 +28,13 @@ internal object PackedUtils {
         return result
     }
 
-    fun zigZagEncodeInt(value: Int): Int =
-        (value shl 1) xor (value shr 31)
+    fun zigZagEncodeInt(value: Int): Int = (value shl 1) xor (value shr 31)
 
-    fun zigZagDecodeInt(value: Int): Int =
-        (value ushr 1) xor -(value and 1)
+    fun zigZagDecodeInt(value: Int): Int = (value ushr 1) xor -(value and 1)
 
-    fun zigZagEncodeLong(value: Long): Long =
-        (value shl 1) xor (value shr 63)
+    fun zigZagEncodeLong(value: Long): Long = (value shl 1) xor (value shr 63)
 
-    fun zigZagDecodeLong(value: Long): Long =
-        (value ushr 1) xor -(value and 1L)
+    fun zigZagDecodeLong(value: Long): Long = (value ushr 1) xor -(value and 1L)
 
     fun writeShort(value: Short, out: ByteArrayOutputStream) {
         val v = value.toInt() and 0xFFFF
@@ -92,9 +85,6 @@ internal object PackedUtils {
         return v
     }
 
-    // ------------------------------------------------------------
-    // LEB128 VarInt / VarLong writers
-    // ------------------------------------------------------------
     fun writeVarInt(value: Int, out: ByteArrayOutputStream) {
         var v = value
         while (true) {
@@ -121,9 +111,6 @@ internal object PackedUtils {
         }
     }
 
-    // ------------------------------------------------------------
-    // LEB128 VarInt / VarLong decoders (with EOF checking)
-    // ------------------------------------------------------------
     fun decodeVarInt(input: ByteArray, offset: Int): Pair<Int, Int> {
         var result = 0
         var shift = 0

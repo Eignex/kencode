@@ -1,8 +1,6 @@
 package com.eignex.kencode
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertContentEquals
+import kotlin.test.*
 
 class Crc16Test {
     private val crc16 = Crc16() // defaults = CRC-16/X25

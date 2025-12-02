@@ -78,7 +78,8 @@ open class Base85(
         val fullGroups = len / 5
         val rem = len % 5
 
-        // Remainder of 1 is invalid in ASCII85 (n bytes → n+1 chars, so remainder is 0 or 2–4).
+        // Remainder of 1 is invalid in ASCII85 (n bytes → n+1 chars,
+        // so remainder is 0 or 2–4).
         if (rem == 1) {
             throw IllegalArgumentException("Invalid ASCII85 length: remainder of 1 is not allowed")
         }

@@ -1,8 +1,6 @@
 package com.eignex.kencode
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertContentEquals
+import kotlin.test.*
 
 class BitPackingTest {
 
@@ -77,7 +75,8 @@ class BitPackingTest {
 
     @Test
     fun `zigzag long roundtrip`() {
-        val values = listOf(0L, 1L, -1L, 2L, -2L, Long.MAX_VALUE, Long.MIN_VALUE)
+        val values =
+            listOf(0L, 1L, -1L, 2L, -2L, Long.MAX_VALUE, Long.MIN_VALUE)
         for (v in values) {
             val enc = PackedUtils.zigZagEncodeLong(v)
             val dec = PackedUtils.zigZagDecodeLong(enc)
@@ -101,7 +100,11 @@ class BitPackingTest {
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarInt(bytes, 0)
             assertEquals(v, decoded, "VarInt failed for $v")
-            assertEquals(bytes.size, consumed, "VarInt consumed mismatch for $v")
+            assertEquals(
+                bytes.size,
+                consumed,
+                "VarInt consumed mismatch for $v"
+            )
         }
     }
 
@@ -123,7 +126,11 @@ class BitPackingTest {
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarInt(bytes, 1)
             assertEquals(v, decoded, "VarInt failed for $v")
-            assertEquals(bytes.size, consumed+1, "VarInt consumed mismatch for $v")
+            assertEquals(
+                bytes.size,
+                consumed + 1,
+                "VarInt consumed mismatch for $v"
+            )
         }
     }
 
@@ -143,7 +150,11 @@ class BitPackingTest {
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarLong(bytes, 0)
             assertEquals(v, decoded, "VarLong failed for $v")
-            assertEquals(bytes.size, consumed, "VarLong consumed mismatch for $v")
+            assertEquals(
+                bytes.size,
+                consumed,
+                "VarLong consumed mismatch for $v"
+            )
         }
     }
 
@@ -164,14 +175,19 @@ class BitPackingTest {
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarLong(bytes, 1)
             assertEquals(v, decoded, "VarLong failed for $v")
-            assertEquals(bytes.size, consumed+1, "VarLong consumed mismatch for $v")
+            assertEquals(
+                bytes.size,
+                consumed + 1,
+                "VarLong consumed mismatch for $v"
+            )
         }
     }
 
     @Test
     fun `flags roundtrip`() {
         val flags = booleanArrayOf(true, false, true, true, false)
-        val longFlags = PackedUtils.packFlagsToLong(*flags.toTypedArray().toBooleanArray())
+        val longFlags =
+            PackedUtils.packFlagsToLong(*flags.toTypedArray().toBooleanArray())
         val unpacked = PackedUtils.unpackFlagsFromLong(longFlags, flags.size)
         assertContentEquals(flags, unpacked)
     }

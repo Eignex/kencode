@@ -30,7 +30,8 @@ open class Crc16(
 
     private val mask = (1 shl width) - 1
 
-    // Internal representation is reflected (LSB-first), so pre-reflect poly and init.
+    // Internal representation is reflected (LSB-first),
+    // so pre-reflect poly and init.
     private val refPoly: Int = poly.reverseBits(width)
     private val refInit: Int = init.reverseBits(width)
 
@@ -97,9 +98,8 @@ open class Crc32(
 
     companion object Default : Crc32()
 
-    private val mask: Long =
-        if (width == 32) 0xFFFFFFFFL
-        else (1L shl width) - 1L
+    private val mask: Long = if (width == 32) 0xFFFFFFFFL
+    else (1L shl width) - 1L
 
     // Internal representation: reflected
     private val refPoly: Long = poly.reverseBits(width).toLong() and mask
@@ -143,7 +143,6 @@ open class Crc32(
 }
 
 /** Bit helpers */
-
 private fun Int.reverseBits(width: Int): Int {
     var v = this
     var r = 0

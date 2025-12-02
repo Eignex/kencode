@@ -31,12 +31,14 @@ class PackedDecoder(
         inStructure = true
         currentDescriptor = descriptor
 
-        val boolIdx = (0 until descriptor.elementsCount)
-            .filter { descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN }
+        val boolIdx = (0 until descriptor.elementsCount).filter {
+                descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
+            }
         booleanIndices = boolIdx.toIntArray()
 
-        val nullableIdx = (0 until descriptor.elementsCount)
-            .filter { descriptor.getElementDescriptor(it).isNullable }
+        val nullableIdx = (0 until descriptor.elementsCount).filter {
+                descriptor.getElementDescriptor(it).isNullable
+            }
         nullableIndices = nullableIdx.toIntArray()
 
         val (flagsLong, bytesRead) = PackedUtils.decodeVarLong(input, position)
@@ -47,7 +49,8 @@ class PackedDecoder(
             booleanValues = BooleanArray(0)
             nullValues = BooleanArray(0)
         } else {
-            val allFlags = PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
+            val allFlags =
+                PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
             booleanValues = if (booleanIndices.isEmpty()) {
                 BooleanArray(0)
             } else {
@@ -211,8 +214,7 @@ class PackedDecoder(
     }
 
     override fun decodeBooleanElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Boolean {
         val pos = booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
@@ -220,8 +222,7 @@ class PackedDecoder(
     }
 
     override fun decodeIntElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Int {
         val anns = descriptor.getElementAnnotations(index)
         val zigZag = anns.hasVarInt()
@@ -237,8 +238,7 @@ class PackedDecoder(
     }
 
     override fun decodeLongElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Long {
         val anns = descriptor.getElementAnnotations(index)
         val zigZag = anns.hasVarInt()
@@ -254,8 +254,7 @@ class PackedDecoder(
     }
 
     override fun decodeByteElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Byte {
         require(position < input.size) {
             "Unexpected EOF while decoding Byte element at index $index"
@@ -264,41 +263,36 @@ class PackedDecoder(
     }
 
     override fun decodeShortElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Short {
         return readShortPos()
     }
 
     override fun decodeCharElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Char {
         return readUtf8Char()
     }
 
     override fun decodeFloatElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Float {
         return java.lang.Float.intBitsToFloat(readIntPos())
     }
 
     override fun decodeDoubleElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Double {
         return java.lang.Double.longBitsToDouble(readLongPos())
     }
 
     override fun decodeStringElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): String {
         val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
         position += bytesRead
         require(len >= 0 && position + len <= input.size) {
-            "Unexpected EOF while decoding String element at index $index: need $len bytes from position=$position, size=${input.size}"
+            "Unexpected EOF while decoding String element at index $index: " + "need $len bytes from position=$position, size=${input.size}"
         }
         val bytes = input.copyOfRange(position, position + len)
         position += len
@@ -307,8 +301,7 @@ class PackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeInlineElement(
-        descriptor: SerialDescriptor,
-        index: Int
+        descriptor: SerialDescriptor, index: Int
     ): Decoder {
         currentIndex = index
         return this
@@ -324,12 +317,7 @@ class PackedDecoder(
 
         if (!deserializer.descriptor.isInline) {
             val kind = deserializer.descriptor.kind
-            if (kind is StructureKind.CLASS ||
-                kind is StructureKind.OBJECT ||
-                kind is StructureKind.LIST ||
-                kind is StructureKind.MAP ||
-                kind is PolymorphicKind
-            ) {
+            if (kind is StructureKind.CLASS || kind is StructureKind.OBJECT || kind is StructureKind.LIST || kind is StructureKind.MAP || kind is PolymorphicKind) {
                 error("Nested objects/collections are not supported")
             }
         }
@@ -407,8 +395,7 @@ class PackedDecoder(
                     "Invalid UTF-8 continuation byte: 0x${b1.toString(16)}"
                 }
                 val codePoint =
-                    ((b0 and 0b0001_1111) shl 6) or
-                            (b1 and 0b0011_1111)
+                    ((b0 and 0b0001_1111) shl 6) or (b1 and 0b0011_1111)
                 2 to codePoint
             }
 
@@ -419,19 +406,22 @@ class PackedDecoder(
                 }
                 val b1 = input[position + 1].toInt() and 0xFF
                 val b2 = input[position + 2].toInt() and 0xFF
-                require((b1 and 0b1100_0000) == 0b1000_0000 &&
-                        (b2 and 0b1100_0000) == 0b1000_0000) {
+                require(
+                    (b1 and 0b1100_0000) == 0b1000_0000 && (b2 and 0b1100_0000) == 0b1000_0000
+                ) {
                     "Invalid UTF-8 continuation byte in 3-byte char"
                 }
                 val codePoint =
-                    ((b0 and 0b0000_1111) shl 12) or
-                            ((b1 and 0b0011_1111) shl 6) or
-                            (b2 and 0b0011_1111)
+                    ((b0 and 0b0000_1111) shl 12) or ((b1 and 0b0011_1111) shl 6) or (b2 and 0b0011_1111)
                 3 to codePoint
             }
 
             else -> throw IllegalArgumentException(
-                "UTF-8 sequence too long for Char (leading byte: 0x${b0.toString(16)})"
+                "UTF-8 sequence too long for Char (leading byte: 0x${
+                    b0.toString(
+                        16
+                    )
+                })"
             )
         }
 
