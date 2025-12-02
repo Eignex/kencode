@@ -67,6 +67,9 @@ class PackedDecoder(
         return if (inStructure) {
             decodeBooleanElement(currentDescriptor, currentIndex)
         } else {
+            require(position < input.size) {
+                "Unexpected EOF while decoding Boolean"
+            }
             input[position++].toInt() != 0
         }
     }
@@ -75,6 +78,9 @@ class PackedDecoder(
         return if (inStructure) {
             decodeByteElement(currentDescriptor, currentIndex)
         } else {
+            require(position < input.size) {
+                "Unexpected EOF while decoding Byte"
+            }
             input[position++]
         }
     }
@@ -133,6 +139,9 @@ class PackedDecoder(
         } else {
             val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
             position += bytesRead
+            require(len >= 0 && position + len <= input.size) {
+                "Unexpected EOF while decoding String payload: need $len bytes from position=$position, size=${input.size}"
+            }
             val bytes = input.copyOfRange(position, position + len)
             position += len
             bytes.toString(Charsets.UTF_8)
@@ -248,6 +257,9 @@ class PackedDecoder(
         descriptor: SerialDescriptor,
         index: Int
     ): Byte {
+        require(position < input.size) {
+            "Unexpected EOF while decoding Byte element at index $index"
+        }
         return input[position++]
     }
 
@@ -285,6 +297,9 @@ class PackedDecoder(
     ): String {
         val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
         position += bytesRead
+        require(len >= 0 && position + len <= input.size) {
+            "Unexpected EOF while decoding String element at index $index: need $len bytes from position=$position, size=${input.size}"
+        }
         val bytes = input.copyOfRange(position, position + len)
         position += len
         return bytes.toString(Charsets.UTF_8)
@@ -369,10 +384,9 @@ class PackedDecoder(
         }
     }
 
-
     private fun readUtf8Char(): Char {
-        if (position >= input.size) {
-            error("Unexpected EOF while decoding UTF-8 char")
+        require(position < input.size) {
+            "Unexpected EOF while decoding UTF-8 char"
         }
 
         val b0 = input[position].toInt() and 0xFF
@@ -385,10 +399,12 @@ class PackedDecoder(
 
             // 2-byte: 110xxxxx 10xxxxxx
             (b0 and 0b1110_0000) == 0b1100_0000 -> {
-                if (position + 2 > input.size) error("Unexpected EOF in 2-byte UTF-8 char")
+                require(position + 2 <= input.size) {
+                    "Unexpected EOF in 2-byte UTF-8 char"
+                }
                 val b1 = input[position + 1].toInt() and 0xFF
-                if ((b1 and 0b1100_0000) != 0b1000_0000) {
-                    error("Invalid UTF-8 continuation byte: 0x${b1.toString(16)}")
+                require((b1 and 0b1100_0000) == 0b1000_0000) {
+                    "Invalid UTF-8 continuation byte: 0x${b1.toString(16)}"
                 }
                 val codePoint =
                     ((b0 and 0b0001_1111) shl 6) or
@@ -398,13 +414,14 @@ class PackedDecoder(
 
             // 3-byte: 1110xxxx 10xxxxxx 10xxxxxx
             (b0 and 0b1111_0000) == 0b1110_0000 -> {
-                if (position + 3 > input.size) error("Unexpected EOF in 3-byte UTF-8 char")
+                require(position + 3 <= input.size) {
+                    "Unexpected EOF in 3-byte UTF-8 char"
+                }
                 val b1 = input[position + 1].toInt() and 0xFF
                 val b2 = input[position + 2].toInt() and 0xFF
-                if ((b1 and 0b1100_0000) != 0b1000_0000 ||
-                    (b2 and 0b1100_0000) != 0b1000_0000
-                ) {
-                    error("Invalid UTF-8 continuation byte in 3-byte char")
+                require((b1 and 0b1100_0000) == 0b1000_0000 &&
+                        (b2 and 0b1100_0000) == 0b1000_0000) {
+                    "Invalid UTF-8 continuation byte in 3-byte char"
                 }
                 val codePoint =
                     ((b0 and 0b0000_1111) shl 12) or
@@ -413,7 +430,9 @@ class PackedDecoder(
                 3 to codePoint
             }
 
-            else -> error("UTF-8 sequence too long for Char (leading byte: 0x${b0.toString(16)})")
+            else -> throw IllegalArgumentException(
+                "UTF-8 sequence too long for Char (leading byte: 0x${b0.toString(16)})"
+            )
         }
 
         position += len
@@ -422,5 +441,4 @@ class PackedDecoder(
         // since Char is a UTF-16 code unit.
         return cp.toChar()
     }
-
 }

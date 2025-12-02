@@ -3,7 +3,18 @@ package com.eignex.kencode
 import java.io.ByteArrayOutputStream
 
 internal object PackedUtils {
-    // flags -> int/long
+
+    private fun requireAvailable(
+        data: ByteArray,
+        offset: Int,
+        needed: Int,
+        what: String
+    ) {
+        require(offset >= 0 && needed >= 0 && offset + needed <= data.size) {
+            "Unexpected EOF while decoding $what: need $needed bytes from offset=$offset, size=${data.size}"
+        }
+    }
+
     fun packFlagsToLong(vararg flags: Boolean): Long {
         var result = 0L
         for (i in flags.indices) {
@@ -57,12 +68,14 @@ internal object PackedUtils {
     }
 
     fun readShort(data: ByteArray, offset: Int): Short {
+        requireAvailable(data, offset, 2, "Short")
         val b0 = data[offset].toInt() and 0xFF
         val b1 = data[offset + 1].toInt() and 0xFF
         return ((b0 shl 8) or b1).toShort()
     }
 
     fun readInt(data: ByteArray, offset: Int): Int {
+        requireAvailable(data, offset, 4, "Int")
         var v = 0
         for (i in 0 until 4) {
             v = (v shl 8) or (data[offset + i].toInt() and 0xFF)
@@ -71,6 +84,7 @@ internal object PackedUtils {
     }
 
     fun readLong(data: ByteArray, offset: Int): Long {
+        requireAvailable(data, offset, 8, "Long")
         var v = 0L
         for (i in 0 until 8) {
             v = (v shl 8) or (data[offset + i].toLong() and 0xFFL)
@@ -78,6 +92,9 @@ internal object PackedUtils {
         return v
     }
 
+    // ------------------------------------------------------------
+    // LEB128 VarInt / VarLong writers
+    // ------------------------------------------------------------
     fun writeVarInt(value: Int, out: ByteArrayOutputStream) {
         var v = value
         while (true) {
@@ -104,19 +121,24 @@ internal object PackedUtils {
         }
     }
 
+    // ------------------------------------------------------------
+    // LEB128 VarInt / VarLong decoders (with EOF checking)
+    // ------------------------------------------------------------
     fun decodeVarInt(input: ByteArray, offset: Int): Pair<Int, Int> {
         var result = 0
         var shift = 0
         var pos = offset
         while (true) {
-            if (pos >= input.size) error("Unexpected EOF while decoding VarInt")
+            require(pos < input.size) {
+                "Unexpected EOF while decoding VarInt"
+            }
             val b = input[pos++].toInt() and 0xFF
             result = result or ((b and 0x7F) shl shift)
             if (b and 0x80 == 0) {
                 return result to (pos - offset)
             }
             shift += 7
-            if (shift > 35) error("VarInt too long")
+            require(shift <= 35) { "VarInt too long" }
         }
     }
 
@@ -125,14 +147,16 @@ internal object PackedUtils {
         var shift = 0
         var pos = offset
         while (true) {
-            if (pos >= input.size) error("Unexpected EOF while decoding VarLong")
+            require(pos < input.size) {
+                "Unexpected EOF while decoding VarLong"
+            }
             val b = input[pos++].toInt() and 0xFF
             result = result or ((b and 0x7F).toLong() shl shift)
             if (b and 0x80 == 0) {
                 return result to (pos - offset)
             }
             shift += 7
-            if (shift > 70) error("VarLong too long")
+            require(shift <= 70) { "VarLong too long" }
         }
     }
 }

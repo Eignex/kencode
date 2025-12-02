@@ -115,6 +115,16 @@ class PackedFormatTest {
         val seq: Int
     )
 
+    @Serializable
+    data class Child(val value: Int)
+
+    @Serializable
+    data class Parent(val id: Int, val child: Child)
+
+    @Serializable
+    data class WithList(val id: Int, val items: List<Int>)
+
+
     private fun <T> roundtrip(
         serializer: KSerializer<T>, value: T
     ) {
@@ -518,4 +528,76 @@ class PackedFormatTest {
         assertNull(result)
     }
 
+    @Test
+    fun `single continuation byte should throw for top level char`() {
+        // 0x80 is a continuation byte without a valid leading byte.
+        val bytes = byteArrayOf(0x80.toByte())
+        val decoder = PackedDecoder(bytes)
+
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeSerializableValue(Char.serializer())
+        }
+    }
+
+    @Test
+    fun `truncated 2-byte sequence should throw for top level char`() {
+        // 0xC2 is a valid leading byte for a 2-byte sequence, but we don't
+        // provide the required continuation byte → Unexpected EOF.
+        val bytes = byteArrayOf(0xC2.toByte())
+        val decoder = PackedDecoder(bytes)
+
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeSerializableValue(Char.serializer())
+        }
+    }
+
+    @Test
+    fun `invalid continuation byte should throw for top level char`() {
+        // 0xC2 expects a continuation byte (10xxxxxx); 0x41 ('A') is invalid.
+        val bytes = byteArrayOf(0xC2.toByte(), 0x41)
+        val decoder = PackedDecoder(bytes)
+
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeSerializableValue(Char.serializer())
+        }
+    }
+
+    @Test
+    fun `encoding nested class with PackedFormat should throw`() {
+        val value = Parent(id = 1, child = Child(2))
+
+        assertFailsWith<IllegalStateException> {
+            PackedFormat.encodeToByteArray(Parent.serializer(), value)
+        }
+    }
+
+    @Test
+    fun `encoding list field with PackedFormat should throw`() {
+        val value = WithList(id = 1, items = listOf(1, 2, 3))
+
+        assertFailsWith<IllegalStateException> {
+            PackedFormat.encodeToByteArray(WithList.serializer(), value)
+        }
+    }
+
+    @Test
+    fun `decoding nested class with PackedFormat should throw`() {
+        // Minimal bytes: a single 0x00 varlong for flags; actual payload is irrelevant
+        // because the decoder rejects nested structures based on the descriptor
+        // before deserializing the nested value.
+        val bytes = byteArrayOf(0x00)
+
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(Parent.serializer(), bytes)
+        }
+    }
+
+    @Test
+    fun `decoding list field with PackedFormat should throw`() {
+        val bytes = byteArrayOf(0x00)
+
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(WithList.serializer(), bytes)
+        }
+    }
 }
