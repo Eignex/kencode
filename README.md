@@ -6,35 +6,51 @@
 
 # KEncode
 
-**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin, ideal for URLs, headers, file names, and other size-limited channels. Produces short and predictable payloads.**
+**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin,
+ideal for URLs, headers, file names, and other size-limited channels. Produces
+short and predictable payloads.**
 
 ![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
 ![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
 ![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)
 ![License](https://img.shields.io/github/license/eignex/kencode)
 
-> KEncode produces short, predictable text payloads that fit into environments with strict character or length limits such as URLs, file names, Kubernetes labels, and log keys.
+> KEncode produces short, predictable text payloads that fit into environments
+> with strict character or length limits such as URLs, file names, Kubernetes
+> labels, and log keys.
 
-> It provides high-performance radix and base encoders, efficient integer coding, optional checksums, and a compact bit-packed serializer for flat data models.
+> It provides high-performance radix and base encoders, efficient integer
+> coding, optional checksums, and a compact bit-packed serializer for flat data
+> models.
 
 ---
 
 ## Overview
 
-KEncode brings together several compact encoding tools: radix formats like Base36 and Base62, dense ASCII-safe formats such as Base64 and ASCII85-style Base85, varint and zig-zag integer coding, CRC-16 and CRC-32 checksums, and a minimal-allocation bit-packed serializer built on `kotlinx.serialization`.
+KEncode provides **three focused entry points**, all aimed at producing compact,
+ASCII-safe representations:
 
-These features help you move structured data through **channels with tight ASCII or size constraints**, including:
+1. **ByteEncoding codecs**: `Base62` / `Base36` / `Base64` / `Base85`
+   Low-level encoders/decoders for `ByteArray` values.  
+   Useful when you already have binary data and only need an ASCII-safe
+   representation.
 
-* URLs and query parameters
-* File names
-* Kubernetes pod names, labels, and annotations
-* HTTP headers and cookies
-* Message queue identifiers
-* Log keys and structured logging fields
+2. **Standalone BinaryFormat**: `PackedFormat`
+   Produce compact binary payloads from Kotlin objects using
+   `kotlinx.serialization` `BinaryFormat`.
+   `PackedFormat` produces very small from flat structures using bitmasks,
+   varints, but no object nesting. Use `kotlinx.serialization.ProtoBuf` instead
+   when you need nested types, lists, or maps.
 
-⚠️ Encrypt any payload that contains sensitive information.
+3. **Standalone StringFormat**: `EncodedFormat`
+   Produce string payloads from Kotlin objects using `kotlinx.serialization`
+   `StringFormat`.
+   Encompasses a `BinaryFormat` + optional checksum + `ByteEncoding` text codec.
+   Use when you want a single `encodeToString` / `decodeFromString` API that
+   yields short, deterministic tokens.
 
-The bit-packed serializer supports only flat structures. Use `ProtoBuf` from `kotlinx.serialization` when you need maps, nested types, or more complex layouts.
+KEncode focuses on minimal outputs; encrypt the payload first if it contains
+sensitive information.
 
 ---
 
@@ -55,7 +71,7 @@ You also need to load the serialization plugin.
 
 ## Full serialization example
 
-Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
+Minimal example using the default `EncodedFormat` (`Base62` + `PackedFormat`):
 
 ```kotlin
 @Serializable
@@ -147,7 +163,8 @@ println(encoded)
 val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
 ```
 
-This example relies on kotlinx protobuf implementation, which you install: 
+This example relies on kotlinx protobuf implementation, which you install:
+
 ```kotlin
 implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
 ```
@@ -206,7 +223,7 @@ println(result)
 
 ## Checksums
 
-You can add a CRC checksum at the string boundary. On decode, a mismatch
+You can add a CRC checksum to an `EncodedFormat`. On decode, a mismatch
 throws, so you get a simple integrity check on the serialized payload.
 
 ```kotlin
