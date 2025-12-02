@@ -6,8 +6,7 @@
 
 # KEncode
 
-**Compact, ASCII-safe encodings and ultra-small binary serialization for Kotlin,
-ideal for URLs, headers, file names, and other size-limited channels.**
+**High-efficiency binary/text codecs with compact bit-packed serialization for Kotlin.**
 
 ![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
 ![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
@@ -39,7 +38,8 @@ representations:
    maps.
 
 3. **Standalone StringFormat**: `EncodedFormat`  
-   Adds checksum + text encoding on top of a binary format, providing very s
+   Adds checksum + text encoding on top of a binary format, providing very short
+   string formats.
 
 ---
 
