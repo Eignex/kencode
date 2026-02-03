@@ -12,6 +12,57 @@ internal object PackedUtils {
         }
     }
 
+    fun packFlags(flags: BooleanArray): ByteArray {
+        // 1. Find the last byte that actually contains a 'true' value.
+        var lastTrueIndex = -1
+        for (i in flags.indices) {
+            if (flags[i]) lastTrueIndex = i
+        }
+
+        if (lastTrueIndex == -1) {
+            return ByteArray(0) // All false -> 0 bytes
+        }
+
+        // 2. Calculate exact number of bytes needed (1-based)
+        // e.g. lastTrueIndex = 0 (1st bit) -> 1 byte
+        // e.g. lastTrueIndex = 8 (9th bit) -> 2 bytes
+        val numBytes = (lastTrueIndex / 8) + 1
+        val bytes = ByteArray(numBytes)
+
+        // 3. Pack bits (8 per byte)
+        for (i in 0..lastTrueIndex) {
+            if (flags[i]) {
+                val byteIndex = i / 8
+                val bitIndex = i % 8
+                bytes[byteIndex] = (bytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
+            }
+        }
+        return bytes
+    }
+
+    fun unpackFlags(input: ByteArray, offset: Int, length: Int): BooleanArray {
+        // Guard against OOB
+        require(offset + length <= input.size) {
+            "Unexpected EOF reading flags: need $length bytes"
+        }
+
+        // We return an array exactly sized to the bits we have.
+        // The Decoder will handle padding this out to the full schema size.
+        val totalBits = length * 8
+        val result = BooleanArray(totalBits)
+
+        for (i in 0 until totalBits) {
+            val byteIndex = i / 8
+            val bitIndex = i % 8
+            val byteVal = input[offset + byteIndex].toInt()
+
+            val isSet = (byteVal and (1 shl bitIndex)) != 0
+            result[i] = isSet
+        }
+
+        return result
+    }
+
     fun packFlagsToLong(vararg flags: Boolean): Long {
         var result = 0L
         for (i in flags.indices) {
@@ -27,7 +78,6 @@ internal object PackedUtils {
         }
         return result
     }
-
     fun zigZagEncodeInt(value: Int): Int = (value shl 1) xor (value shr 31)
 
     fun zigZagDecodeInt(value: Int): Int = (value ushr 1) xor -(value and 1)

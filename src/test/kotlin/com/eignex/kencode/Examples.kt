@@ -54,10 +54,11 @@ class Examples {
             handledAt = null,
             type = PayloadType.TYPE1
         )
-        println(EncodedFormat.encodeToString(payload))
+        val message = EncodedFormat.encodeToString(payload)
+        println(message)
         // 0fiXYI
 
-        val result = EncodedFormat.decodeFromString<Payload>("0fiXYI")
+        val result = EncodedFormat.decodeFromString<Payload>(message)
         assertEquals(result, payload)
     }
 
