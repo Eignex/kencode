@@ -25,21 +25,20 @@ Kotlin.**
 
 ## Overview
 
-KEncode has **three focused entry points**, all aimed at compact, ASCII-safe
+KEncode has three focused entry points, all aimed at compact, ASCII-safe
 representations:
 
-1. **ByteEncoding codecs**: `Base62` / `Base36` / `Base64` / `Base85`  
+1. ByteEncoding codecs: `Base62` / `Base36` / `Base64` / `Base85`  
    Low-level encoders/decoders for byte arrays when you already have binary
    data.
 
-2. **Standalone BinaryFormat**: `PackedFormat`  
-   A binary serializer for flat Kotlin serializable classes. It uses a bitset
-   for booleans and nullability, and varint encodings for integers. It avoids
-   support for nesting or collections in order to keep the layout small and
-   predictable. Use `kotlinx.serialization.ProtoBuf` when hierarchical
-   structures are required.
+2. Standalone BinaryFormat: `PackedFormat`  
+   A compact binary serializer optimized for Kotlin. It supports arbitrary
+   object graphs, including nested objects, lists, and maps. It uses
+   per-object bitsets for booleans and nullability, and varint encodings for
+   integers to keep the layout significantly smaller than standard formats.
 
-3. **Standalone StringFormat**: `EncodedFormat`  
+3. Standalone StringFormat: `EncodedFormat`  
    A wrapper that applies a binary format, optionally appends a checksum, and
    then encodes the final byte sequence using a chosen `ByteEncoding`. This
    produces short, deterministic string representations suitable for external
@@ -104,23 +103,18 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 
 You can use the encoders standalone on raw byte arrays.
 
-```kotlin
-val bytes = "any byte data".encodeToByteArray()
-println(Base36.encode(bytes)) // 0ksef5o4kvegb70nre15t
-println(Base62.encode(bytes)) // 2BVj6VHhfNlsGmoMQF
-println(Base64.encode(bytes)) // YW55IGJ5dGUgZGF0YQ==
-println(Base85.encode(bytes)) // @;^?5@X3',+Cno&@/
+### 2. Update the **ProtoBuf serialization** section
 
-// Decoding is symmetric:
-val back = Base62.decode("2BVj6VHhfNlsGmoMQF")
-```
+The motivation is now changed from "complexity" to "interoperability."
 
 ---
 
 ## ProtoBuf serialization
 
-For more complex payloads (nested types, lists, maps) use `ProtoBuf` as the
-binary format and still get compact, ASCII-safe strings:
+`PackedFormat` is optimized for Kotlin-to-Kotlin scenarios. If you need
+cross-language compatibility (consuming the payload in non-JVM languages) or
+require standard Protocol Buffer schema evolution, you can swap the binary
+format for `ProtoBuf`:
 
 ```kotlin
 @Serializable
@@ -207,44 +201,44 @@ val decoded = format.decodeFromString<Command>(encoded)
 
 ## PackedFormat explanation
 
-`PackedFormat` is a `BinaryFormat` designed to produce very small payloads for 
-**flat** Kotlin serializable classes. It avoids nesting and collections, 
-allowing a compact and deterministic binary layout.
+`PackedFormat` is a `BinaryFormat` designed to produce the smallest feasible
+payloads for Kotlin classes. Unlike JSON or standard ProtoBuf, it uses a
+state-aware bit-packing strategy to merge boolean flags and nullability
+indicators.
+
+### Capabilities
+
+* Full Graph Support: Handles nested objects, lists, maps, and polymorphic
+  types.
+* Bit-Packing: For every class in the hierarchy, all `Boolean` fields and
+  `Nullable` indicators are packed into a single varlong header. For very or 
+  dynamic payloads a
+* VarInts: Integers can be encoded as VarInts via annotation (or ZigZag).
 
 ### Field layout
 
-For a single class, the encoding consists of:
+For a standard class, the encoding follows this structure:
 
-1. **Flags varlong**
+1. Bitmask Header A single varlong containing:
+    * Boolean bits — one per boolean property in the specific class.
+    * Nullability bits — one per nullable property.
+   *(This ensures that a class with 10 booleans and 5 nullable fields only uses ~2 bytes of overhead).*
 
-   A single varlong encodes:
-    * **Boolean bits** — one per boolean property, in declaration order  
-      (`1` = true, `0` = false)
-    * **Nullability bits** — one per nullable property  
-      (`1` = null, `0` = non-null)
-
-2. **Payload bytes**
-
-   After the flags, each non-boolean field is encoded in declaration order:
-
-    * Fixed primitives (`Byte`, `Short`, `Int`, `Long`, `Float`, `Double`)
-    * `String`: `[varint length][UTF-8 bytes]`
-    * `Char`: UTF-8 encoding
-    * `Enum`: ordinal as varint
-    * Nullable fields omit payload bytes when null
-
-A top-level nullable value is encoded with a single bit: `1` = null, `0` =
-present.
+2. Payload bytes After the flags, fields are encoded in declaration order:
+    * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
+    * Strings**: `[varint length][UTF-8 bytes]`.
+    * Nested Objects: Recursively encodes the child object (starting with its own Bitmask Header).
+    * Collections: `[varint size][item 1][item 2]...` (Collections do not use bitmasks; nulls in lists use inline markers).
 
 ### VarInt / VarUInt annotations
 
-Use varint-style encodings for compact integer fields:
+You can further optimize integer fields using annotations:
 
 ```kotlin
 @Serializable
 data class Counters(
     @VarUInt val seq: Long, // unsigned varint
-    @VarInt val delta: Int // zig-zag + varint
+    @VarInt val delta: Int  // zig-zag + varint (good for small negative numbers)
 )
 ```
 
@@ -255,15 +249,15 @@ data class Counters(
 `EncodedFormat` provides a single `StringFormat` API that produces short,
 ASCII-safe tokens by composing three layers:
 
-1. **Binary format**  
+1. Binary format  
    Default is `PackedFormat`, but any `BinaryFormat` (e.g. ProtoBuf) can be
    used.
 
-2. **Checksum (optional)**  
+2. Checksum (optional)  
    Supports `Crc16`, `Crc32`, or a custom implementation.  
    The checksum is appended to the binary payload and verified during decode.
 
-3. **Text codec**  
+3. Text codec  
    Converts the final bytes into a compact ASCII representation.  
    Default is `Base62`, with alternatives such as `Base36`, `Base64`,
    `Base64UrlSafe`, `Base85`, or custom alphabets.
