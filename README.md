@@ -44,26 +44,18 @@ representations:
    produces short, deterministic string representations suitable for external
    identifiers.
 
-These components define explicit data layouts and predictable output lengths,
-enabling efficient transport, storage, and comparison of serialized values.
----
-
-## Installation
+### Installation
 
 ```kotlin
 dependencies {
     implementation("com.eignex:kencode:1.0.0")
-
-    // For serialization support
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
 }
 ```
 
-You also need to load the serialization plugin.
+For PackedFormat and EncodedFormat you also need you also need to load the
+serialization plugin.
 
----
-
-## Full serialization example
+### Full serialization example
 
 Minimal example using the default `EncodedFormat` (`Base62` + `PackedFormat`):
 
@@ -103,9 +95,16 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 
 You can use the encoders standalone on raw byte arrays.
 
-### 2. Update the **ProtoBuf serialization** section
+```kotlin
+val bytes = "any byte data".encodeToByteArray()
+println(Base36.encode(bytes)) // 0ksef5o4kvegb70nre15t
+println(Base62.encode(bytes)) // 2BVj6VHhfNlsGmoMQF
+println(Base64.encode(bytes)) // YW55IGJ5dGUgZGF0YQ==
+println(Base85.encode(bytes)) // @;^?5@X3',+Cno&@/
 
-The motivation is now changed from "complexity" to "interoperability."
+// Decoding is symmetric:
+val back = Base62.decode("2BVj6VHhfNlsGmoMQF")
+```
 
 ---
 
@@ -126,7 +125,7 @@ val encoded = format.encodeToString(payload) // 05cAKYGWf6gBgtZVpkqPEWOYH
 val decoded = format.decodeFromString<ProtoBufRequired>(encoded)
 ```
 
-This example relies on kotlinx protobuf, which you install:
+This example relies on kotlinx protobuf, which you install like so:
 
 ```kotlin
 implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
@@ -185,8 +184,8 @@ val result: SensitiveData = PackedFormat.decodeFromByteArray(decrypted)
 
 ## Checksums
 
-You can add a CRC checksum to an `EncodedFormat`. On decode, a mismatch
-throws, so you get a simple integrity check on the serialized payload.
+You can add a CRC checksum to an `EncodedFormat`, this is built in. On decode, a
+mismatch throws, so you get a simple integrity check on the serialized payload.
 
 ```kotlin
 @Serializable
