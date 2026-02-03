@@ -156,3 +156,5 @@ val encrypted = cipher.doFinal(binary)
 // 3. Encode to Text
 val token = Base62.encode(encrypted)
 ```
+See [Examples](https://github.com/Eignex/kencode/blob/main/src/test/kotlin/com/eignex/kencode/Examples.kt)
+for a Bouncycastle demo.
