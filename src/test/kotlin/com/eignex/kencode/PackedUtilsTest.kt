@@ -5,6 +5,115 @@ import kotlin.test.*
 class BitPackingTest {
 
     @Test
+    fun `packFlags simple bit pattern`() {
+        val flags = booleanArrayOf(true, false, true)
+        val packed = PackedUtils.packFlags(flags)
+
+        assertEquals(1, packed.size, "Should pack into 1 byte")
+        assertEquals(5.toByte(), packed[0], "Bits should match 101 binary")
+    }
+
+    @Test
+    fun `packFlags multi byte`() {
+        val flags = BooleanArray(16)
+        flags[0] = true
+        flags[10] = true
+
+        val packed = PackedUtils.packFlags(flags)
+
+        assertEquals(2, packed.size, "Should require 2 bytes")
+        assertEquals(1.toByte(), packed[0], "Byte 0 should have bit 0 set")
+        assertEquals(4.toByte(), packed[1], "Byte 1 should have bit 2 set (index 10)")
+    }
+
+    @Test
+    fun `packFlags all false optimizes to empty`() {
+        val flags = booleanArrayOf(false, false, false, false)
+        val packed = PackedUtils.packFlags(flags)
+
+        assertEquals(0, packed.size, "All false should result in 0 bytes")
+    }
+
+    @Test
+    fun `packFlags empty input`() {
+        val flags = BooleanArray(0)
+        val packed = PackedUtils.packFlags(flags)
+
+        assertEquals(0, packed.size)
+    }
+
+    @Test
+    fun `unpackFlags simple`() {
+        val input = byteArrayOf(5)
+        val unpacked = PackedUtils.unpackFlags(input, 0, 1)
+
+        assertEquals(8, unpacked.size, "Unpacking 1 byte should yield 8 booleans")
+        assertTrue(unpacked[0])
+        assertFalse(unpacked[1])
+        assertTrue(unpacked[2])
+        assertFalse(unpacked[3])
+    }
+
+    @Test
+    fun `unpackFlags with offset`() {
+        val input = byteArrayOf(0xFF.toByte(), 5, 0xFF.toByte())
+        val unpacked = PackedUtils.unpackFlags(input, 1, 1)
+
+        assertEquals(8, unpacked.size)
+        assertTrue(unpacked[0])
+        assertFalse(unpacked[1])
+        assertTrue(unpacked[2])
+        assertFalse(unpacked[3])
+    }
+
+    @Test
+    fun `pack and unpack roundtrip exact boundary`() {
+        val flags = BooleanArray(16)
+        flags[0] = true
+        flags[7] = true
+        flags[8] = true
+        flags[15] = true
+
+        val packed = PackedUtils.packFlags(flags)
+        assertEquals(2, packed.size)
+
+        val unpacked = PackedUtils.unpackFlags(packed, 0, packed.size)
+        assertContentEquals(flags, unpacked)
+    }
+
+    @Test
+    fun `pack and unpack roundtrip padded boundary`() {
+
+        val flags = BooleanArray(10)
+        flags[0] = true
+        flags[9] = true
+
+        val packed = PackedUtils.packFlags(flags)
+        val unpacked = PackedUtils.unpackFlags(packed, 0, packed.size)
+
+        assertEquals(16, unpacked.size)
+
+        assertTrue(unpacked[0])
+        assertTrue(unpacked[9])
+        assertFalse(unpacked[1])
+
+        for (i in 10 until 16) {
+            assertFalse(unpacked[i], "Padding bit $i should be false")
+        }
+    }
+
+    @Test
+    fun `unpackFlags throws on OOB`() {
+        val input = byteArrayOf(1, 2)
+        assertFailsWith<IllegalArgumentException> {
+            PackedUtils.unpackFlags(input, 0, 3)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackedUtils.unpackFlags(input, 2, 1)
+        }
+    }
+
+    @Test
     fun `short roundtrip`() {
         val out = java.io.ByteArrayOutputStream()
         PackedUtils.writeShort(0x1234.toShort(), out)
