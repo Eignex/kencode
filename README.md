@@ -8,11 +8,10 @@
 
 **High-efficiency binary/text codecs with compact bit-packed serialization for
 Kotlin.**
-
-![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)
-![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)
-![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)
-![License](https://img.shields.io/github/license/eignex/kencode)
+[![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.eignex/kencode/1.0.0)
+[![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)](https://github.com/eignex/kencode/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)](https://codecov.io/gh/eignex/kencode)
+[![License](https://img.shields.io/github/license/eignex/kencode)](https://github.com/eignex/kencode/blob/main/LICENSE)
 
 > KEncode produces short, predictable text payloads for environments with strict
 > character or length limits such as URLs, file names, Kubernetes labels, and log
