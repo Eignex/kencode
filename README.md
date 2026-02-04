@@ -23,12 +23,11 @@ KEncode provides three standalone entry points:
 
 1. **ByteEncoding** text codecs: Base62, Base36, Base64, and Base85 encoders
    for raw binary data.
-2. **PackedFormat**: A binary serializer optimized for Kotlin that supports
-   nested objects, lists, and maps. It uses bitsets for booleans and nullability 
-   to minimize overhead.
-3. **EncodedFormat**: A wrapper for the above that combines a binary format, 
-   an optional checksum, and a text codec to produce small deterministic string 
-   identifiers.
+2. **PackedFormat**: A binary format serializer optimized for Kotlin that
+   supports nested objects, lists, and maps. It uses bitsets for booleans and 
+   nullability to minimize overhead.
+3. **EncodedFormat**: A string format serializer that wraps the above to produce
+   small deterministic string identifiers.
 
 ### Installation
 
