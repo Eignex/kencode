@@ -1,22 +1,19 @@
 <p align="center">
-  <a href="https://www.eignex.com/">
+  <a href="https://eignex.com/">
     <img src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em" />
   </a>
 </p>
 
 # KEncode
 
-**High-efficiency binary/text codecs with compact bit-packed serialization for
-Kotlin.**
-
 [![Maven Central](https://img.shields.io/maven-central/v/com.eignex/kencode.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.eignex/kencode/1.0.0)
 [![Build](https://github.com/eignex/kencode/actions/workflows/build.yml/badge.svg)](https://github.com/eignex/kencode/actions/workflows/build.yml)
 [![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)](https://codecov.io/gh/eignex/kencode)
 [![License](https://img.shields.io/github/license/eignex/kencode)](https://github.com/eignex/kencode/blob/main/LICENSE)
 
-> KEncode produces short, predictable text payloads for environments with strict
-> character or length limits such as URLs, file names, Kubernetes labels, and log
-> keys.
+KEncode produces short, predictable text payloads for environments with strict
+character or length limits such as URLs, file names, Kubernetes labels, and log
+keys.
 
 ---
 
@@ -24,13 +21,13 @@ Kotlin.**
 
 KEncode provides three entry points for compact, ASCII-safe representations:
 
-1. ByteEncoding codecs: Base62, Base36, Base64, and Base85 low-level encoders
+1. **ByteEncoding** codecs: Base62, Base36, Base64, and Base85 encoders
    for raw binary data.
-2. PackedFormat: A binary serializer optimized for Kotlin that supports nested
-   objects, lists, and maps. It uses bitsets for booleans and nullability to
-   minimize overhead.
-3. EncodedFormat: A wrapper that combines a binary format, an optional checksum,
-   and a text codec to produce deterministic string identifiers.
+2. **PackedFormat**: A binary serializer optimized for Kotlin that supports
+   nested objects, lists, and maps. It uses bitsets for booleans and nullability 
+   to minimize overhead.
+3. **EncodedFormat**: A wrapper that combines a binary format, an optional 
+   checksum, and a text codec to produce deterministic string identifiers.
 
 ### Installation
 
@@ -72,6 +69,7 @@ val payload = Payload(
 )
 
 val encoded = EncodedFormat.encodeToString(payload)
+// > 0fiXYI (that's it, this specific payload fits in 4 raw bytes)
 val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 ```
 
@@ -83,8 +81,8 @@ PackedFormat is a BinaryFormat designed to produce the smallest feasible
 payloads for Kotlin classes by moving structural metadata into a header.
 
 * Bit-Packing: Booleans and nullability markers are stored in a single
-  bit-header (1 bit per field).
-* VarInts: Integer fields can be optimized using @VarUInt or @VarInt (ZigZag)
+  bit-header (about 1 bit per field).
+* VarInts: Int/Long fields can be optimized using @VarUInt or @VarInt (ZigZag)
   annotations.
 * Full Graph Support: Handles nested objects, lists, maps, and polymorphism
   recursively.
@@ -93,15 +91,14 @@ payloads for Kotlin classes by moving structural metadata into a header.
 
 For a standard class, the encoding follows this structure:
 
-1. Bitmask Header: A varlong containing bits for all booleans and nullable
-   indicators. A class with 10 booleans and 5 nullable fields uses ~2 bytes of
-   overhead.
+1. Bitmask Header: A variable length bitset containing bits for all booleans and
+   nullable indicators. A class with 10 booleans and 5 nullable fields uses 2 
+   bytes for the header (the boolean variables are inlined to the header).
 2. Payload bytes: Fields are encoded in declaration order.
-
-  * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
-  * Strings: [varint length][UTF-8 bytes].
-  * Nested Objects: Recursively encodes the child object with its own header.
-  * Collections: [varint size][items...]. Nulls in lists use inline markers.
+    * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
+    * Strings: [varint length][UTF-8 bytes].
+    * Nested Objects: Recursively encodes the child object with its own header.
+    * Collections: [varint size][items...]. Nulls in lists use inline markers.
 
 ---
 
@@ -157,4 +154,4 @@ val encrypted = cipher.doFinal(binary)
 val token = Base62.encode(encrypted)
 ```
 See [Examples](https://github.com/Eignex/kencode/blob/main/src/test/kotlin/com/eignex/kencode/Examples.kt)
-for a Bouncycastle demo.
+for a BouncyCastle demo.
