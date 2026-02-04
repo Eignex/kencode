@@ -147,7 +147,27 @@ class PackedFormatTest {
                 ),
                 nestedLists = listOf(listOf(listOf(1, 2), listOf(3))),
                 optionalDeepMap = mapOf(42 to null)
-            )
+            ),
+
+            DeepBreadth(
+                branchA = Level1(true, Level2("data-a", listOf(listOf(1)))),
+                branchB = Level1(false, null),
+                branchC = Level1(true, Level2("data-c", emptyList())),
+                rootValue = 999
+            ),
+
+            PolymorphicContainer(
+                main = PolymorphicBase.Action("Login", 1),
+                history = listOf(
+                    PolymorphicBase.Notification("Welcome!", false),
+                    PolymorphicBase.Heartbeat,
+                    PolymorphicBase.Action("Update", 2),
+                    PolymorphicBase.Notification("Hello", true),
+                )
+            ),
+
+            PolymorphicBase.Heartbeat,
+            PolymorphicBase.Action("Standalone", 0)
         )
 
         testData.forEach { value ->

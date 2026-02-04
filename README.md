@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://eignex.com/">
-    <img src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em" />
+    <img src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em"  alt="Eignex">
   </a>
 </p>
 
@@ -85,7 +85,9 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 * VarInts: Int/Long fields can be optimized using @VarUInt or @VarInt (ZigZag)
   annotations.
 * Full Graph Support: Handles nested objects, lists, maps, and polymorphism
-  recursively.
+  recursively. While this is supported it will not produce as compact 
+  representations as flat structures that can pack all metadata into the same 
+  header.
 
 ### Field layout
 

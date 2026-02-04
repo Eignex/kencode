@@ -229,3 +229,19 @@ data class MultiLevelCollections(
     val nestedLists: List<List<List<Int>>>,
     val optionalDeepMap: Map<Int, Map<String, Boolean>?>?
 )
+
+@Serializable
+sealed class PolymorphicBase {
+    @Serializable
+    data class Action(val name: String, val priority: Int) : PolymorphicBase()
+    @Serializable
+    data class Notification(val message: String, val silent: Boolean) : PolymorphicBase()
+    @Serializable
+    object Heartbeat : PolymorphicBase()
+}
+
+@Serializable
+data class PolymorphicContainer(
+    val main: PolymorphicBase,
+    val history: List<PolymorphicBase>
+)
