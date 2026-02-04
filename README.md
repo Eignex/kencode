@@ -19,15 +19,16 @@ keys.
 
 ## Overview
 
-KEncode provides three entry points for compact, ASCII-safe representations:
+KEncode provides three standalone entry points:
 
-1. **ByteEncoding** codecs: Base62, Base36, Base64, and Base85 encoders
+1. **ByteEncoding** text codecs: Base62, Base36, Base64, and Base85 encoders
    for raw binary data.
 2. **PackedFormat**: A binary serializer optimized for Kotlin that supports
    nested objects, lists, and maps. It uses bitsets for booleans and nullability 
    to minimize overhead.
-3. **EncodedFormat**: A wrapper that combines a binary format, an optional 
-   checksum, and a text codec to produce deterministic string identifiers.
+3. **EncodedFormat**: A wrapper for the above that combines a binary format, 
+   an optional checksum, and a text codec to produce small deterministic string 
+   identifiers.
 
 ### Installation
 
@@ -37,8 +38,8 @@ dependencies {
 }
 ```
 
-For PackedFormat and EncodedFormat you also need to load the serialization
-plugin.
+For PackedFormat and EncodedFormat you also need to load the 
+`kotlinx.serialization` plugin and core library.
 
 ### Full serialization example
 
@@ -49,7 +50,7 @@ Minimal example using the default EncodedFormat (Base62 + PackedFormat):
 data class Payload(
     @VarUInt val id: ULong, // varint
     @VarInt val delta: Int, // zig-zag + varint
-    val urgent: Boolean,    // joined to bitset
+    val urgent: Boolean,    // these 3 are joined to bitset
     val sensitive: Boolean,
     val external: Boolean,
     val handled: Instant?,  // nullable, tracked via bitset
@@ -78,7 +79,7 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 ## PackedFormat
 
 PackedFormat is a BinaryFormat designed to produce the smallest feasible
-payloads for Kotlin classes by moving structural metadata into a header.
+payloads for Kotlin classes by moving structural metadata into a compact header.
 
 * Bit-Packing: Booleans and nullability markers are stored in a single
   bit-header (about 1 bit per field).
@@ -94,7 +95,7 @@ For a standard class, the encoding follows this structure:
 1. Bitmask Header: A variable length bitset containing bits for all booleans and
    nullable indicators. A class with 10 booleans and 5 nullable fields uses 2 
    bytes for the header (the boolean variables are inlined to the header).
-2. Payload bytes: Fields are encoded in declaration order.
+2. Payload bytes: Fields are encoded in declaration order:
     * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
     * Strings: [varint length][UTF-8 bytes].
     * Nested Objects: Recursively encodes the child object with its own header.
@@ -130,9 +131,10 @@ KEncode includes standalone codecs for byte-to-text conversion. All
 implementations support custom alphabets.
 
 * Base62 / Base36: Uses fixed-block encoding for predictable lengths without
-  padding. Main use is to have 100% alpha-numeric output.
+  padding. Main use is to have 100% alpha-numeric output, with or without
+  upper-case.
 * Base85: High-density encoding (4 bytes to 5 characters).
-* Base64 / URL-Safe: RFC 4648 compatible.
+* Base64 / Base64UrlSafe: RFC 4648 compatible.
 
 ---
 
