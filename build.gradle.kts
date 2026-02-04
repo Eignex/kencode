@@ -1,10 +1,10 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "2.2.21"
-    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("jvm") version "2.3.0"
+    kotlin("plugin.serialization") version "2.3.0"
     id("org.jetbrains.dokka") version "2.1.0"
-    id("org.jetbrains.kotlinx.kover") version "0.9.3"
+    id("org.jetbrains.kotlinx.kover") version "0.9.5"
     `maven-publish`
     signing
 
@@ -12,27 +12,26 @@ plugins {
 }
 
 group = "com.eignex"
-version = "1.0.0"
+version = findProperty("ciVersion") as String? ?: "SNAPSHOT"
 
 repositories { mavenCentral() }
 
 kotlin {
     jvmToolchain(21)
-    compilerOptions { jvmTarget.set(JVM_21) }
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_21) }
 }
 
 java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
     withSourcesJar()
     withJavadocJar()
 }
 
 dependencies {
     testImplementation(kotlin("test"))
-    compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0")
-    testImplementation("org.bouncycastle:bcprov-jdk18on:1.80")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
+    testImplementation("org.bouncycastle:bcprov-jdk18on:1.83")
 }
 
 tasks.test { useJUnitPlatform() }
@@ -57,9 +56,9 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/Eignex/kencode")
-                    connection.set("scm:git:https://github.com/Eignex/kencode.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/Eignex/kencode.git")
+                    url.set("https://github.com/Eignex/kpermute")
+                    connection.set("scm:git:https://github.com/Eignex/kpermute.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/Eignex/kpermute.git")
                 }
                 developers {
                     developer {
