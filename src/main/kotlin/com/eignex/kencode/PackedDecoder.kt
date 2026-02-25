@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+import PackedConfiguration
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
@@ -8,12 +9,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
+@Suppress("UNCHECKED_CAST")
 @OptIn(ExperimentalSerializationApi::class)
 class PackedDecoder(
-    private val input: ByteArray
-) : Decoder, CompositeDecoder {
-
+    private val input: ByteArray,
+    private val config: PackedConfiguration = PackedConfiguration(),
     override val serializersModule: SerializersModule = EmptySerializersModule()
+) : Decoder, CompositeDecoder {
 
     internal var position: Int = 0
 
@@ -199,10 +201,13 @@ class PackedDecoder(
 
     override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasVarInt()
-        val varInt = anns.hasVarUInt() || zigZag
+        val hasVarInt = anns.hasVarInt()
+        val hasVarUInt = anns.hasVarUInt()
 
-        return if (varInt) {
+        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
+        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+
+        return if (isVar) {
             val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
             position += bytesRead
             if (zigZag) PackedUtils.zigZagDecodeInt(raw) else raw
@@ -213,10 +218,13 @@ class PackedDecoder(
 
     override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasVarInt()
-        val varInt = anns.hasVarUInt() || zigZag
+        val hasVarInt = anns.hasVarInt()
+        val hasVarUInt = anns.hasVarUInt()
 
-        return if (varInt) {
+        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
+        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+
+        return if (isVar) {
             val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
             position += bytesRead
             if (zigZag) PackedUtils.zigZagDecodeLong(raw) else raw
@@ -248,12 +256,8 @@ class PackedDecoder(
         val kind = deserializer.descriptor.kind
         val isInline = deserializer.descriptor.isInline
 
-        // [CRITICAL FIX]
-        // 1. Isolate complex structures (Classes, Lists, Maps) to separate their state.
-        // 2. EXCLUDE Inline Classes (Value Classes) via `!isInline`. They are wrappers
-        //    and must share the parent's context to access field annotations (like @VarUInt).
         if ((kind is StructureKind.CLASS || kind is StructureKind.OBJECT || kind is StructureKind.LIST || kind is StructureKind.MAP || kind is PolymorphicKind) && !isInline) {
-            val subDecoder = PackedDecoder(input)
+            val subDecoder = PackedDecoder(input, config, serializersModule)
             subDecoder.position = this.position
             val value = deserializer.deserialize(subDecoder)
             this.position = subDecoder.position

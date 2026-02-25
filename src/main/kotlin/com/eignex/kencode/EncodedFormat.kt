@@ -2,8 +2,13 @@ package com.eignex.kencode
 
 import PackedFormat
 import kotlinx.serialization.*
-import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+
+data class EncodedConfiguration(
+    val codec: ByteEncoding = Base62,
+    val checksum: Checksum? = null,
+    val binaryFormat: BinaryFormat = PackedFormat.Default
+)
 
 /**
  * Text `StringFormat` that combines:
@@ -25,17 +30,21 @@ import kotlinx.serialization.modules.SerializersModule
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class EncodedFormat(
-    val codec: ByteEncoding = Base62,
-    val checksum: Checksum? = null,
-    val binaryFormat: BinaryFormat = PackedFormat
+    val configuration: EncodedConfiguration,
 ) : StringFormat {
+
+    constructor(
+        codec: ByteEncoding = Base62,
+        checksum: Checksum? = null,
+        binaryFormat: BinaryFormat = PackedFormat,
+    ) : this(EncodedConfiguration(codec, checksum, binaryFormat))
+
+    override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
     /**
      * Default format: `PackedFormat` + `Base62` without checksum.
      */
     companion object Default : EncodedFormat()
-
-    override val serializersModule: SerializersModule = EmptySerializersModule()
 
     /**
      * Serializes [value] with [binaryFormat], optionally appends [checksum],
@@ -44,11 +53,11 @@ open class EncodedFormat(
     override fun <T> encodeToString(
         serializer: SerializationStrategy<T>, value: T
     ): String {
-        val bytes = binaryFormat.encodeToByteArray(serializer, value)
-        val checked = if (checksum != null) {
-            bytes + checksum.digest(bytes)
+        val bytes = configuration.binaryFormat.encodeToByteArray(serializer, value)
+        val checked = if (configuration.checksum != null) {
+            bytes + configuration.checksum.digest(bytes)
         } else bytes
-        return codec.encode(checked)
+        return configuration.codec.encode(checked)
     }
 
     /**
@@ -60,18 +69,40 @@ open class EncodedFormat(
     override fun <T> decodeFromString(
         deserializer: DeserializationStrategy<T>, string: String
     ): T {
-        val input = codec.decode(string)
-        val bytes = if (checksum != null) {
-            require(input.size >= checksum.size)
-            val bytes = input.sliceArray(0..<input.size - checksum.size)
+        val input = configuration.codec.decode(string)
+        val bytes = if (configuration.checksum != null) {
+            require(input.size >= configuration.checksum.size)
+            val bytes = input.sliceArray(0..<input.size - configuration.checksum.size)
             val actual =
-                input.sliceArray(input.size - checksum.size..<input.size)
-            val expected = checksum.digest(bytes)
+                input.sliceArray(input.size - configuration.checksum.size..<input.size)
+            val expected = configuration.checksum.digest(bytes)
             require(actual.contentEquals(expected)) {
                 "Checksum mismatch."
             }
             bytes
         } else input
-        return binaryFormat.decodeFromByteArray(deserializer, bytes)
+        return configuration.binaryFormat.decodeFromByteArray(deserializer, bytes)
     }
+}
+
+class EncodedFormatBuilder {
+    var codec: ByteEncoding = Base62
+    var checksum: Checksum? = null
+    var binaryFormat: BinaryFormat = PackedFormat.Default
+}
+
+fun EncodedFormat(
+    from: EncodedFormat = EncodedFormat.Default,
+    builderAction: EncodedFormatBuilder.() -> Unit
+): EncodedFormat {
+    val builder = EncodedFormatBuilder().apply {
+        codec = from.configuration.codec
+        checksum = from.configuration.checksum
+        binaryFormat = from.configuration.binaryFormat
+    }
+    builder.builderAction()
+
+    val newConfig = EncodedConfiguration(builder.codec, builder.checksum, builder.binaryFormat)
+
+    return EncodedFormat(newConfig)
 }

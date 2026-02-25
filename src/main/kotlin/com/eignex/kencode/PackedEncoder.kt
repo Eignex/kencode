@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+import PackedConfiguration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.*
@@ -11,10 +12,10 @@ import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalSerializationApi::class)
 class PackedEncoder(
-    private val output: ByteArrayOutputStream
-) : Encoder, CompositeEncoder {
-
+    private val output: ByteArrayOutputStream,
+    private val config: PackedConfiguration = PackedConfiguration(),
     override val serializersModule: SerializersModule = EmptySerializersModule()
+) : Encoder, CompositeEncoder {
 
     private var inStructure: Boolean = false
     private var isCollection: Boolean = false
@@ -32,9 +33,7 @@ class PackedEncoder(
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            // [CRITICAL] Always spawn a new encoder for nested structures (Objects/Lists/Maps)
-            // to prevent state pollution (bitmasks, isCollection flags) between levels.
-            val childEncoder = PackedEncoder(dataBuffer)
+            val childEncoder = PackedEncoder(dataBuffer, config, serializersModule)
             childEncoder.initializeStructure(descriptor)
             return childEncoder
         }
@@ -51,7 +50,7 @@ class PackedEncoder(
         PackedUtils.writeVarInt(collectionSize, target)
 
         // Spawn new encoder for the collection items
-        val childEncoder = PackedEncoder(target)
+        val childEncoder = PackedEncoder(target, config, serializersModule)
         childEncoder.initializeStructure(descriptor)
         return childEncoder
     }
@@ -87,7 +86,6 @@ class PackedEncoder(
         dataBuffer.reset()
     }
 
-    // Helper to write to the correct buffer
     private fun getBuffer(): ByteArrayOutputStream = if (inStructure) dataBuffer else output
 
     override fun encodeBoolean(value: Boolean) {
@@ -226,12 +224,14 @@ class PackedEncoder(
     }
 
     override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
-        // Only classes support per-field annotations
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasVarInt()
-        val varInt = anns.hasVarUInt() || zigZag
+        val hasVarInt = anns.hasVarInt()
+        val hasVarUInt = anns.hasVarUInt()
 
-        if (varInt) {
+        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
+        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+
+        if (isVar) {
             val v = if (zigZag) PackedUtils.zigZagEncodeInt(value) else value
             PackedUtils.writeVarInt(v, dataBuffer)
         } else {
@@ -241,10 +241,13 @@ class PackedEncoder(
 
     override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
         val anns = descriptor.getElementAnnotations(index)
-        val zigZag = anns.hasVarInt()
-        val varInt = anns.hasVarUInt() || zigZag
+        val hasVarInt = anns.hasVarInt()
+        val hasVarUInt = anns.hasVarUInt()
 
-        if (varInt) {
+        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
+        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+
+        if (isVar) {
             val v = if (zigZag) PackedUtils.zigZagEncodeLong(value) else value
             PackedUtils.writeVarLong(v, dataBuffer)
         } else {
