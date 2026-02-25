@@ -171,7 +171,7 @@ class PackedFormatTest {
 
         testData.forEach { value ->
             @Suppress("UNCHECKED_CAST")
-            val serializer = serializer(value::class.java) as KSerializer<Any>
+            val serializer = serializer(value::class.java)
             assertPackedRoundtrip(serializer, value)
         }
     }
@@ -193,7 +193,7 @@ class PackedFormatTest {
 
         primitives.forEach { value ->
             @Suppress("UNCHECKED_CAST")
-            val serializer = serializer(value::class.java) as KSerializer<Any>
+            val serializer = serializer(value::class.java)
             assertPackedRoundtrip(serializer, value)
         }
     }
