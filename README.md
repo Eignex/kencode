@@ -37,7 +37,7 @@ KEncode provides three standalone entry points:
 
 ```kotlin
 dependencies {
-    implementation("com.eignex:kencode:1.0.0")
+    implementation("com.eignex:kencode:1.1.0")
 }
 ```
 
