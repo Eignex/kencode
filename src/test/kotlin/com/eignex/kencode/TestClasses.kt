@@ -51,7 +51,8 @@ data class NullableFieldsPayload(
     val maybeId: Int?,
     val maybeName: String?,
     val maybeScore: Long?,
-    val maybeFlag: Boolean?
+    val maybeFlag: Boolean?,
+    val maybeList: List<Int>?
 )
 
 @Serializable

@@ -3,8 +3,7 @@
 package com.eignex.kencode
 
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.builtins.nullable
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.*
 import kotlinx.serialization.serializer
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
@@ -20,10 +19,11 @@ class PackedFormatTest {
      */
     private fun <T> assertPackedRoundtrip(
         serializer: KSerializer<T>,
-        value: T
+        value: T,
+        format: PackedFormat = PackedFormat
     ) {
-        val bytes = PackedFormat.encodeToByteArray(serializer, value)
-        val decoded = PackedFormat.decodeFromByteArray(serializer, bytes)
+        val bytes = format.encodeToByteArray(serializer, value)
+        val decoded = format.decodeFromByteArray(serializer, bytes)
         assertEquals(
             value,
             decoded,
@@ -39,6 +39,28 @@ class PackedFormatTest {
             SimpleIntsAndBooleans(1, 100, true, false),
             SimpleIntsAndBooleans(Int.MAX_VALUE, Int.MIN_VALUE, false, true),
             AllPrimitiveTypes(123, 456L, 7, 8, 3.5f, 2.75, 'A', true, "Hello"),
+            AllPrimitiveTypes(
+                123,
+                456L,
+                7,
+                8,
+                Float.NaN,
+                Double.NaN,
+                'A',
+                true,
+                "Hello"
+            ),
+            AllPrimitiveTypes(
+                -123,
+                -456L,
+                -7,
+                -8,
+                -.5f,
+                -2.75,
+                'ñ',
+                true,
+                "Hello \uD83D\uDE80"
+            ),
             AllPrimitiveTypesNullable(
                 null,
                 null,
@@ -55,8 +77,8 @@ class PackedFormatTest {
             // Enums & Nullables
             EnumPayload(1, Status.NEW, null),
             EnumPayload(2, Status.IN_PROGRESS, Status.DONE),
-            NullableFieldsPayload(null, null, null, null),
-            NullableFieldsPayload(10, "Alice", 999L, true),
+            NullableFieldsPayload(null, null, null, null, null),
+            NullableFieldsPayload(10, "Alice", 999L, true, listOf(1, 2, 3)),
             NullableBooleansAndNonBooleans(
                 null,
                 false,
@@ -321,5 +343,59 @@ class PackedFormatTest {
             bytes
         )
         assertEquals(payload, decoded)
+    }
+
+    @Test
+    fun `truncated data should throw informative error`() {
+        val serializer = AllPrimitiveTypes.serializer()
+        val valid = PackedFormat.encodeToByteArray(
+            serializer,
+            AllPrimitiveTypes(1, 1, 1, 1, 1f, 1.0, 'a', true, "test")
+        )
+
+        val truncated = valid.copyOfRange(0, valid.size - 5)
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(serializer, truncated)
+        }
+    }
+
+    @Test
+    fun `decodeElementIndex simulates sequential decoding for classes and collections`() {
+        // 1. Test the Class path
+        // UnannotatedPayload has 2 properties (x, y)
+        val classSerializer = UnannotatedPayload.serializer()
+        val classBytes = PackedFormat.encodeToByteArray(classSerializer, UnannotatedPayload(1, 2L))
+
+        val classDecoder = PackedDecoder(classBytes)
+        val classDescriptor = classSerializer.descriptor
+
+        classDecoder.beginStructure(classDescriptor)
+
+        // It should yield index 0, then 1, then DECODE_DONE
+        assertEquals(0, classDecoder.decodeElementIndex(classDescriptor))
+        assertEquals(1, classDecoder.decodeElementIndex(classDescriptor))
+        assertEquals(
+            kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
+            classDecoder.decodeElementIndex(classDescriptor)
+        )
+
+        // 2. Test the Collection path
+        val listSerializer = ListSerializer(serializer<Int>())
+        val listBytes = PackedFormat.encodeToByteArray(listSerializer, listOf(10, 20))
+
+        val listDecoder = PackedDecoder(listBytes)
+        val listDescriptor = listSerializer.descriptor
+
+        listDecoder.beginStructure(listDescriptor)
+        // Manually trigger the size decoding which sets up the collection state
+        listDecoder.decodeCollectionSize(listDescriptor)
+
+        // It should yield index 0, then 1, then DECODE_DONE
+        assertEquals(0, listDecoder.decodeElementIndex(listDescriptor))
+        assertEquals(1, listDecoder.decodeElementIndex(listDescriptor))
+        assertEquals(
+            kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
+            listDecoder.decodeElementIndex(listDescriptor)
+        )
     }
 }
