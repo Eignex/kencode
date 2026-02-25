@@ -159,7 +159,6 @@ class PackedEncoder(
     @ExperimentalSerializationApi
     override fun encodeNotNullMark() {
         if (inStructure && isCollection) {
-            // Inline not-null marker for collections (0 = present)
             PackedUtils.writeVarLong(0L, dataBuffer)
         } else if (!inStructure) {
             PackedUtils.writeVarLong(0L, output)
@@ -204,8 +203,6 @@ class PackedEncoder(
         nullableIndices = intArrayOf()
     }
 
-    // --- Element Encoding Delegates ---
-
     private fun booleanPos(index: Int): Int {
         for (i in booleanIndices.indices) if (booleanIndices[i] == index) return i
         return -1
@@ -224,11 +221,21 @@ class PackedEncoder(
 
     override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
         val anns = descriptor.getElementAnnotations(index)
+        val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
         val hasVarUInt = anns.hasVarUInt()
 
-        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
-        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+        val isVar = when {
+            hasFixedInt -> false
+            hasVarInt || hasVarUInt -> true
+            else -> config.defaultVarInt || config.defaultZigZag
+        }
+
+        val zigZag = when {
+            hasVarInt -> true
+            hasVarUInt || hasFixedInt -> false
+            else -> config.defaultZigZag
+        }
 
         if (isVar) {
             val v = if (zigZag) PackedUtils.zigZagEncodeInt(value) else value
@@ -240,11 +247,21 @@ class PackedEncoder(
 
     override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
         val anns = descriptor.getElementAnnotations(index)
+        val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
         val hasVarUInt = anns.hasVarUInt()
 
-        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
-        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+        val isVar = when {
+            hasFixedInt -> false
+            hasVarInt || hasVarUInt -> true
+            else -> config.defaultVarInt || config.defaultZigZag
+        }
+
+        val zigZag = when {
+            hasVarInt -> true
+            hasVarUInt || hasFixedInt -> false
+            else -> config.defaultZigZag
+        }
 
         if (isVar) {
             val v = if (zigZag) PackedUtils.zigZagEncodeLong(value) else value
