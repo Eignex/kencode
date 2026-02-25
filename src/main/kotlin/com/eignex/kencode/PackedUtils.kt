@@ -34,7 +34,8 @@ internal object PackedUtils {
             if (flags[i]) {
                 val byteIndex = i / 8
                 val bitIndex = i % 8
-                bytes[byteIndex] = (bytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
+                bytes[byteIndex] =
+                    (bytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
             }
         }
         return bytes
@@ -78,6 +79,7 @@ internal object PackedUtils {
         }
         return result
     }
+
     fun zigZagEncodeInt(value: Int): Int = (value shl 1) xor (value shr 31)
 
     fun zigZagDecodeInt(value: Int): Int = (value ushr 1) xor -(value and 1)

@@ -23,7 +23,11 @@ class BitPackingTest {
 
         assertEquals(2, packed.size, "Should require 2 bytes")
         assertEquals(1.toByte(), packed[0], "Byte 0 should have bit 0 set")
-        assertEquals(4.toByte(), packed[1], "Byte 1 should have bit 2 set (index 10)")
+        assertEquals(
+            4.toByte(),
+            packed[1],
+            "Byte 1 should have bit 2 set (index 10)"
+        )
     }
 
     @Test
@@ -47,7 +51,11 @@ class BitPackingTest {
         val input = byteArrayOf(5)
         val unpacked = PackedUtils.unpackFlags(input, 0, 1)
 
-        assertEquals(8, unpacked.size, "Unpacking 1 byte should yield 8 booleans")
+        assertEquals(
+            8,
+            unpacked.size,
+            "Unpacking 1 byte should yield 8 booleans"
+        )
         assertTrue(unpacked[0])
         assertFalse(unpacked[1])
         assertTrue(unpacked[2])

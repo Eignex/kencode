@@ -241,8 +241,14 @@ class PackedFormatTest {
         val standardFormat = PackedFormat.Default
         val optimizedFormat = PackedFormat { defaultVarInt = true }
 
-        val standardBytes = standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
-        val optimizedBytes = optimizedFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val standardBytes = standardFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
+        val optimizedBytes = optimizedFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
 
         // Standard size: 4 bytes (Int) + 8 bytes (Long) = 12 bytes
         assertEquals(12, standardBytes.size)
@@ -252,7 +258,10 @@ class PackedFormatTest {
         assertTrue(optimizedBytes.size < standardBytes.size)
 
         // Validate roundtrip
-        val decoded = optimizedFormat.decodeFromByteArray(UnannotatedPayload.serializer(), optimizedBytes)
+        val decoded = optimizedFormat.decodeFromByteArray(
+            UnannotatedPayload.serializer(),
+            optimizedBytes
+        )
         assertEquals(payload, decoded)
     }
 
@@ -265,9 +274,18 @@ class PackedFormatTest {
         val varIntFormat = PackedFormat { defaultVarInt = true }
         val zigZagFormat = PackedFormat { defaultZigZag = true }
 
-        val standardBytes = standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
-        val varIntBytes = varIntFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
-        val zigZagBytes = zigZagFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val standardBytes = standardFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
+        val varIntBytes = varIntFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
+        val zigZagBytes = zigZagFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
 
         // Standard: 12 bytes
         assertEquals(12, standardBytes.size)
@@ -277,7 +295,10 @@ class PackedFormatTest {
         assertEquals(2, zigZagBytes.size)
 
         // Validate roundtrip
-        val decoded = zigZagFormat.decodeFromByteArray(UnannotatedPayload.serializer(), zigZagBytes)
+        val decoded = zigZagFormat.decodeFromByteArray(
+            UnannotatedPayload.serializer(),
+            zigZagBytes
+        )
         assertEquals(payload, decoded)
     }
 }
