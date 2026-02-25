@@ -200,11 +200,21 @@ class PackedDecoder(
 
     override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int {
         val anns = descriptor.getElementAnnotations(index)
+        val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
         val hasVarUInt = anns.hasVarUInt()
 
-        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
-        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+        val isVar = when {
+            hasFixedInt -> false
+            hasVarInt || hasVarUInt -> true
+            else -> config.defaultVarInt || config.defaultZigZag
+        }
+
+        val zigZag = when {
+            hasVarInt -> true
+            hasVarUInt || hasFixedInt -> false
+            else -> config.defaultZigZag
+        }
 
         return if (isVar) {
             val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
@@ -217,11 +227,21 @@ class PackedDecoder(
 
     override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long {
         val anns = descriptor.getElementAnnotations(index)
+        val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
         val hasVarUInt = anns.hasVarUInt()
 
-        val zigZag = hasVarInt || (config.defaultZigZag && !hasVarUInt)
-        val isVar = hasVarUInt || zigZag || config.defaultVarInt
+        val isVar = when {
+            hasFixedInt -> false
+            hasVarInt || hasVarUInt -> true
+            else -> config.defaultVarInt || config.defaultZigZag
+        }
+
+        val zigZag = when {
+            hasVarInt -> true
+            hasVarUInt || hasFixedInt -> false
+            else -> config.defaultZigZag
+        }
 
         return if (isVar) {
             val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)

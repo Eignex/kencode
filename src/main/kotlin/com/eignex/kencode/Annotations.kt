@@ -62,5 +62,28 @@ annotation class VarInt
 @Retention(AnnotationRetention.RUNTIME)
 annotation class VarUInt
 
+/**
+ * Marks an `Int` or `Long` property to be encoded using **fixed-length** encoding.
+ *
+ * Behavior:
+ * - Serialized densely using fixed bytes (4 bytes for Int, 8 bytes for Long).
+ * - **Overrides** any global `PackedConfiguration` defaults (`defaultVarInt` or `defaultZigZag`).
+ * - Applies only to `Int` and `Long` fields inside `PackedFormat` structures.
+ *
+ * Usage:
+ * ```
+ * @Serializable
+ * data class Example(
+ *     @FixedInt val hash: Int,    // always 4 bytes, even if defaultVarInt = true
+ *     @FixedInt val mask: Long    // always 8 bytes
+ * )
+ * ```
+ */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class FixedInt
+
 fun List<Annotation>.hasVarInt(): Boolean = any { it is VarInt }
 fun List<Annotation>.hasVarUInt(): Boolean = any { it is VarUInt }
+fun List<Annotation>.hasFixedInt(): Boolean = any { it is FixedInt }
