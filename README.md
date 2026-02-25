@@ -44,33 +44,23 @@ dependencies {
 For PackedFormat and EncodedFormat you also need to load the
 `kotlinx.serialization` plugin and core library.
 
-### Full serialization example
+## Full serialization example
 
-Minimal example using the default EncodedFormat (Base62 + PackedFormat):
+Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 
 ```kotlin
 @Serializable
 data class Payload(
-    @VarUInt val id: ULong, // varint
-    @VarInt val delta: Int, // zig-zag + varint
-    val urgent: Boolean,    // these 3 are joined to bitset
-    val sensitive: Boolean,
-    val external: Boolean,
-    val handled: Instant?,  // nullable, tracked via bitset
-    val type: PayloadType   // encoded as varint
+    @VarUInt val id: ULong, // low numbers are compacted
+    @VarInt val delta: Int, // low numbers are compacted and zigzagged to improve negative numbers
+    val urgent: Boolean,    // Packed into bitset
+    val handled: Instant?,  // Nullability tracked via bitset
+    val type: PayloadType
 )
 
 enum class PayloadType { TYPE1, TYPE2, TYPE3 }
 
-val payload = Payload(
-    id = 123u,
-    delta = -2,
-    urgent = true,
-    sensitive = false,
-    external = true,
-    handled = null,
-    type = PayloadType.TYPE1
-)
+val payload = Payload(123u, -2, true, null, PayloadType.TYPE1)
 
 val encoded = EncodedFormat.encodeToString(payload)
 // > 0fiXYI (that's it, this specific payload fits in 4 raw bytes)
@@ -93,18 +83,14 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
   representations as flat structures that can pack all metadata into the same
   header.
 
-### Field layout
-
-For a standard class, the encoding follows this structure:
-
-1. Bitmask Header: A variable length bitset containing bits for all booleans and
-   nullable indicators. A class with 10 booleans and 5 nullable fields uses 2
-   bytes for the header (the boolean variables are inlined to the header).
-2. Payload bytes: Fields are encoded in declaration order:
-    * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
-    * Strings: [varint length][UTF-8 bytes].
-    * Nested Objects: Recursively encodes the child object with its own header.
-    * Collections: [varint size][items...]. Nulls in lists use inline markers.
+```kotlin
+val compactFormat = PackedFormat {
+    defaultVarInt = true    // All Int/Long use VarInt by default
+    defaultZigZag = true    // All Int/Long use ZigZag by default
+    serializersModule = myCustomModule
+}
+val bytes = PackedFormat.encodeToBytes(payload)
+```
 
 ---
 
@@ -119,13 +105,13 @@ composing three layers:
 3. Text Layer: Base62 (default), Base36, Base64, or Base85.
 
 ```kotlin
-val format = EncodedFormat(
-    binaryFormat = ProtoBuf,
-    checksum = Crc16,
-    codec = Base36
-)
+val customFormat = EncodedFormat {
+    codec = Base36          // Use Base36 instead of Base62 (for lowercase)
+    checksum = Crc16        // Append a 2-byte checksum
+    binaryFormat = ProtoBuf // Use ProtoBuf instead of PackedFormat (or the compactFormat from previous example)
+}
 
-val token = format.encodeToString(payload)
+val token = customFormat.encodeToString(payload)
 ```
 
 ---
