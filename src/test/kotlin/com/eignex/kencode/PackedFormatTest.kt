@@ -2,7 +2,6 @@
 
 package com.eignex.kencode
 
-import PackedFormat
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer

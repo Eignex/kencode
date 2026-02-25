@@ -1,6 +1,5 @@
 package com.eignex.kencode
 
-import PackedFormat
 import kotlinx.serialization.*
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.bouncycastle.jce.provider.BouncyCastleProvider
