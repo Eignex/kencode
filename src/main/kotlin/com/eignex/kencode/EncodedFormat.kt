@@ -62,7 +62,8 @@ open class EncodedFormat(
     override fun <T> encodeToString(
         serializer: SerializationStrategy<T>, value: T
     ): String {
-        val bytes = configuration.binaryFormat.encodeToByteArray(serializer, value)
+        val bytes =
+            configuration.binaryFormat.encodeToByteArray(serializer, value)
         val checked = if (configuration.checksum != null) {
             bytes + configuration.checksum.digest(bytes)
         } else bytes
@@ -81,7 +82,8 @@ open class EncodedFormat(
         val input = configuration.codec.decode(string)
         val bytes = if (configuration.checksum != null) {
             require(input.size >= configuration.checksum.size)
-            val bytes = input.sliceArray(0..<input.size - configuration.checksum.size)
+            val bytes =
+                input.sliceArray(0..<input.size - configuration.checksum.size)
             val actual =
                 input.sliceArray(input.size - configuration.checksum.size..<input.size)
             val expected = configuration.checksum.digest(bytes)
@@ -90,7 +92,10 @@ open class EncodedFormat(
             }
             bytes
         } else input
-        return configuration.binaryFormat.decodeFromByteArray(deserializer, bytes)
+        return configuration.binaryFormat.decodeFromByteArray(
+            deserializer,
+            bytes
+        )
     }
 }
 
@@ -138,7 +143,11 @@ fun EncodedFormat(
     }
     builder.builderAction()
 
-    val newConfig = EncodedConfiguration(builder.codec, builder.checksum, builder.binaryFormat)
+    val newConfig = EncodedConfiguration(
+        builder.codec,
+        builder.checksum,
+        builder.binaryFormat
+    )
 
     return EncodedFormat(newConfig)
 }

@@ -27,8 +27,8 @@ KEncode provides three standalone entry points:
 
 1. **ByteEncoding** text codecs: Base62, Base36, Base64, and Base85 encoders
    for raw binary data.
-2. **PackedFormat**: A binary format serializer that supports nested objects, 
-   lists, and maps. It uses bitsets for booleans and nullability to minimize 
+2. **PackedFormat**: A binary format serializer that supports nested objects,
+   lists, and maps. It uses bitsets for booleans and nullability to minimize
    overhead.
 3. **EncodedFormat**: A string format serializer that wraps the above to produce
    small deterministic string identifiers.
@@ -41,7 +41,7 @@ dependencies {
 }
 ```
 
-For PackedFormat and EncodedFormat you also need to load the 
+For PackedFormat and EncodedFormat you also need to load the
 `kotlinx.serialization` plugin and core library.
 
 ### Full serialization example
@@ -89,8 +89,8 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 * VarInts: Int/Long fields can be optimized using @VarUInt or @VarInt (ZigZag)
   annotations.
 * Full Graph Support: Handles nested objects, lists, maps, and polymorphism
-  recursively. While this is supported it will not produce as compact 
-  representations as flat structures that can pack all metadata into the same 
+  recursively. While this is supported it will not produce as compact
+  representations as flat structures that can pack all metadata into the same
   header.
 
 ### Field layout
@@ -98,7 +98,7 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 For a standard class, the encoding follows this structure:
 
 1. Bitmask Header: A variable length bitset containing bits for all booleans and
-   nullable indicators. A class with 10 booleans and 5 nullable fields uses 2 
+   nullable indicators. A class with 10 booleans and 5 nullable fields uses 2
    bytes for the header (the boolean variables are inlined to the header).
 2. Payload bytes: Fields are encoded in declaration order:
     * Primitives: Encoded densely (VarInt for Int/Long, fixed for others).
@@ -120,8 +120,8 @@ composing three layers:
 
 ```kotlin
 val format = EncodedFormat(
-    binaryFormat = ProtoBuf, 
-    checksum = Crc16, 
+    binaryFormat = ProtoBuf,
+    checksum = Crc16,
     codec = Base36
 )
 
@@ -160,5 +160,6 @@ val encrypted = cipher.doFinal(binary)
 // 3. Encode to Text
 val token = Base62.encode(encrypted)
 ```
+
 See [Examples](https://github.com/Eignex/kencode/blob/main/src/test/kotlin/com/eignex/kencode/Examples.kt)
 for a BouncyCastle demo.

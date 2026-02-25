@@ -113,7 +113,10 @@ fun PackedFormat(
     builder.builderAction()
 
     return PackedFormat(
-        configuration = PackedConfiguration(builder.defaultVarInt, builder.defaultZigZag),
+        configuration = PackedConfiguration(
+            builder.defaultVarInt,
+            builder.defaultZigZag
+        ),
         serializersModule = builder.serializersModule
     )
 }

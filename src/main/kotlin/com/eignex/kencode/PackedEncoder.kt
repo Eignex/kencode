@@ -32,7 +32,8 @@ class PackedEncoder(
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            val childEncoder = PackedEncoder(dataBuffer, config, serializersModule)
+            val childEncoder =
+                PackedEncoder(dataBuffer, config, serializersModule)
             childEncoder.initializeStructure(descriptor)
             return childEncoder
         }
@@ -85,7 +86,8 @@ class PackedEncoder(
         dataBuffer.reset()
     }
 
-    private fun getBuffer(): ByteArrayOutputStream = if (inStructure) dataBuffer else output
+    private fun getBuffer(): ByteArrayOutputStream =
+        if (inStructure) dataBuffer else output
 
     override fun encodeBoolean(value: Boolean) {
         if (inStructure && !isCollection) {
@@ -121,11 +123,17 @@ class PackedEncoder(
     }
 
     override fun encodeFloat(value: Float) {
-        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), getBuffer())
+        PackedUtils.writeInt(
+            java.lang.Float.floatToRawIntBits(value),
+            getBuffer()
+        )
     }
 
     override fun encodeDouble(value: Double) {
-        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), getBuffer())
+        PackedUtils.writeLong(
+            java.lang.Double.doubleToRawLongBits(value),
+            getBuffer()
+        )
     }
 
     override fun encodeChar(value: Char) {
@@ -183,7 +191,10 @@ class PackedEncoder(
         if (totalFlagsCount > 0) {
             val combined = BooleanArray(totalFlagsCount)
             if (booleanValues.isNotEmpty()) booleanValues.copyInto(combined, 0)
-            if (nullValues.isNotEmpty()) nullValues.copyInto(combined, booleanValues.size)
+            if (nullValues.isNotEmpty()) nullValues.copyInto(
+                combined,
+                booleanValues.size
+            )
 
             if (totalFlagsCount > 64) {
                 val flagBytes = PackedUtils.packFlags(combined)
@@ -213,13 +224,21 @@ class PackedEncoder(
         return -1
     }
 
-    override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
+    override fun encodeBooleanElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Boolean
+    ) {
         val pos = booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
     }
 
-    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
+    override fun encodeIntElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Int
+    ) {
         val anns = descriptor.getElementAnnotations(index)
         val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
@@ -245,7 +264,11 @@ class PackedEncoder(
         }
     }
 
-    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
+    override fun encodeLongElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Long
+    ) {
         val anns = descriptor.getElementAnnotations(index)
         val hasFixedInt = anns.hasFixedInt()
         val hasVarInt = anns.hasVarInt()
@@ -271,40 +294,76 @@ class PackedEncoder(
         }
     }
 
-    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) {
+    override fun encodeByteElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Byte
+    ) {
         dataBuffer.write(value.toInt() and 0xFF)
     }
 
-    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) {
+    override fun encodeShortElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Short
+    ) {
         PackedUtils.writeShort(value, dataBuffer)
     }
 
-    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) {
+    override fun encodeCharElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Char
+    ) {
         writeUtf8Char(value, dataBuffer)
     }
 
-    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
-        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), dataBuffer)
+    override fun encodeFloatElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Float
+    ) {
+        PackedUtils.writeInt(
+            java.lang.Float.floatToRawIntBits(value),
+            dataBuffer
+        )
     }
 
-    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
-        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), dataBuffer)
+    override fun encodeDoubleElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: Double
+    ) {
+        PackedUtils.writeLong(
+            java.lang.Double.doubleToRawLongBits(value),
+            dataBuffer
+        )
     }
 
-    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
+    override fun encodeStringElement(
+        descriptor: SerialDescriptor,
+        index: Int,
+        value: String
+    ) {
         val bytes = value.toByteArray(Charsets.UTF_8)
         PackedUtils.writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
 
     @ExperimentalSerializationApi
-    override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
+    override fun encodeInlineElement(
+        descriptor: SerialDescriptor,
+        index: Int
+    ): Encoder {
         currentIndex = index
         return this
     }
 
     override fun <T> encodeSerializableElement(
-        descriptor: SerialDescriptor, index: Int, serializer: SerializationStrategy<T>, value: T
+        descriptor: SerialDescriptor,
+        index: Int,
+        serializer: SerializationStrategy<T>,
+        value: T
     ) {
         currentIndex = index
         serializer.serialize(this, value)
@@ -313,7 +372,10 @@ class PackedEncoder(
 
     @ExperimentalSerializationApi
     override fun <T : Any> encodeNullableSerializableElement(
-        descriptor: SerialDescriptor, index: Int, serializer: SerializationStrategy<T>, value: T?
+        descriptor: SerialDescriptor,
+        index: Int,
+        serializer: SerializationStrategy<T>,
+        value: T?
     ) {
         if (isCollection) {
             // Collections use inline markers

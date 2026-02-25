@@ -59,10 +59,12 @@ class EncodedFormatTest {
         val encoded = customFormat.encodeToString(Payload.serializer(), value)
 
         assertTrue(encoded.isNotEmpty())
-        val decoded = customFormat.decodeFromString(Payload.serializer(), encoded)
+        val decoded =
+            customFormat.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
 
-        val tampered = encoded.dropLast(1) + if (encoded.last() == 'u') "t" else "u"
+        val tampered =
+            encoded.dropLast(1) + if (encoded.last() == 'u') "t" else "u"
         assertFailsWith<IllegalArgumentException> {
             customFormat.decodeFromString(Payload.serializer(), tampered)
         }
