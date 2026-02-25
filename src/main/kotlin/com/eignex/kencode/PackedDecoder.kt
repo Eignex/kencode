@@ -108,7 +108,14 @@ class PackedDecoder(
                 CompositeDecoder.DECODE_DONE
             }
         }
-        return CompositeDecoder.DECODE_DONE
+
+        val nextIndex = currentIndex + 1
+        return if (nextIndex < descriptor.elementsCount) {
+            currentIndex = nextIndex
+            nextIndex
+        } else {
+            CompositeDecoder.DECODE_DONE
+        }
     }
 
     override fun decodeSequentially(): Boolean = true
@@ -172,16 +179,12 @@ class PackedDecoder(
 
     @ExperimentalSerializationApi
     override fun decodeNotNullMark(): Boolean {
-        if (!inStructure || isCollection) {
-            val (flags, bytesRead) = PackedUtils.decodeVarLong(input, position)
-            position += bytesRead
-            return (flags and 1L) == 0L
+        require(!inStructure || isCollection) {
+            "decodeNotNullMark cannot be called inside classes. Use decodeNullableSerializableElement instead."
         }
-        val idx = currentIndex
-        if (idx < 0) return true
-        val pos = nullablePos(idx)
-        if (pos == -1) return true
-        return !nullValues[pos]
+        val (flags, bytesRead) = PackedUtils.decodeVarLong(input, position)
+        position += bytesRead
+        return (flags and 1L) == 0L
     }
 
     @ExperimentalSerializationApi
@@ -348,28 +351,13 @@ class PackedDecoder(
         deserializer: DeserializationStrategy<T?>,
         previousValue: T?
     ): T? {
-        if (isCollection) {
-            val notNull = decodeNotNullMark()
-            return if (notNull) {
-                decodeSerializableElement(
-                    descriptor,
-                    index,
-                    deserializer as DeserializationStrategy<T>,
-                    previousValue
-                )
-            } else {
-                decodeNull()
-            }
+        require(!isCollection) {
+            "decodeNullableSerializableElement should not be called for collections."
         }
 
         val pos = nullablePos(index)
-        if (pos == -1) {
-            return decodeSerializableElement(
-                descriptor,
-                index,
-                deserializer as DeserializationStrategy<T>,
-                previousValue
-            )
+        require(pos != -1) {
+            "Element $index is not declared as nullable in the descriptor."
         }
 
         if (nullValues[pos]) return null
