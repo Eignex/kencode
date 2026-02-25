@@ -1,6 +1,5 @@
 package com.eignex.kencode
 
-import PackedConfiguration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.*

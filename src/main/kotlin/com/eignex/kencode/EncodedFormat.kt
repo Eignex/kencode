@@ -1,9 +1,15 @@
 package com.eignex.kencode
 
-import PackedFormat
 import kotlinx.serialization.*
 import kotlinx.serialization.modules.SerializersModule
 
+/**
+ * Holds the configuration for an [EncodedFormat] instance.
+ *
+ * @property codec The ASCII-safe byte codec used to turn raw bytes into text (e.g., Base62, Base64).
+ * @property checksum An optional checksum appended to the binary payload and verified upon decoding.
+ * @property binaryFormat The underlying binary serialization format used before encoding to text.
+ */
 data class EncodedConfiguration(
     val codec: ByteEncoding = Base62,
     val checksum: Checksum? = null,
@@ -11,44 +17,47 @@ data class EncodedConfiguration(
 )
 
 /**
- * Text `StringFormat` that combines:
+ * Text `StringFormat` that produces short, predictable string tokens by composing:
  *
- * - A binary format (e.g. [PackedFormat], `ProtoBuf`)
- * - An optional checksum
- * - An ASCII-safe byte encoding (e.g. [Base62], [Base64], [Base36], [Base85])
+ * 1. A binary format (e.g. [PackedFormat], `ProtoBuf`).
+ * 2. An optional checksum.
+ * 3. An ASCII-safe byte encoding (e.g. [Base62], [Base64], [Base36], [Base85]).
  *
  * Typical use:
+ * - `encodeToString`: serialize -> (optionally) append checksum -> encode bytes to text.
+ * - `decodeFromString`: decode text to bytes -> (optionally) verify checksum -> deserialize.
  *
- * - `encodeToString`: serialize → (optionally) append checksum → encode bytes
- * - `decodeFromString`: decode bytes → (optionally) verify checksum → deserialize
+ * Use the [EncodedFormat] builder function to create a customized instance.
  *
- * This is intended for short, predictable tokens for URLs, headers, file names, etc.
- *
- * @property codec ASCII-safe byte codec used to turn raw bytes into text.
- * @property checksum Optional checksum appended to the binary payload and verified on decode.
- * @property binaryFormat Binary serialization format used before encoding.
+ * @property configuration The active configuration dictating the codec, checksum, and binary format.
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class EncodedFormat(
     val configuration: EncodedConfiguration,
 ) : StringFormat {
 
+    /**
+     * Secondary constructor for direct instantiation without the builder.
+     */
     constructor(
         codec: ByteEncoding = Base62,
         checksum: Checksum? = null,
         binaryFormat: BinaryFormat = PackedFormat,
     ) : this(EncodedConfiguration(codec, checksum, binaryFormat))
 
+    /**
+     * Delegates to the underlying [BinaryFormat]'s serializers module.
+     */
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
     /**
-     * Default format: `PackedFormat` + `Base62` without checksum.
+     * Default format: `PackedFormat` + `Base62` without a checksum.
      */
     companion object Default : EncodedFormat()
 
     /**
-     * Serializes [value] with [binaryFormat], optionally appends [checksum],
-     * and encodes the result using [codec].
+     * Serializes [value] with the configured binary format, optionally appends a checksum,
+     * and encodes the resulting byte array using the text codec.
      */
     override fun <T> encodeToString(
         serializer: SerializationStrategy<T>, value: T
@@ -61,10 +70,10 @@ open class EncodedFormat(
     }
 
     /**
-     * Decodes [string] using [codec], optionally verifies [checksum],
-     * then deserializes the remaining bytes with [binaryFormat].
+     * Decodes [string] using the text codec, optionally verifies and strips the checksum,
+     * then deserializes the remaining bytes with the configured binary format.
      *
-     * @throws IllegalArgumentException if a checksum is configured and does not match.
+     * @throws IllegalArgumentException if a checksum is configured and the verification fails.
      */
     override fun <T> decodeFromString(
         deserializer: DeserializationStrategy<T>, string: String
@@ -85,12 +94,39 @@ open class EncodedFormat(
     }
 }
 
+/**
+ * Builder for configuring [EncodedFormat] instances.
+ */
 class EncodedFormatBuilder {
+    /**
+     * The ASCII-safe byte codec used to turn raw bytes into text. Defaults to [Base62].
+     */
     var codec: ByteEncoding = Base62
+
+    /**
+     * An optional checksum appended to the binary payload. Defaults to `null`.
+     */
     var checksum: Checksum? = null
+
+    /**
+     * The underlying binary serialization format. Defaults to [PackedFormat.Default].
+     */
     var binaryFormat: BinaryFormat = PackedFormat.Default
 }
 
+/**
+ * Creates a customized [EncodedFormat] instance.
+ *
+ * ```
+ * val format = EncodedFormat {
+ * codec = Base36
+ * checksum = Crc16
+ * }
+ * ```
+ *
+ * @param from An existing [EncodedFormat] instance to copy defaults from.
+ * @param builderAction The configuration block.
+ */
 fun EncodedFormat(
     from: EncodedFormat = EncodedFormat.Default,
     builderAction: EncodedFormatBuilder.() -> Unit
