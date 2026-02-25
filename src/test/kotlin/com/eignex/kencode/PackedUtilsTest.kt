@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+import java.io.ByteArrayOutputStream
 import kotlin.test.*
 
 class BitPackingTest {
@@ -309,7 +310,61 @@ class BitPackingTest {
         assertContentEquals(flags, unpacked)
     }
 
-    private fun Array<Boolean>.toBooleanArray(): BooleanArray {
+    @Test
+    fun `comprehensive truncation coverage`() {
+        val types:List<Pair<String, (ByteArrayOutputStream) -> Unit>> = listOf(
+            "Short" to {
+                PackedUtils.writeShort(
+                    1102,
+                    it
+                )
+            },
+            "Int" to {
+                PackedUtils.writeInt(
+                    110258102,
+                    it
+                )
+            },
+            "Long" to {
+                PackedUtils.writeLong(
+                    1102401240912490L,
+                    it
+                )
+            },
+            "VarInt" to {
+                PackedUtils.writeVarInt(
+                    110249021,
+                    it
+                )
+            },
+            "VarLong" to {
+                PackedUtils.writeVarLong(
+                    112085102501L,
+                    it
+                )
+            }
+        )
+
+        types.forEach { (name, writer) ->
+            val out = ByteArrayOutputStream()
+            writer(out)
+            val full = out.toByteArray()
+            // Truncate by 1 byte to trigger requireAvailable
+            val truncated = full.copyOfRange(0, full.size - 1)
+
+            assertFailsWith<IllegalArgumentException>("Should fail $name truncation") {
+                when (name) {
+                    "Short" -> PackedUtils.readShort(truncated, 0)
+                    "Int" -> PackedUtils.readInt(truncated, 0)
+                    "Long" -> PackedUtils.readLong(truncated, 0)
+                    "VarInt" -> PackedUtils.decodeVarInt(truncated, 0)
+                    "VarLong" -> PackedUtils.decodeVarLong(truncated, 0)
+                }
+            }
+        }
+    }
+
+        private fun Array<Boolean>.toBooleanArray(): BooleanArray {
         val result = BooleanArray(size)
         for (i in indices) result[i] = this[i]
         return result
