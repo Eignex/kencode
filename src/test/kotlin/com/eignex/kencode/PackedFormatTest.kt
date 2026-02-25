@@ -301,4 +301,25 @@ class PackedFormatTest {
         )
         assertEquals(payload, decoded)
     }
+
+    @Test
+    fun `builder defaultVarInt is overridden by FixedInt annotation`() {
+        val payload = InversePayload(5, -10L, 6u, 7uL)
+
+        val optimizedFormat = PackedFormat {
+            defaultVarInt = true
+            defaultZigZag = true
+        }
+
+        val bytes = optimizedFormat.encodeToByteArray(
+            InversePayload.serializer(),
+            payload
+        )
+        assertEquals(24, bytes.size)
+        val decoded = optimizedFormat.decodeFromByteArray(
+            InversePayload.serializer(),
+            bytes
+        )
+        assertEquals(payload, decoded)
+    }
 }

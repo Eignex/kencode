@@ -630,3 +630,11 @@ data class PolymorphicContainer(
 
 @Serializable
 data class UnannotatedPayload(val x: Int, val y: Long)
+
+@Serializable
+data class InversePayload(
+    @FixedInt val fixedX: Int,
+    @FixedInt val fixedY: Long,
+    @FixedInt val fixedUX: UInt,
+    @FixedInt val fixedUY: ULong
+)
