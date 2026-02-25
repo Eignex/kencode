@@ -245,3 +245,6 @@ data class PolymorphicContainer(
     val main: PolymorphicBase,
     val history: List<PolymorphicBase>
 )
+
+@Serializable
+data class UnannotatedPayload(val x: Int, val y: Long)

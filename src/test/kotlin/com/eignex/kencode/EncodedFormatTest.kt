@@ -45,4 +45,26 @@ class EncodedFormatTest {
             formatWithChecksum.decodeFromString(Payload.serializer(), tampered)
         }
     }
+
+    @Test
+    fun `builder configures custom properties successfully`() {
+        val value = Payload(99, "builder validation")
+
+        val customFormat = EncodedFormat {
+            codec = Base85
+            checksum = Crc32
+            binaryFormat = PackedFormat.Default
+        }
+
+        val encoded = customFormat.encodeToString(Payload.serializer(), value)
+
+        assertTrue(encoded.isNotEmpty())
+        val decoded = customFormat.decodeFromString(Payload.serializer(), encoded)
+        assertEquals(value, decoded)
+
+        val tampered = encoded.dropLast(1) + if (encoded.last() == 'u') "t" else "u"
+        assertFailsWith<IllegalArgumentException> {
+            customFormat.decodeFromString(Payload.serializer(), tampered)
+        }
+    }
 }
