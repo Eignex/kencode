@@ -233,4 +233,51 @@ class PackedFormatTest {
             decoder.decodeSerializableValue(Char.serializer())
         }
     }
+
+    @Test
+    fun `builder defaultVarInt reduces size for positive integers`() {
+        val payload = UnannotatedPayload(5, 10L)
+
+        val standardFormat = PackedFormat.Default
+        val optimizedFormat = PackedFormat { defaultVarInt = true }
+
+        val standardBytes = standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val optimizedBytes = optimizedFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+
+        // Standard size: 4 bytes (Int) + 8 bytes (Long) = 12 bytes
+        assertEquals(12, standardBytes.size)
+
+        // Optimized size: 1 byte (VarInt 5) + 1 byte (VarLong 10) = 2 bytes
+        assertEquals(2, optimizedBytes.size)
+        assertTrue(optimizedBytes.size < standardBytes.size)
+
+        // Validate roundtrip
+        val decoded = optimizedFormat.decodeFromByteArray(UnannotatedPayload.serializer(), optimizedBytes)
+        assertEquals(payload, decoded)
+    }
+
+    @Test
+    fun `builder defaultZigZag reduces size for negative integers`() {
+        // -1 without ZigZag takes 5 bytes for Int and 10 bytes for Long in standard VarInt encoding
+        val payload = UnannotatedPayload(-1, -1L)
+
+        val standardFormat = PackedFormat.Default
+        val varIntFormat = PackedFormat { defaultVarInt = true }
+        val zigZagFormat = PackedFormat { defaultZigZag = true }
+
+        val standardBytes = standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val varIntBytes = varIntFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val zigZagBytes = zigZagFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+
+        // Standard: 12 bytes
+        assertEquals(12, standardBytes.size)
+        // Basic VarInt of negative numbers uses max bytes: 5 + 10 = 15 bytes
+        assertEquals(15, varIntBytes.size)
+        // ZigZag folds -1 into 1, which takes 1 byte each: 1 + 1 = 2 bytes
+        assertEquals(2, zigZagBytes.size)
+
+        // Validate roundtrip
+        val decoded = zigZagFormat.decodeFromByteArray(UnannotatedPayload.serializer(), zigZagBytes)
+        assertEquals(payload, decoded)
+    }
 }
