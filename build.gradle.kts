@@ -47,7 +47,7 @@ publishing {
             from(components["java"])
             pom {
                 name.set("kencode")
-                description.set("Pure Kotlin JVM library.")
+                description.set("ASCII-safe encodings and ultra-small binary serialization for Kotlin, optimized for URLs, file names, and Kubernetes labels. Generates short, predictable payloads within tight character limits.")
                 url.set("https://github.com/Eignex/kencode")
                 licenses {
                     license {
