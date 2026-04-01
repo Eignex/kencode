@@ -64,7 +64,7 @@ internal object PackedUtils {
         return result
     }
 
-    fun packFlagsToLong(vararg flags: Boolean): Long {
+    fun packFlagsToLong(flags: BooleanArray): Long {
         var result = 0L
         for (i in flags.indices) {
             if (flags[i]) result = result or (1L shl i)
