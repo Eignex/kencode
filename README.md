@@ -87,8 +87,7 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 
 ```kotlin
 val compactFormat = PackedFormat {
-    defaultVarInt = true    // All Int/Long use VarInt by default
-    defaultZigZag = true    // All Int/Long use ZigZag by default
+    defaultEncoding = PackedIntegerType.SIGNED
     serializersModule = myCustomModule
 }
 val bytes = PackedFormat.encodeToBytes(payload)
