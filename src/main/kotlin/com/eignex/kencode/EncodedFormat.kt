@@ -81,7 +81,9 @@ open class EncodedFormat(
     ): T {
         val input = configuration.codec.decode(string)
         val bytes = if (configuration.checksum != null) {
-            require(input.size >= configuration.checksum.size)
+            require(input.size >= configuration.checksum.size) {
+                "Input too short to contain checksum: expected at least ${configuration.checksum.size} bytes but got ${input.size}."
+            }
             val bytes =
                 input.sliceArray(0..<input.size - configuration.checksum.size)
             val actual =
