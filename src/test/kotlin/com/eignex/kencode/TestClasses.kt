@@ -74,10 +74,10 @@ data class StringHeavyPayload(
 
 @Serializable
 data class VarIntVarUIntPayload(
-    @VarInt val signedIntVar: Int,
-    @VarInt val signedLongVar: Long,
-    @VarUInt val unsignedIntVar: Int,
-    @VarUInt val unsignedLongVar: Long,
+    @PackedType(PackedIntegerType.SIGNED)  val signedIntVar: Int,
+    @PackedType(PackedIntegerType.SIGNED)  val signedLongVar: Long,
+    @PackedType(PackedIntegerType.DEFAULT) val unsignedIntVar: Int,
+    @PackedType(PackedIntegerType.DEFAULT) val unsignedLongVar: Long,
     val plainInt: Int,
     val plainLong: Long
 )
@@ -637,8 +637,8 @@ data class UnannotatedPayload(val x: Int, val y: Long)
 
 @Serializable
 data class InversePayload(
-    @FixedInt val fixedX: Int,
-    @FixedInt val fixedY: Long,
-    @FixedInt val fixedUX: UInt,
-    @FixedInt val fixedUY: ULong
+    @PackedType(PackedIntegerType.FIXED) val fixedX: Int,
+    @PackedType(PackedIntegerType.FIXED) val fixedY: Long,
+    @PackedType(PackedIntegerType.FIXED) val fixedUX: UInt,
+    @PackedType(PackedIntegerType.FIXED) val fixedUY: ULong
 )

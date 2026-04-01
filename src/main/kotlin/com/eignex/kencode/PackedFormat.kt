@@ -21,7 +21,7 @@ data class PackedConfiguration(
  *
  * Features:
  * - Booleans and nullability encoded as compact bitmasks in a class header.
- * - Optional varint / zig-zag encoding via `@VarInt` / `@VarUInt` annotations, or globally via [PackedConfiguration].
+ * - Optional varint / zig-zag encoding via `@PackedType` annotations, or globally via [PackedConfiguration].
  * - Fixed, deterministic field order based on declaration.
  *
  * Limitations:

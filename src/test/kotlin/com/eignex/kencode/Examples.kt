@@ -22,10 +22,10 @@ class Examples {
     data class Payload constructor(
 
         // only uses as many bytes as needed
-        @VarUInt
+        @PackedType(PackedIntegerType.DEFAULT)
         val id: ULong,
 
-        @VarInt // does zig-zag to encode small negatives efficiently
+        @PackedType(PackedIntegerType.SIGNED) // zig-zag encodes small negatives efficiently
         val delta: Int,
 
         // these are packed into a bitset along with nullability flags

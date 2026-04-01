@@ -51,8 +51,8 @@ Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 ```kotlin
 @Serializable
 data class Payload(
-    @VarUInt val id: ULong, // low numbers are compacted
-    @VarInt val delta: Int, // low numbers are compacted and zigzagged to improve negative numbers
+    @PackedType(PackedIntegerType.DEFAULT) val id: ULong, // low numbers are compacted
+    @PackedType(PackedIntegerType.SIGNED)  val delta: Int, // zigzagged to compact small negatives
     val urgent: Boolean,    // Packed into bitset
     val handled: Instant?,  // Nullability tracked via bitset
     val type: PayloadType
@@ -76,8 +76,10 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 
 * Bit-Packing: Booleans and nullability markers are stored in a single
   bit-header (about 1 bit per field).
-* VarInts: Int/Long fields can be optimized using @VarUInt or @VarInt (ZigZag)
-  annotations.
+* VarInts: Int/Long fields can be optimized using `@PackedType(PackedIntegerType.DEFAULT)`
+  (unsigned varint) or `@PackedType(PackedIntegerType.SIGNED)` (ZigZag) annotations.
+  If you already use `kotlinx-serialization-protobuf`, `@ProtoType` annotations are
+  recognized automatically as a fallback.
 * Full Graph Support: Handles nested objects, lists, maps, and polymorphism
   recursively. While this is supported it will not produce as compact
   representations as flat structures that can pack all metadata into the same
