@@ -8,12 +8,11 @@ import java.io.ByteArrayOutputStream
 /**
  * Holds the configuration for a [PackedFormat] instance.
  *
- * @property defaultVarInt When true, all `Int` and `Long` fields without specific annotations are encoded as variable-length integers.
- * @property defaultZigZag When true, all `Int` and `Long` fields without specific annotations are ZigZag encoded to efficiently store small negative numbers.
+ * @property defaultEncoding The encoding applied to all `Int` and `Long` fields that carry no
+ *   [PackedType] annotation. Defaults to [PackedIntegerType.FIXED] (4 / 8 raw bytes).
  */
 data class PackedConfiguration(
-    val defaultVarInt: Boolean = false,
-    val defaultZigZag: Boolean = false
+    val defaultEncoding: PackedIntegerType = PackedIntegerType.FIXED
 )
 
 /**
@@ -77,15 +76,10 @@ class PackedFormatBuilder {
     var serializersModule: SerializersModule = EmptySerializersModule()
 
     /**
-     * If true, applies variable-length integer encoding to all `Int` and `Long` fields by default.
+     * The encoding applied to all `Int` and `Long` fields that carry no [PackedType] annotation.
+     * Defaults to [PackedIntegerType.FIXED].
      */
-    var defaultVarInt: Boolean = false
-
-    /**
-     * If true, applies ZigZag encoding to all `Int` and `Long` fields by default.
-     * Overrides [defaultVarInt] as ZigZag inherently implies variable-length encoding.
-     */
-    var defaultZigZag: Boolean = false
+    var defaultEncoding: PackedIntegerType = PackedIntegerType.FIXED
 }
 
 /**
@@ -93,8 +87,8 @@ class PackedFormatBuilder {
  *
  * ```
  * val format = PackedFormat {
- * defaultZigZag = true
- * serializersModule = myCustomModule
+ *     defaultEncoding = PackedIntegerType.SIGNED
+ *     serializersModule = myCustomModule
  * }
  * ```
  *
@@ -107,16 +101,12 @@ fun PackedFormat(
 ): PackedFormat {
     val builder = PackedFormatBuilder().apply {
         serializersModule = from.serializersModule
-        defaultVarInt = from.configuration.defaultVarInt
-        defaultZigZag = from.configuration.defaultZigZag
+        defaultEncoding = from.configuration.defaultEncoding
     }
     builder.builderAction()
 
     return PackedFormat(
-        configuration = PackedConfiguration(
-            builder.defaultVarInt,
-            builder.defaultZigZag
-        ),
+        configuration = PackedConfiguration(builder.defaultEncoding),
         serializersModule = builder.serializersModule
     )
 }

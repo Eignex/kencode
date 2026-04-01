@@ -66,9 +66,5 @@ internal fun resolveIntEncoding(anns: List<Annotation>, config: PackedConfigurat
     try {
         anns.filterIsInstance<KxProtoType>().firstOrNull()?.let { return it.type.toIntEncoding() }
     } catch (_: NoClassDefFoundError) { }
-    return when {
-        config.defaultZigZag -> IntEncoding.ZIGZAG
-        config.defaultVarInt -> IntEncoding.VARINT
-        else                 -> IntEncoding.FIXED
-    }
+    return config.defaultEncoding.toIntEncoding()
 }
