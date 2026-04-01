@@ -72,7 +72,7 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
             out[outPos++] = if (remaining > 2) alphabet[i3] else '='
         }
 
-        return String(out)
+        return out.concatToString()
     }
 
 

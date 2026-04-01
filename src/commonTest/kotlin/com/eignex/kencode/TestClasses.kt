@@ -2,6 +2,7 @@
 
 package com.eignex.kencode
 
+import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
 import kotlin.time.*
 

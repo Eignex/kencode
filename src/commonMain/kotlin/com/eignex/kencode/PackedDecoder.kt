@@ -156,9 +156,9 @@ class PackedDecoder(
     override fun decodeLong(): Long =
         if (inStructure && !isCollection) decodeLongElement(currentDescriptor, currentIndex) else readLongPos()
 
-    override fun decodeFloat(): Float = java.lang.Float.intBitsToFloat(readIntPos())
+    override fun decodeFloat(): Float = Float.fromBits(readIntPos())
 
-    override fun decodeDouble(): Double = java.lang.Double.longBitsToDouble(readLongPos())
+    override fun decodeDouble(): Double = Double.fromBits(readLongPos())
 
     override fun decodeChar(): Char = readUtf8Char()
     override fun decodeString(): String = readStringInline()
@@ -166,7 +166,7 @@ class PackedDecoder(
     private fun readStringInline(): String {
         val len = readVarInt()
         require(len >= 0 && position + len <= input.size)
-        return String(input, position, len, Charsets.UTF_8).also { position += len }
+        return input.decodeToString(position, position + len).also { position += len }
     }
 
     @ExperimentalSerializationApi
@@ -237,10 +237,10 @@ class PackedDecoder(
         }
 
     override fun decodeFloatElement(descriptor: SerialDescriptor, index: Int): Float =
-        java.lang.Float.intBitsToFloat(readIntPos())
+        Float.fromBits(readIntPos())
 
     override fun decodeDoubleElement(descriptor: SerialDescriptor, index: Int): Double =
-        java.lang.Double.longBitsToDouble(readLongPos())
+        Double.fromBits(readLongPos())
 
     override fun decodeCharElement(descriptor: SerialDescriptor, index: Int): Char = readUtf8Char()
 

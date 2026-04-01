@@ -35,7 +35,7 @@ class BaseRadixTest {
             assertRoundtrip(
                 codec,
                 bytes,
-                "Roundtrip failed for ${codec.javaClass.simpleName} length=$len"
+                "Roundtrip failed for ${codec::class.simpleName} length=$len"
             )
         }
     }
@@ -47,7 +47,7 @@ class BaseRadixTest {
                 assertRoundtrip(
                     codec,
                     bytes,
-                    "Failed for ${codec.javaClass.simpleName} pattern=${bytes.toList()}"
+                    "Failed for ${codec::class.simpleName} pattern=${bytes.toList()}"
                 )
             }
         }

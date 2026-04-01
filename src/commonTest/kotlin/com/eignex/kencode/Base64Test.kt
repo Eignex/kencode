@@ -145,7 +145,7 @@ class Base64Test {
         )
 
         for ((plain, expectedEncoded) in vectors) {
-            val bytes = plain.toByteArray()
+            val bytes = plain.encodeToByteArray()
             val encoded = Base64.encode(bytes, 0, bytes.size)
             assertEquals(
                 expectedEncoded, encoded, "Encoding mismatch for '$plain'"

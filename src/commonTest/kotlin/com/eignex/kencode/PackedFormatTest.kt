@@ -2,6 +2,7 @@
 
 package com.eignex.kencode
 
+import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.serializer
@@ -32,6 +33,7 @@ class PackedFormatTest {
     }
 
     @Test
+    @OptIn(InternalSerializationApi::class)
     fun `verify all test class patterns`() {
         // A comprehensive list of all test data instances from TestClasses.kt
         val testData: List<Any> = listOf(
@@ -197,12 +199,13 @@ class PackedFormatTest {
 
         testData.forEach { value ->
             @Suppress("UNCHECKED_CAST")
-            val serializer = serializer(value::class.java)
+            val serializer = value::class.serializer() as KSerializer<Any>
             assertPackedRoundtrip(serializer, value)
         }
     }
 
     @Test
+    @OptIn(InternalSerializationApi::class)
     fun `top level primitives roundtrip`() {
         val primitives: List<Any> = listOf(
             true, false,
@@ -219,7 +222,7 @@ class PackedFormatTest {
 
         primitives.forEach { value ->
             @Suppress("UNCHECKED_CAST")
-            val serializer = serializer(value::class.java)
+            val serializer = value::class.serializer() as KSerializer<Any>
             assertPackedRoundtrip(serializer, value)
         }
     }

@@ -3,7 +3,6 @@ package com.eignex.kencode
 import kotlinx.serialization.*
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import java.io.ByteArrayOutputStream
 
 /**
  * Holds the configuration for a [PackedFormat] instance.
@@ -49,7 +48,7 @@ open class PackedFormat(
     override fun <T> encodeToByteArray(
         serializer: SerializationStrategy<T>, value: T
     ): ByteArray {
-        val out = ByteArrayOutputStream()
+        val out = ByteOutput()
         val encoder = PackedEncoder(out, configuration, serializersModule)
         encoder.encodeSerializableValue(serializer, value)
         return out.toByteArray()

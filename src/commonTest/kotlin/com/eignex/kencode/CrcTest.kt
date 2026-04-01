@@ -7,7 +7,7 @@ class CrcTest {
     private fun hex(s: String): ByteArray =
         ByteArray(s.length / 2) { i -> s.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
 
-    private fun Checksum.digest(s: String): ByteArray = digest(s.toByteArray())
+    private fun Checksum.digest(s: String): ByteArray = digest(s.encodeToByteArray())
 
     @Test fun `crc8 size is one byte`() = assertEquals(1, Crc8.size)
 

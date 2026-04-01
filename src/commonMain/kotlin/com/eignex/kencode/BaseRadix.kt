@@ -1,6 +1,7 @@
 package com.eignex.kencode
 
-import java.math.BigInteger
+import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.ionspin.kotlin.bignum.integer.Sign
 import kotlin.math.*
 
 const val BASE_62: String =
@@ -47,11 +48,11 @@ open class BaseRadix(
     }
 
     private val alphabetSize: Int = alphabet.length
-    private val base: BigInteger = BigInteger.valueOf(alphabetSize.toLong())
+    private val base: BigInteger = BigInteger.fromLong(alphabetSize.toLong())
     private val logBase: Double = log2(alphabetSize.toDouble())
 
     private val bigZero = BigInteger.ZERO
-    private val bigFF = BigInteger.valueOf(0xFFL)
+    private val bigFF = BigInteger.fromLong(0xFFL)
 
     // ------------------------------------------------------------
     // Alphabet lookup tables
@@ -215,20 +216,17 @@ open class BaseRadix(
         outPos: Int = 0,
         outLen: Int = encodedLengthForBytes(inLen)
     ): StringBuilder {
-        var n = BigInteger(1, input, inPos, inLen)
+        var n = BigInteger.fromByteArray(input.sliceArray(inPos until inPos + inLen), Sign.POSITIVE)
 
-        // Pre-fill with zero-character for consistent fixed-length output
-        repeat(outLen) {
-            output.append(zeroChar)
-        }
-
-        var writeIndex = outPos + outLen - 1
-        while (n > bigZero && writeIndex >= outPos) {
-            val remainder = n.mod(base)
-            output.setCharAt(writeIndex, charFromIndex(remainder.toInt()))
+        val chars = CharArray(outLen) { zeroChar }
+        var writeIndex = outLen - 1
+        while (n > bigZero && writeIndex >= 0) {
+            val remainder = n.rem(base)
+            chars[writeIndex] = charFromIndex(remainder.intValue(exactRequired = false))
             writeIndex--
-            n = n.divide(base)
+            n = n / base
         }
+        output.append(chars.concatToString())
 
         return output
     }
@@ -258,13 +256,13 @@ open class BaseRadix(
                 val block = input.substring(inPos, inPos + inLen)
                 throw IllegalArgumentException("Not an encoding char: '$c' in block '$block'.")
             }
-            n = n.multiply(base).add(BigInteger.valueOf(index.toLong()))
+            n = n * base + BigInteger.fromLong(index.toLong())
         }
 
         // Extract bytes (big-endian)
         for (i in outLen - 1 downTo 0) {
-            output[outPos + i] = n.and(bigFF).toByte()
-            n = n.shiftRight(8)
+            output[outPos + i] = (n and bigFF).byteValue(exactRequired = false)
+            n = n shr 8
         }
 
         // If we still have a non-zero number, the block did not fit in outLen bytes

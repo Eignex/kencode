@@ -1,7 +1,5 @@
 package com.eignex.kencode
 
-import java.io.ByteArrayOutputStream
-
 internal object PackedUtils {
 
     private fun requireAvailable(
@@ -88,20 +86,20 @@ internal object PackedUtils {
 
     fun zigZagDecodeLong(value: Long): Long = (value ushr 1) xor -(value and 1L)
 
-    fun writeShort(value: Short, out: ByteArrayOutputStream) {
+    fun writeShort(value: Short, out: ByteOutput) {
         val v = value.toInt() and 0xFFFF
         out.write((v ushr 8) and 0xFF)
         out.write(v and 0xFF)
     }
 
-    fun writeInt(value: Int, out: ByteArrayOutputStream) {
+    fun writeInt(value: Int, out: ByteOutput) {
         out.write((value ushr 24) and 0xFF)
         out.write((value ushr 16) and 0xFF)
         out.write((value ushr 8) and 0xFF)
         out.write(value and 0xFF)
     }
 
-    fun writeLong(value: Long, out: ByteArrayOutputStream) {
+    fun writeLong(value: Long, out: ByteOutput) {
         out.write(((value ushr 56) and 0xFF).toInt())
         out.write(((value ushr 48) and 0xFF).toInt())
         out.write(((value ushr 40) and 0xFF).toInt())
@@ -137,7 +135,7 @@ internal object PackedUtils {
         return v
     }
 
-    fun writeVarInt(value: Int, out: ByteArrayOutputStream) {
+    fun writeVarInt(value: Int, out: ByteOutput) {
         var v = value
         while (true) {
             if ((v and 0x7F.inv()) == 0) {
@@ -150,7 +148,7 @@ internal object PackedUtils {
         }
     }
 
-    fun writeVarLong(value: Long, out: ByteArrayOutputStream) {
+    fun writeVarLong(value: Long, out: ByteOutput) {
         var v = value
         while (true) {
             if ((v and 0x7FL.inv()) == 0L) {

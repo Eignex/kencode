@@ -65,7 +65,7 @@ open class Base85(
 
             // Full chunk: 5 chars; partial chunk (1–3 bytes): (chunkLen + 1) chars
             val outLen = if (chunkLen == 4) 5 else chunkLen + 1
-            out.append(tmp, 0, outLen)
+            out.appendRange(tmp, 0, outLen)
         }
 
         return out.toString()
@@ -127,7 +127,7 @@ open class Base85(
             }
 
             val needed = rem - 1
-            System.arraycopy(tmp, 0, out, outPos, needed)
+            tmp.copyInto(out, outPos, 0, needed)
         }
 
         return out

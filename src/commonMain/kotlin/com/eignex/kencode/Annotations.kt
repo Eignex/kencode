@@ -44,7 +44,7 @@ enum class PackedIntegerType {
  */
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
-@Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.SOURCE)
 annotation class PackedType(val type: PackedIntegerType)
 
 internal enum class IntEncoding { FIXED, VARINT, ZIGZAG }
@@ -65,6 +65,6 @@ internal fun resolveIntEncoding(anns: List<Annotation>, config: PackedConfigurat
     anns.filterIsInstance<PackedType>().firstOrNull()?.let { return it.type.toIntEncoding() }
     try {
         anns.filterIsInstance<KxProtoType>().firstOrNull()?.let { return it.type.toIntEncoding() }
-    } catch (_: NoClassDefFoundError) { }
+    } catch (_: Throwable) { }
     return config.defaultEncoding.toIntEncoding()
 }

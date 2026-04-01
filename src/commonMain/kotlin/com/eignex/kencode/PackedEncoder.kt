@@ -7,11 +7,9 @@ import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import java.io.ByteArrayOutputStream
-
 @OptIn(ExperimentalSerializationApi::class)
-class PackedEncoder(
-    private val output: ByteArrayOutputStream,
+class PackedEncoder internal constructor(
+    private val output: ByteOutput,
     private val config: PackedConfiguration = PackedConfiguration(),
     override val serializersModule: SerializersModule = EmptySerializersModule()
 ) : Encoder, CompositeEncoder {
@@ -33,7 +31,7 @@ class PackedEncoder(
     private val collectionBitmapValues: MutableList<Boolean> = mutableListOf()
 
     // Buffer for field data
-    private val dataBuffer = ByteArrayOutputStream()
+    private val dataBuffer = ByteOutput()
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
@@ -93,7 +91,7 @@ class PackedEncoder(
         dataBuffer.reset()
     }
 
-    private fun getBuffer(): ByteArrayOutputStream = if (inStructure) dataBuffer else output
+    private fun getBuffer(): ByteOutput = if (inStructure) dataBuffer else output
 
     override fun encodeBoolean(value: Boolean) {
         when {
@@ -118,17 +116,17 @@ class PackedEncoder(
     }
 
     override fun encodeFloat(value: Float) {
-        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), getBuffer())
+        PackedUtils.writeInt(value.toBits(), getBuffer())
     }
 
     override fun encodeDouble(value: Double) {
-        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), getBuffer())
+        PackedUtils.writeLong(value.toBits(), getBuffer())
     }
 
     override fun encodeChar(value: Char) { writeUtf8Char(value, getBuffer()) }
 
     override fun encodeString(value: String) {
-        val bytes = value.toByteArray(Charsets.UTF_8)
+        val bytes = value.encodeToByteArray()
         val buf = getBuffer()
         PackedUtils.writeVarInt(bytes.size, buf)
         buf.write(bytes)
@@ -243,15 +241,15 @@ class PackedEncoder(
     }
 
     override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
-        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), dataBuffer)
+        PackedUtils.writeInt(value.toBits(), dataBuffer)
     }
 
     override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
-        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), dataBuffer)
+        PackedUtils.writeLong(value.toBits(), dataBuffer)
     }
 
     override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
-        val bytes = value.toByteArray(Charsets.UTF_8)
+        val bytes = value.encodeToByteArray()
         PackedUtils.writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
@@ -300,7 +298,7 @@ class PackedEncoder(
         encodeSerializableElement(descriptor, index, serializer, value)
     }
 
-    private fun writeUtf8Char(value: Char, out: ByteArrayOutputStream) {
+    private fun writeUtf8Char(value: Char, out: ByteOutput) {
         val cp = value.code
         when {
             cp < 0x80  -> out.write(cp)

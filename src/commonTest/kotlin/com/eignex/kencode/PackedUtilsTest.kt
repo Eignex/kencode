@@ -1,6 +1,5 @@
 package com.eignex.kencode
 
-import java.io.ByteArrayOutputStream
 import kotlin.test.*
 
 class BitPackingTest {
@@ -124,7 +123,7 @@ class BitPackingTest {
 
     @Test
     fun `short roundtrip`() {
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         PackedUtils.writeShort(0x1234.toShort(), out)
         val bytes = out.toByteArray()
         val decoded = PackedUtils.readShort(bytes, 0)
@@ -133,7 +132,7 @@ class BitPackingTest {
 
     @Test
     fun `short roundtrip offset`() {
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         out.write(1)
         PackedUtils.writeShort(0x1234.toShort(), out)
         val bytes = out.toByteArray()
@@ -143,7 +142,7 @@ class BitPackingTest {
 
     @Test
     fun `int roundtrip`() {
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         PackedUtils.writeInt(0x01020304, out)
         val bytes = out.toByteArray()
         val decoded = PackedUtils.readInt(bytes, 0)
@@ -152,7 +151,7 @@ class BitPackingTest {
 
     @Test
     fun `int roundtrip offset`() {
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         out.write(1)
         PackedUtils.writeInt(0x01020304, out)
         val bytes = out.toByteArray()
@@ -163,7 +162,7 @@ class BitPackingTest {
     @Test
     fun `long roundtrip`() {
         val value = 0x0102030405060708L
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         PackedUtils.writeLong(value, out)
         val bytes = out.toByteArray()
         val decoded = PackedUtils.readLong(bytes, 0)
@@ -173,7 +172,7 @@ class BitPackingTest {
     @Test
     fun `long roundtrip offset`() {
         val value = 0x0102030405060708L
-        val out = java.io.ByteArrayOutputStream()
+        val out = ByteOutput()
         out.write(1)
         PackedUtils.writeLong(value, out)
         val bytes = out.toByteArray()
@@ -213,7 +212,7 @@ class BitPackingTest {
             Int.MAX_VALUE
         )
         for (v in values) {
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteOutput()
             PackedUtils.writeVarInt(v, out)
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarInt(bytes, 0)
@@ -238,7 +237,7 @@ class BitPackingTest {
             Int.MAX_VALUE
         )
         for (v in values) {
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteOutput()
             out.write(1)
             PackedUtils.writeVarInt(v, out)
             val bytes = out.toByteArray()
@@ -263,7 +262,7 @@ class BitPackingTest {
             Long.MAX_VALUE
         )
         for (v in values) {
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteOutput()
             PackedUtils.writeVarLong(v, out)
             val bytes = out.toByteArray()
             val (decoded, consumed) = PackedUtils.decodeVarLong(bytes, 0)
@@ -287,7 +286,7 @@ class BitPackingTest {
             Long.MAX_VALUE
         )
         for (v in values) {
-            val out = java.io.ByteArrayOutputStream()
+            val out = ByteOutput()
             out.write(1)
             PackedUtils.writeVarLong(v, out)
             val bytes = out.toByteArray()
@@ -311,7 +310,7 @@ class BitPackingTest {
 
     @Test
     fun `comprehensive truncation coverage`() {
-        val types:List<Pair<String, (ByteArrayOutputStream) -> Unit>> = listOf(
+        val types:List<Pair<String, (ByteOutput) -> Unit>> = listOf(
             "Short" to {
                 PackedUtils.writeShort(
                     1102,
@@ -345,7 +344,7 @@ class BitPackingTest {
         )
 
         types.forEach { (name, writer) ->
-            val out = ByteArrayOutputStream()
+            val out = ByteOutput()
             writer(out)
             val full = out.toByteArray()
             // Truncate by 1 byte to trigger requireAvailable
