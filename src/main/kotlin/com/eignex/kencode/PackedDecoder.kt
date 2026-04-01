@@ -166,9 +166,7 @@ class PackedDecoder(
     private fun readStringInline(): String {
         val len = readVarInt()
         require(len >= 0 && position + len <= input.size)
-        val bytes = input.copyOfRange(position, position + len)
-        position += len
-        return bytes.toString(Charsets.UTF_8)
+        return String(input, position, len, Charsets.UTF_8).also { position += len }
     }
 
     @ExperimentalSerializationApi
@@ -371,7 +369,9 @@ class PackedDecoder(
                 require((b2 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
                 3 to (((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F))
             }
-            else -> throw IllegalArgumentException("Invalid UTF-8 start byte")
+            else -> throw IllegalArgumentException(
+                "Code points above U+FFFF (4-byte UTF-8 sequences) are not supported in Char fields; use String instead"
+            )
         }
         position += len
         return cp.toChar()
