@@ -207,7 +207,7 @@ open class BaseRadix(
      *
      * The encoded block is written starting at [outPos] and occupies exactly [outLen] characters.
      */
-    fun encodeBlock(
+    internal fun encodeBlock(
         input: ByteArray,
         inPos: Int = 0,
         inLen: Int = input.size,
@@ -240,7 +240,7 @@ open class BaseRadix(
      *
      * @throws IllegalArgumentException if invalid characters or inconsistent blocks are found.
      */
-    fun decodeBlock(
+    internal fun decodeBlock(
         input: CharSequence,
         inPos: Int = 0,
         inLen: Int = input.length,
