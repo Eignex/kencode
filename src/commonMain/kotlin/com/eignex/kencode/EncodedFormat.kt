@@ -9,11 +9,14 @@ import kotlinx.serialization.modules.SerializersModule
  * @property codec The ASCII-safe byte codec used to turn raw bytes into text (e.g., Base62, Base64).
  * @property checksum An optional checksum appended to the binary payload and verified upon decoding.
  * @property binaryFormat The underlying binary serialization format used before encoding to text.
+ * @property compactZeros When true, leading zero bytes are stripped before encoding and restored on decode.
+ *   A varint prefix encodes the count, costing 1 byte for up to 127 stripped bytes.
  */
 data class EncodedConfiguration(
     val codec: ByteEncoding = Base62,
     val checksum: Checksum? = null,
-    val binaryFormat: BinaryFormat = PackedFormat.Default
+    val binaryFormat: BinaryFormat = PackedFormat.Default,
+    val compactZeros: Boolean = false,
 )
 
 /**
@@ -43,7 +46,8 @@ open class EncodedFormat(
         codec: ByteEncoding = Base62,
         checksum: Checksum? = null,
         binaryFormat: BinaryFormat = PackedFormat,
-    ) : this(EncodedConfiguration(codec, checksum, binaryFormat))
+        compactZeros: Boolean = false,
+    ) : this(EncodedConfiguration(codec, checksum, binaryFormat, compactZeros))
 
     /**
      * Delegates to the underlying [BinaryFormat]'s serializers module.
@@ -67,7 +71,8 @@ open class EncodedFormat(
         val checked = if (configuration.checksum != null) {
             bytes + configuration.checksum.digest(bytes)
         } else bytes
-        return configuration.codec.encode(checked)
+        val payload = if (configuration.compactZeros) compactZerosEncode(checked) else checked
+        return configuration.codec.encode(payload)
     }
 
     /**
@@ -80,24 +85,78 @@ open class EncodedFormat(
         deserializer: DeserializationStrategy<T>, string: String
     ): T {
         val input = configuration.codec.decode(string)
+        val raw = if (configuration.compactZeros) compactZerosDecode(input) else input
         val bytes = if (configuration.checksum != null) {
-            require(input.size >= configuration.checksum.size) {
-                "Input too short to contain checksum: expected at least ${configuration.checksum.size} bytes but got ${input.size}."
+            require(raw.size >= configuration.checksum.size) {
+                "Input too short to contain checksum: expected at least ${configuration.checksum.size} bytes but got ${raw.size}."
             }
             val bytes =
-                input.sliceArray(0..<input.size - configuration.checksum.size)
+                raw.sliceArray(0..<raw.size - configuration.checksum.size)
             val actual =
-                input.sliceArray(input.size - configuration.checksum.size..<input.size)
+                raw.sliceArray(raw.size - configuration.checksum.size..<raw.size)
             val expected = configuration.checksum.digest(bytes)
             require(actual.contentEquals(expected)) {
                 "Checksum mismatch."
             }
             bytes
-        } else input
+        } else raw
         return configuration.binaryFormat.decodeFromByteArray(
             deserializer,
             bytes
         )
+    }
+
+    /**
+     * Strips leading zero bytes from [bytes], prepends a varint encoding of the
+     * count, and returns the result.
+     */
+    private fun compactZerosEncode(bytes: ByteArray): ByteArray {
+        var k = 0
+        while (k < bytes.size && bytes[k] == 0.toByte()) k++
+        val prefix = varintEncode(k)
+        val result = ByteArray(prefix.size + bytes.size - k)
+        prefix.copyInto(result)
+        bytes.copyInto(result, destinationOffset = prefix.size, startIndex = k)
+        return result
+    }
+
+    /**
+     * Reads a varint prefix written by [compactZerosEncode] and restores the leading
+     * zero bytes, returning the original byte array.
+     */
+    private fun compactZerosDecode(bytes: ByteArray): ByteArray {
+        require(bytes.isNotEmpty()) { "Compact payload cannot be empty." }
+        val (k, prefixLen) = varintDecode(bytes, 0)
+        val result = ByteArray(k + bytes.size - prefixLen)
+        bytes.copyInto(result, destinationOffset = k, startIndex = prefixLen)
+        return result
+    }
+
+    private fun varintEncode(value: Int): ByteArray {
+        require(value >= 0) { "varint value must be non-negative" }
+        val buf = ByteArray(5)
+        var v = value
+        var pos = 0
+        while (v > 0x7F) {
+            buf[pos++] = ((v and 0x7F) or 0x80).toByte()
+            v = v ushr 7
+        }
+        buf[pos++] = v.toByte()
+        return buf.copyOf(pos)
+    }
+
+    private fun varintDecode(bytes: ByteArray, offset: Int): Pair<Int, Int> {
+        var value = 0
+        var shift = 0
+        var pos = offset
+        while (true) {
+            require(pos < bytes.size) { "Truncated varint in compactZeros payload." }
+            val b = bytes[pos++].toInt() and 0xFF
+            value = value or ((b and 0x7F) shl shift)
+            shift += 7
+            if (b and 0x80 == 0) break
+        }
+        return Pair(value, pos - offset)
     }
 }
 
@@ -119,6 +178,12 @@ class EncodedFormatBuilder {
      * The underlying binary serialization format. Defaults to [PackedFormat.Default].
      */
     var binaryFormat: BinaryFormat = PackedFormat.Default
+
+    /**
+     * When true, leading zero bytes are stripped before encoding and restored on decode.
+     * Defaults to `false`.
+     */
+    var compactZeros: Boolean = false
 }
 
 /**
@@ -142,13 +207,15 @@ fun EncodedFormat(
         codec = from.configuration.codec
         checksum = from.configuration.checksum
         binaryFormat = from.configuration.binaryFormat
+        compactZeros = from.configuration.compactZeros
     }
     builder.builderAction()
 
     val newConfig = EncodedConfiguration(
         builder.codec,
         builder.checksum,
-        builder.binaryFormat
+        builder.binaryFormat,
+        builder.compactZeros,
     )
 
     return EncodedFormat(newConfig)
