@@ -1,6 +1,77 @@
 package com.eignex.kencode
 
 /**
+ * Shared CRC digest engine parameterized by width (up to 32 bits).
+ * Uses Long arithmetic throughout to handle both 16-bit and 32-bit cases uniformly.
+ */
+private class CrcEngine(
+    poly: Int,
+    init: Int,
+    private val refin: Boolean,
+    private val refout: Boolean,
+    xorOut: Int,
+    private val width: Int
+) {
+    private val mask: Long = if (width == 32) 0xFFFFFFFFL else (1L shl width) - 1L
+    private val refPoly: Long = poly.reverseBits(width).toLong() and mask
+    private val refInit: Long = init.reverseBits(width).toLong() and mask
+    private val xorOutL: Long = xorOut.toLong() and mask
+
+    val size: Int = (width + 7) / 8
+
+    fun digest(data: ByteArray): ByteArray {
+        var crc = refInit
+        for (b in data) {
+            val raw = b.toInt() and 0xFF
+            val byte = if (refin) raw else raw.reverseBits8()
+            crc = crc xor byte.toLong()
+            repeat(8) {
+                crc = if ((crc and 1L) != 0L) (crc ushr 1) xor refPoly else crc ushr 1
+            }
+            crc = crc and mask
+        }
+        var finalCrc = if (refout) crc else crc.toInt().reverseBits(width).toLong() and mask
+        finalCrc = (finalCrc xor xorOutL) and mask
+        return ByteArray(size) { i ->
+            val shift = 8 * (size - 1 - i)
+            ((finalCrc ushr shift) and 0xFFL).toByte()
+        }
+    }
+}
+
+/**
+ * CRC-8 implementation with configurable polynomial and parameters.
+ *
+ * Default configuration implements CRC-8/SMBUS.
+ *
+ * Parameters:
+ * @param poly generator polynomial (high bit implicit).
+ * @param init initial CRC register value.
+ * @param refin whether to reflect bits of each input byte.
+ * @param refout whether to reflect the final CRC value.
+ * @param xorOut final XOR mask.
+ *
+ * Output:
+ * - Returned as a single-byte array.
+ */
+open class Crc8(
+    poly: Int = 0x07,
+    init: Int = 0x00,
+    refin: Boolean = false,
+    refout: Boolean = false,
+    xorOut: Int = 0x00
+) : Checksum {
+
+    companion object Default : Crc8()
+
+    private val engine = CrcEngine(poly, init, refin, refout, xorOut, width = 8)
+
+    override val size: Int get() = engine.size
+
+    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
+}
+
+/**
  * CRC-16 implementation with configurable polynomial and parameters.
  *
  * Default configuration implements the X.25 CRC.
@@ -20,54 +91,19 @@ package com.eignex.kencode
 open class Crc16(
     poly: Int = 0x1021,
     init: Int = 0xFFFF,
-    private val refin: Boolean = true,
-    private val refout: Boolean = true,
-    private val xorOut: Int = 0xFFFF,
-    private val width: Int = 16
+    refin: Boolean = true,
+    refout: Boolean = true,
+    xorOut: Int = 0xFFFF,
+    width: Int = 16
 ) : Checksum {
 
     companion object Default : Crc16()
 
-    private val mask = (1 shl width) - 1
+    private val engine = CrcEngine(poly, init, refin, refout, xorOut, width)
 
-    // Internal representation is reflected (LSB-first),
-    // so pre-reflect poly and init.
-    private val refPoly: Int = poly.reverseBits(width)
-    private val refInit: Int = init.reverseBits(width)
+    override val size: Int get() = engine.size
 
-    override val size: Int = (width + 7) / 8
-
-    override fun digest(data: ByteArray): ByteArray {
-        var crc = refInit and mask
-
-        for (i in data.indices) {
-            val raw = data[i].toInt() and 0xFF
-            val b = if (refin) raw else raw.reverseBits8()
-
-            crc = crc xor b
-            repeat(8) {
-                crc = if ((crc and 1) != 0) {
-                    (crc ushr 1) xor refPoly
-                } else {
-                    crc ushr 1
-                }
-            }
-            crc = crc and mask
-        }
-
-        // Convert from internal reflected form to requested output form.
-        crc = if (refout) crc else crc.reverseBits(width)
-
-        crc = (crc xor xorOut) and mask
-
-        // Output big-endian (high byte first).
-        val out = ByteArray(size)
-        for (i in 0 until size) {
-            val shift = 8 * (size - 1 - i)
-            out[i] = ((crc ushr shift) and 0xFF).toByte()
-        }
-        return out
-    }
+    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
 }
 
 /**
@@ -88,58 +124,21 @@ open class Crc16(
  * - Internal representation uses reflected form.
  */
 open class Crc32(
-    poly: Int = 0x04C11DB7, // canonical CRC-32 poly
+    poly: Int = 0x04C11DB7,
     init: Int = 0xFFFFFFFF.toInt(),
-    private val refin: Boolean = true,
-    private val refout: Boolean = true,
-    private val xorOut: Int = 0xFFFFFFFF.toInt(),
-    private val width: Int = 32
+    refin: Boolean = true,
+    refout: Boolean = true,
+    xorOut: Int = 0xFFFFFFFF.toInt(),
+    width: Int = 32
 ) : Checksum {
 
     companion object Default : Crc32()
 
-    private val mask: Long = if (width == 32) 0xFFFFFFFFL
-    else (1L shl width) - 1L
+    private val engine = CrcEngine(poly, init, refin, refout, xorOut, width)
 
-    // Internal representation: reflected
-    private val refPoly: Long = poly.reverseBits(width).toLong() and mask
-    private val refInit: Long = init.reverseBits(width).toLong() and mask
+    override val size: Int get() = engine.size
 
-    override val size: Int = (width + 7) / 8
-
-    override fun digest(data: ByteArray): ByteArray {
-        var crc = refInit
-
-        for (i in data.indices) {
-            val raw = data[i].toInt() and 0xFF
-            val b = if (refin) raw else raw.reverseBits8()
-
-            crc = crc xor (b.toLong() and 0xFFL)
-            repeat(8) {
-                crc = if ((crc and 1L) != 0L) {
-                    (crc ushr 1) xor refPoly
-                } else {
-                    crc ushr 1
-                }
-            }
-            crc = crc and mask
-        }
-
-        var finalCrc = if (refout) {
-            crc
-        } else {
-            crc.toInt().reverseBits(width).toLong() and mask
-        }
-
-        finalCrc = (finalCrc xor (xorOut.toLong() and mask)) and mask
-
-        val out = ByteArray(size)
-        for (i in 0 until size) {
-            val shift = 8 * (size - 1 - i)
-            out[i] = ((finalCrc ushr shift) and 0xFFL).toByte()
-        }
-        return out
-    }
+    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
 }
 
 /** Bit helpers */
