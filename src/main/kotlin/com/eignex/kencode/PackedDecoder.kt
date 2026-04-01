@@ -40,6 +40,10 @@ class PackedDecoder(
     private var nullBitmapIndex: Int = 0
     private var boolBitmapIndex: Int = 0
 
+    // When a nullable-collection parent intercepts the null check for a complex element it
+    // primes the sub-decoder so that NullableSerializer's own decodeNotNullMark call is a no-op.
+    internal var skipNextNullMark: Boolean = false
+
     override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
         inStructure = true
         currentDescriptor = descriptor
@@ -183,6 +187,10 @@ class PackedDecoder(
             nullBitmapIndex++
             return !isNull
         }
+        if (skipNextNullMark) {
+            skipNextNullMark = false
+            return true
+        }
         return (readVarLong() and 1L) == 0L
     }
 
@@ -256,6 +264,22 @@ class PackedDecoder(
 
         val kind = deserializer.descriptor.kind
         val isInline = deserializer.descriptor.isInline
+
+        if (isNullableCollection && deserializer.descriptor.isNullable && !isInline && (kind is StructureKind || kind is PolymorphicKind)) {
+            val isNotNull = decodeNotNullMark()
+            if (!isNotNull) {
+                currentIndex = -1
+                @Suppress("UNCHECKED_CAST")
+                return decodeNull() as T
+            }
+            val subDecoder = PackedDecoder(input, config, serializersModule)
+            subDecoder.position = this.position
+            subDecoder.skipNextNullMark = true
+            val value = deserializer.deserialize(subDecoder)
+            this.position = subDecoder.position
+            currentIndex = -1
+            return value
+        }
 
         if (!isInline && (kind is StructureKind || kind is PolymorphicKind)) {
             val subDecoder = PackedDecoder(input, config, serializersModule)
