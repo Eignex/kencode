@@ -361,10 +361,4 @@ class BitPackingTest {
             }
         }
     }
-
-        private fun Array<Boolean>.toBooleanArray(): BooleanArray {
-        val result = BooleanArray(size)
-        for (i in indices) result[i] = this[i]
-        return result
-    }
 }
