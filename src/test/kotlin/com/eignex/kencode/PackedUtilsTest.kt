@@ -304,8 +304,7 @@ class BitPackingTest {
     @Test
     fun `flags roundtrip`() {
         val flags = booleanArrayOf(true, false, true, true, false)
-        val longFlags =
-            PackedUtils.packFlagsToLong(*flags.toTypedArray().toBooleanArray())
+        val longFlags = PackedUtils.packFlagsToLong(flags)
         val unpacked = PackedUtils.unpackFlagsFromLong(longFlags, flags.size)
         assertContentEquals(flags, unpacked)
     }

@@ -359,6 +359,126 @@ class PackedFormatTest {
         }
     }
 
+    // --- Size assertions ---
+
+    @Test
+    fun `class with no booleans or nullables has no bitmask header`() {
+        // 4 (Int) + 8 (Long) + 1 (VarInt len) + 13 (String bytes) = 26
+        val bytes = PackedFormat.encodeToByteArray(
+            NoBooleansNoNulls.serializer(),
+            NoBooleansNoNulls(42, 42L, "No flags here")
+        )
+        assertEquals(26, bytes.size)
+    }
+
+    @Test
+    fun `boolean fields pack into single bitmask byte`() {
+        // 2 booleans → 1 bitmask byte (VarLong), 2 ints → 4 bytes each = 9 total
+        val bytes = PackedFormat.encodeToByteArray(
+            SimpleIntsAndBooleans.serializer(),
+            SimpleIntsAndBooleans(0, 0, false, false)
+        )
+        assertEquals(9, bytes.size)
+    }
+
+    @Test
+    fun `empty string encodes as single zero byte`() {
+        val bytes = PackedFormat.encodeToByteArray(String.serializer(), "")
+        assertEquals(1, bytes.size)
+        assertEquals(0, bytes[0])
+    }
+
+    @Test
+    fun `empty list encodes as single zero byte`() {
+        val bytes = PackedFormat.encodeToByteArray(ListSerializer(Int.serializer()), emptyList())
+        assertEquals(1, bytes.size)
+        assertEquals(0, bytes[0])
+    }
+
+    @Test
+    fun `empty map roundtrip`() {
+        assertPackedRoundtrip(MapHolder.serializer(), MapHolder(emptyMap(), null))
+        assertPackedRoundtrip(MapHolder.serializer(), MapHolder(emptyMap(), emptyMap()))
+    }
+
+    // --- VarInt / VarUInt encoding distinction ---
+
+    @Test
+    fun `VarUInt does not apply zigzag so negative inputs encode large`() {
+        // @VarUInt(-1 as Int) = 0xFFFFFFFF unsigned = 5 bytes
+        // @VarUInt(-1L as Long) = 0xFFFFFFFFFFFFFFFF unsigned = 10 bytes
+        val uintNegative = VarIntVarUIntPayload(0, 0L, -1, -1L, 0, 0)
+        val bytes = PackedFormat.encodeToByteArray(VarIntVarUIntPayload.serializer(), uintNegative)
+        // VarInt(0)=1, VarLong(0)=1, VarInt(0xFFFFFFFF)=5, VarLong(0xFFFFFFFF…)=10, Int=4, Long=8 → 29
+        assertEquals(29, bytes.size)
+
+        // @VarInt(-1) = zigzag(−1) = 1 = 1 byte
+        val intNegative = VarIntVarUIntPayload(-1, -1L, 0, 0L, 0, 0)
+        val bytes2 = PackedFormat.encodeToByteArray(VarIntVarUIntPayload.serializer(), intNegative)
+        // VarInt(1)=1, VarLong(1)=1, VarInt(0)=1, VarLong(0)=1, Int=4, Long=8 → 16
+        assertEquals(16, bytes2.size)
+
+        assertPackedRoundtrip(VarIntVarUIntPayload.serializer(), uintNegative)
+        assertPackedRoundtrip(VarIntVarUIntPayload.serializer(), intNegative)
+    }
+
+    // --- defaultVarInt / defaultZigZag interaction ---
+
+    @Test
+    fun `both defaultVarInt and defaultZigZag active uses zigzag`() {
+        val fmt = PackedFormat { defaultVarInt = true; defaultZigZag = true }
+        val payload = UnannotatedPayload(-1, -1L)
+        val bytes = fmt.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        // zigzag(−1)=1 for both → 1 + 1 = 2 bytes
+        assertEquals(2, bytes.size)
+        assertEquals(payload, fmt.decodeFromByteArray(UnannotatedPayload.serializer(), bytes))
+    }
+
+    // --- Nullability roundtrips not covered in the main table ---
+
+    @Test
+    fun `deep null mid-chain roundtrip`() {
+        assertPackedRoundtrip(DeepNested.serializer(), DeepNested("root", Level1(false, null)))
+    }
+
+    // --- UTF-8 character encoding ---
+
+    @Test
+    fun `3-byte UTF-8 char roundtrip`() {
+        assertPackedRoundtrip(
+            AllPrimitiveTypes.serializer(),
+            AllPrimitiveTypes(0, 0L, 0, 0, 0f, 0.0, '中', false, "")
+        )
+    }
+
+    // --- Truncation error coverage ---
+
+    @Test
+    fun `truncated varint throws`() {
+        // Continuation bit set but no following byte
+        val incomplete = byteArrayOf(0x80.toByte())
+        assertFailsWith<IllegalArgumentException> {
+            PackedUtils.decodeVarInt(incomplete, 0)
+        }
+    }
+
+    @Test
+    fun `truncated string bytes throws`() {
+        // VarInt says length 5 but only 2 bytes follow
+        val bad = byteArrayOf(5, 'h'.code.toByte(), 'i'.code.toByte())
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(String.serializer(), bad)
+        }
+    }
+
+    @Test
+    fun `truncated bitmask header throws`() {
+        // NullableFieldsPayload expects a bitmask but gets empty input
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(NullableFieldsPayload.serializer(), byteArrayOf())
+        }
+    }
+
     @Test
     fun `decodeElementIndex simulates sequential decoding for classes and collections`() {
         // 1. Test the Class path
