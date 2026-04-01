@@ -630,6 +630,9 @@ data class PolymorphicContainer(
 )
 
 @Serializable
+data class BooleanListPayload(val id: Int, val flags: List<Boolean>)
+
+@Serializable
 data class UnannotatedPayload(val x: Int, val y: Long)
 
 @Serializable

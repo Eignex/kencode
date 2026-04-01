@@ -479,6 +479,76 @@ class PackedFormatTest {
         }
     }
 
+    // --- Schema-derived bitmask compactness ---
+
+    @Test
+    fun `schema-derived bitmask is more compact than VarLong for 8-flag boundary`() {
+        // 8 booleans where the last flag is true forces VarLong into 2 bytes (bit 7 set = value >= 128).
+        // Schema-derived encoding always uses exactly ceil(8/8) = 1 byte.
+        val allTrue = BooleanFlags64(BooleanArray(64) { true })
+        val bytes = PackedFormat.encodeToByteArray(BooleanFlags64.serializer(), allTrue)
+        // 64 booleans → 8 bytes bitmask (schema-derived), 0 data bytes
+        assertEquals(8, bytes.size)
+        assertPackedRoundtrip(BooleanFlags64.serializer(), allTrue)
+    }
+
+    @Test
+    fun `schema-derived bitmask handles 65-flag class without length prefix`() {
+        // Old format: packFlags (9 bytes data) + VarInt prefix (1 byte) = 10 bytes.
+        // New format: ceil(65/8) = 9 bytes, no prefix.
+        val allTrue = BooleanFlags65(BooleanArray(65) { true })
+        val bytes = PackedFormat.encodeToByteArray(BooleanFlags65.serializer(), allTrue)
+        assertEquals(9, bytes.size)
+        assertPackedRoundtrip(BooleanFlags65.serializer(), allTrue)
+    }
+
+    // --- Collection bitmap compactness ---
+
+    @Test
+    fun `boolean list encodes all values as a single bitmap`() {
+        // 8 booleans in a List<Boolean>: old = 8 bytes (1 each), new = 1 bitmap byte.
+        // id (4 bytes) + size VarInt (1 byte) + bitmap (1 byte) = 6 bytes total.
+        val payload = BooleanListPayload(0, List(8) { it % 2 == 0 })
+        val bytes = PackedFormat.encodeToByteArray(BooleanListPayload.serializer(), payload)
+        assertEquals(6, bytes.size)
+        assertPackedRoundtrip(BooleanListPayload.serializer(), payload)
+    }
+
+    @Test
+    fun `boolean list bitmap roundtrip for various sizes`() {
+        for (n in listOf(0, 1, 7, 8, 9, 63, 64, 65)) {
+            val payload = BooleanListPayload(n, List(n) { it % 3 == 0 })
+            assertPackedRoundtrip(BooleanListPayload.serializer(), payload)
+        }
+    }
+
+    @Test
+    fun `nullable list encodes null markers as a bitmap`() {
+        // List<String?> with 8 elements: old = 8 null-marker bytes, new = 1 bitmap byte.
+        val list = listOf("a", null, "b", null, "c", null, "d", null)
+        val bytes = PackedFormat.encodeToByteArray(ListSerializer(String.serializer().nullable), list)
+        // size (1) + bitmap (1) + 4 strings with length-prefix: 4*(1+1) = 8 bytes → total 10
+        assertEquals(10, bytes.size)
+        val decoded = PackedFormat.decodeFromByteArray(ListSerializer(String.serializer().nullable), bytes)
+        assertEquals(list, decoded)
+    }
+
+    @Test
+    fun `nullable list bitmap roundtrip for mixed null and non-null`() {
+        val lists = listOf(
+            listOf(null, null, null),
+            listOf("x"),
+            listOf("a", null, "b"),
+            emptyList(),
+            listOf(null)
+        )
+        for (list in lists) {
+            val bytes = PackedFormat.encodeToByteArray(ListSerializer(String.serializer().nullable), list)
+            val decoded = PackedFormat.decodeFromByteArray(ListSerializer(String.serializer().nullable), bytes)
+            assertEquals(list, decoded)
+        }
+    }
+
     @Test
     fun `decodeElementIndex simulates sequential decoding for classes and collections`() {
         // 1. Test the Class path

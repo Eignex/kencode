@@ -32,6 +32,14 @@ class PackedDecoder(
     private var collectionSize = -1
     private var collectionIndex = 0
 
+    // Bitmap state for nullable/boolean LIST elements
+    private var isNullableCollection: Boolean = false
+    private var isBooleanCollection: Boolean = false
+    private var collectionNullBitmap: BooleanArray = booleanArrayOf()
+    private var collectionBoolBitmap: BooleanArray = booleanArrayOf()
+    private var nullBitmapIndex: Int = 0
+    private var boolBitmapIndex: Int = 0
+
     override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
         inStructure = true
         currentDescriptor = descriptor
@@ -44,8 +52,15 @@ class PackedDecoder(
             booleanLookup = intArrayOf()
             nullValues = BooleanArray(0)
             nullableLookup = intArrayOf()
+            val isList = kind is StructureKind.LIST
+            val elemDesc = descriptor.getElementDescriptor(0)
+            isNullableCollection = isList && elemDesc.isNullable
+            isBooleanCollection = isList && !isNullableCollection && elemDesc.kind == PrimitiveKind.BOOLEAN
             return this
         }
+
+        isNullableCollection = false
+        isBooleanCollection = false
 
         val boolIdx = (0 until descriptor.elementsCount).filter {
             descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
@@ -60,53 +75,46 @@ class PackedDecoder(
         nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
 
         val totalFlags = boolIdx.size + nullableIdx.size
-
         if (totalFlags == 0) {
             booleanValues = BooleanArray(0)
             nullValues = BooleanArray(0)
         } else {
-            val allFlags: BooleanArray
-            if (totalFlags > 64) {
-                val (byteCount, bytesRead) = PackedUtils.decodeVarInt(input, position)
-                position += bytesRead
-                allFlags = PackedUtils.unpackFlags(input, position, byteCount)
-                position += byteCount
-            } else {
-                val (flagsLong, bytesRead) = PackedUtils.decodeVarLong(input, position)
-                position += bytesRead
-                allFlags = PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
-            }
-
-            booleanValues = BooleanArray(boolIdx.size) { i ->
-                if (i < allFlags.size) allFlags[i] else false
-            }
-            val nullOffset = boolIdx.size
-            nullValues = BooleanArray(nullableIdx.size) { i ->
-                val flagIdx = nullOffset + i
-                if (flagIdx < allFlags.size) allFlags[flagIdx] else false
-            }
+            // Schema-derived fixed-width bitmask: (totalFlags + 7) / 8 bytes, no length prefix needed
+            val numBytes = (totalFlags + 7) / 8
+            val allFlags = PackedUtils.unpackFlags(input, position, numBytes)
+            position += numBytes
+            booleanValues = BooleanArray(boolIdx.size) { i -> allFlags[i] }
+            nullValues = BooleanArray(nullableIdx.size) { i -> allFlags[boolIdx.size + i] }
         }
 
         return this
     }
 
     override fun decodeCollectionSize(descriptor: SerialDescriptor): Int {
-        val (size, bytesRead) = PackedUtils.decodeVarInt(input, position)
-        position += bytesRead
+        val size = readVarInt()
         collectionSize = size
         collectionIndex = 0
+        nullBitmapIndex = 0
+        boolBitmapIndex = 0
+        if (size > 0) {
+            if (isNullableCollection) {
+                val numBytes = (size + 7) / 8
+                collectionNullBitmap = PackedUtils.unpackFlags(input, position, numBytes)
+                position += numBytes
+            }
+            if (isBooleanCollection) {
+                val numBytes = (size + 7) / 8
+                collectionBoolBitmap = PackedUtils.unpackFlags(input, position, numBytes)
+                position += numBytes
+            }
+        }
         return size
     }
 
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         if (isCollection) {
-            return if (collectionIndex < collectionSize) {
-                collectionIndex++
-            } else {
-                CompositeDecoder.DECODE_DONE
-            }
+            return if (collectionIndex < collectionSize) collectionIndex++ else CompositeDecoder.DECODE_DONE
         }
-
         val nextIndex = currentIndex + 1
         return if (nextIndex < descriptor.elementsCount) {
             currentIndex = nextIndex
@@ -120,6 +128,11 @@ class PackedDecoder(
 
     override fun decodeBoolean(): Boolean {
         if (!inStructure || isCollection) {
+            if (isCollection && isBooleanCollection) {
+                val v = if (boolBitmapIndex < collectionBoolBitmap.size) collectionBoolBitmap[boolBitmapIndex] else false
+                boolBitmapIndex++
+                return v
+            }
             require(position < input.size)
             return input[position++].toInt() != 0
         }
@@ -133,32 +146,21 @@ class PackedDecoder(
 
     override fun decodeShort(): Short = readShortPos()
 
-    override fun decodeInt(): Int {
-        return if (inStructure && !isCollection) decodeIntElement(
-            currentDescriptor,
-            currentIndex
-        ) else readIntPos()
-    }
+    override fun decodeInt(): Int =
+        if (inStructure && !isCollection) decodeIntElement(currentDescriptor, currentIndex) else readIntPos()
 
-    override fun decodeLong(): Long {
-        return if (inStructure && !isCollection) decodeLongElement(
-            currentDescriptor,
-            currentIndex
-        ) else readLongPos()
-    }
+    override fun decodeLong(): Long =
+        if (inStructure && !isCollection) decodeLongElement(currentDescriptor, currentIndex) else readLongPos()
 
-    override fun decodeFloat(): Float =
-        java.lang.Float.intBitsToFloat(readIntPos())
+    override fun decodeFloat(): Float = java.lang.Float.intBitsToFloat(readIntPos())
 
-    override fun decodeDouble(): Double =
-        java.lang.Double.longBitsToDouble(readLongPos())
+    override fun decodeDouble(): Double = java.lang.Double.longBitsToDouble(readLongPos())
 
     override fun decodeChar(): Char = readUtf8Char()
     override fun decodeString(): String = readStringInline()
 
     private fun readStringInline(): String {
-        val (len, bytesRead) = PackedUtils.decodeVarInt(input, position)
-        position += bytesRead
+        val len = readVarInt()
         require(len >= 0 && position + len <= input.size)
         val bytes = input.copyOfRange(position, position + len)
         position += len
@@ -166,11 +168,7 @@ class PackedDecoder(
     }
 
     @ExperimentalSerializationApi
-    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int {
-        val (v, bytesRead) = PackedUtils.decodeVarInt(input, position)
-        position += bytesRead
-        return v
-    }
+    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = readVarInt()
 
     @ExperimentalSerializationApi
     override fun decodeNull(): Nothing? = null
@@ -180,9 +178,12 @@ class PackedDecoder(
         require(!inStructure || isCollection) {
             "decodeNotNullMark cannot be called inside classes. Use decodeNullableSerializableElement instead."
         }
-        val (flags, bytesRead) = PackedUtils.decodeVarLong(input, position)
-        position += bytesRead
-        return (flags and 1L) == 0L
+        if (isNullableCollection) {
+            val isNull = if (nullBitmapIndex < collectionNullBitmap.size) collectionNullBitmap[nullBitmapIndex] else false
+            nullBitmapIndex++
+            return !isNull
+        }
+        return (readVarLong() and 1L) == 0L
     }
 
     @ExperimentalSerializationApi
@@ -191,6 +192,8 @@ class PackedDecoder(
     override fun endStructure(descriptor: SerialDescriptor) {
         inStructure = false
         isCollection = false
+        isNullableCollection = false
+        isBooleanCollection = false
         currentIndex = -1
     }
 
@@ -200,89 +203,45 @@ class PackedDecoder(
     private fun nullablePos(index: Int): Int =
         if (index < nullableLookup.size) nullableLookup[index] else -1
 
-    override fun decodeBooleanElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Boolean {
+    override fun decodeBooleanElement(descriptor: SerialDescriptor, index: Int): Boolean {
         val pos = booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         return booleanValues[pos]
     }
 
-    override fun decodeByteElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Byte {
+    override fun decodeByteElement(descriptor: SerialDescriptor, index: Int): Byte {
         require(position < input.size)
         return input[position++]
     }
 
-    override fun decodeShortElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Short = readShortPos()
+    override fun decodeShortElement(descriptor: SerialDescriptor, index: Int): Short = readShortPos()
 
-    override fun decodeIntElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Int = when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-        IntEncoding.ZIGZAG -> {
-            val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
-            position += bytesRead
-            PackedUtils.zigZagDecodeInt(raw)
+    override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int =
+        when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+            IntEncoding.ZIGZAG -> PackedUtils.zigZagDecodeInt(readVarInt())
+            IntEncoding.VARINT -> readVarInt()
+            IntEncoding.FIXED  -> readIntPos()
         }
-        IntEncoding.VARINT -> {
-            val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
-            position += bytesRead
-            raw
-        }
-        IntEncoding.FIXED  -> readIntPos()
-    }
 
-    override fun decodeLongElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Long = when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-        IntEncoding.ZIGZAG -> {
-            val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
-            position += bytesRead
-            PackedUtils.zigZagDecodeLong(raw)
+    override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long =
+        when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+            IntEncoding.ZIGZAG -> PackedUtils.zigZagDecodeLong(readVarLong())
+            IntEncoding.VARINT -> readVarLong()
+            IntEncoding.FIXED  -> readLongPos()
         }
-        IntEncoding.VARINT -> {
-            val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
-            position += bytesRead
-            raw
-        }
-        IntEncoding.FIXED  -> readLongPos()
-    }
 
-    override fun decodeFloatElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Float =
+    override fun decodeFloatElement(descriptor: SerialDescriptor, index: Int): Float =
         java.lang.Float.intBitsToFloat(readIntPos())
 
-    override fun decodeDoubleElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Double =
+    override fun decodeDoubleElement(descriptor: SerialDescriptor, index: Int): Double =
         java.lang.Double.longBitsToDouble(readLongPos())
 
-    override fun decodeCharElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Char = readUtf8Char()
+    override fun decodeCharElement(descriptor: SerialDescriptor, index: Int): Char = readUtf8Char()
 
-    override fun decodeStringElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): String = readStringInline()
+    override fun decodeStringElement(descriptor: SerialDescriptor, index: Int): String = readStringInline()
 
     @ExperimentalSerializationApi
-    override fun decodeInlineElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Decoder {
+    override fun decodeInlineElement(descriptor: SerialDescriptor, index: Int): Decoder {
         currentIndex = index
         return this
     }
@@ -338,14 +297,36 @@ class PackedDecoder(
         )
     }
 
-    private fun readShortPos(): Short =
-        PackedUtils.readShort(input, position).also { position += 2 }
+    // Inline varint/varlong helpers: advance position directly, produce no Pair allocation
+    private fun readVarInt(): Int {
+        var result = 0
+        var shift = 0
+        while (true) {
+            require(position < input.size) { "Unexpected EOF while decoding VarInt" }
+            val b = input[position++].toInt() and 0xFF
+            result = result or ((b and 0x7F) shl shift)
+            if (b and 0x80 == 0) return result
+            shift += 7
+            require(shift <= 35) { "VarInt too long" }
+        }
+    }
 
-    private fun readIntPos(): Int =
-        PackedUtils.readInt(input, position).also { position += 4 }
+    private fun readVarLong(): Long {
+        var result = 0L
+        var shift = 0
+        while (true) {
+            require(position < input.size) { "Unexpected EOF while decoding VarLong" }
+            val b = input[position++].toInt() and 0xFF
+            result = result or ((b and 0x7F).toLong() shl shift)
+            if (b and 0x80 == 0) return result
+            shift += 7
+            require(shift <= 70) { "VarLong too long" }
+        }
+    }
 
-    private fun readLongPos(): Long =
-        PackedUtils.readLong(input, position).also { position += 8 }
+    private fun readShortPos(): Short = PackedUtils.readShort(input, position).also { position += 2 }
+    private fun readIntPos(): Int = PackedUtils.readInt(input, position).also { position += 4 }
+    private fun readLongPos(): Long = PackedUtils.readLong(input, position).also { position += 8 }
 
     private fun readUtf8Char(): Char {
         require(position < input.size) { "Unexpected EOF while decoding UTF-8 char" }
@@ -358,7 +339,6 @@ class PackedDecoder(
                 require((b1 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
                 2 to (((b0 and 0x1F) shl 6) or (b1 and 0x3F))
             }
-
             (b0 and 0b1111_0000) == 0b1110_0000 -> {
                 require(position + 3 <= input.size)
                 val b1 = input[position + 1].toInt() and 0xFF
@@ -367,7 +347,6 @@ class PackedDecoder(
                 require((b2 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
                 3 to (((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F))
             }
-
             else -> throw IllegalArgumentException("Invalid UTF-8 start byte")
         }
         position += len

@@ -27,13 +27,17 @@ class PackedEncoder(
     private lateinit var nullValues: BooleanArray
     private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
+    // Bitmap state for nullable/boolean LIST elements
+    private var isNullableCollection: Boolean = false
+    private var isBooleanCollection: Boolean = false
+    private val collectionBitmapValues: MutableList<Boolean> = mutableListOf()
+
     // Buffer for field data
     private val dataBuffer = ByteArrayOutputStream()
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            val childEncoder =
-                PackedEncoder(dataBuffer, config, serializersModule)
+            val childEncoder = PackedEncoder(dataBuffer, config, serializersModule)
             childEncoder.initializeStructure(descriptor)
             return childEncoder
         }
@@ -41,15 +45,9 @@ class PackedEncoder(
         return this
     }
 
-    override fun beginCollection(
-        descriptor: SerialDescriptor,
-        collectionSize: Int
-    ): CompositeEncoder {
-        // Write size to the current context's buffer
+    override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
         val target = if (inStructure) dataBuffer else output
         PackedUtils.writeVarInt(collectionSize, target)
-
-        // Spawn new encoder for the collection items
         val childEncoder = PackedEncoder(target, config, serializersModule)
         childEncoder.initializeStructure(descriptor)
         return childEncoder
@@ -76,69 +74,58 @@ class PackedEncoder(
             nullValues = BooleanArray(nullableIdx.size)
             nullableLookup = IntArray(descriptor.elementsCount) { -1 }
             nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
+
+            isNullableCollection = false
+            isBooleanCollection = false
         } else {
             booleanValues = BooleanArray(0)
             booleanLookup = intArrayOf()
             nullValues = BooleanArray(0)
             nullableLookup = intArrayOf()
+
+            val isList = kind is StructureKind.LIST
+            val elemDesc = descriptor.getElementDescriptor(0)
+            isNullableCollection = isList && elemDesc.isNullable
+            isBooleanCollection = isList && !isNullableCollection && elemDesc.kind == PrimitiveKind.BOOLEAN
         }
 
+        collectionBitmapValues.clear()
         dataBuffer.reset()
     }
 
-    private fun getBuffer(): ByteArrayOutputStream =
-        if (inStructure) dataBuffer else output
+    private fun getBuffer(): ByteArrayOutputStream = if (inStructure) dataBuffer else output
 
     override fun encodeBoolean(value: Boolean) {
-        if (inStructure && !isCollection) {
-            encodeBooleanElement(currentDescriptor, currentIndex, value)
-        } else {
-            // Top-level or Collection elements are written directly
-            getBuffer().write(if (value) 1 else 0)
+        when {
+            inStructure && !isCollection       -> encodeBooleanElement(currentDescriptor, currentIndex, value)
+            inStructure && isBooleanCollection -> collectionBitmapValues.add(value)
+            else                               -> getBuffer().write(if (value) 1 else 0)
         }
     }
 
-    override fun encodeByte(value: Byte) {
-        getBuffer().write(value.toInt() and 0xFF)
-    }
+    override fun encodeByte(value: Byte) { getBuffer().write(value.toInt() and 0xFF) }
 
-    override fun encodeShort(value: Short) {
-        PackedUtils.writeShort(value, getBuffer())
-    }
+    override fun encodeShort(value: Short) { PackedUtils.writeShort(value, getBuffer()) }
 
     override fun encodeInt(value: Int) {
-        if (inStructure && !isCollection) {
-            encodeIntElement(currentDescriptor, currentIndex, value)
-        } else {
-            PackedUtils.writeInt(value, getBuffer())
-        }
+        if (inStructure && !isCollection) encodeIntElement(currentDescriptor, currentIndex, value)
+        else PackedUtils.writeInt(value, getBuffer())
     }
 
     override fun encodeLong(value: Long) {
-        if (inStructure && !isCollection) {
-            encodeLongElement(currentDescriptor, currentIndex, value)
-        } else {
-            PackedUtils.writeLong(value, getBuffer())
-        }
+        if (inStructure && !isCollection) encodeLongElement(currentDescriptor, currentIndex, value)
+        else PackedUtils.writeLong(value, getBuffer())
     }
 
     override fun encodeFloat(value: Float) {
-        PackedUtils.writeInt(
-            java.lang.Float.floatToRawIntBits(value),
-            getBuffer()
-        )
+        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), getBuffer())
     }
 
     override fun encodeDouble(value: Double) {
-        PackedUtils.writeLong(
-            java.lang.Double.doubleToRawLongBits(value),
-            getBuffer()
-        )
+        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), getBuffer())
     }
 
-    override fun encodeChar(value: Char) {
-        writeUtf8Char(value, getBuffer())
-    }
+    override fun encodeChar(value: Char) { writeUtf8Char(value, getBuffer()) }
 
     override fun encodeString(value: String) {
         val bytes = value.toByteArray(Charsets.UTF_8)
@@ -155,8 +142,8 @@ class PackedEncoder(
     @ExperimentalSerializationApi
     override fun encodeNull() {
         if (inStructure && isCollection) {
-            // Inline null marker for collections (1 = null)
-            PackedUtils.writeVarLong(1L, dataBuffer)
+            if (isNullableCollection) collectionBitmapValues.add(true)
+            else PackedUtils.writeVarLong(1L, dataBuffer)
         } else if (inStructure) {
             error("encodeNull should not be used inside Classes; use bitmask")
         } else {
@@ -167,7 +154,8 @@ class PackedEncoder(
     @ExperimentalSerializationApi
     override fun encodeNotNullMark() {
         if (inStructure && isCollection) {
-            PackedUtils.writeVarLong(0L, dataBuffer)
+            if (isNullableCollection) collectionBitmapValues.add(false)
+            else PackedUtils.writeVarLong(0L, dataBuffer)
         } else if (!inStructure) {
             PackedUtils.writeVarLong(0L, output)
         }
@@ -179,35 +167,35 @@ class PackedEncoder(
     override fun endStructure(descriptor: SerialDescriptor) {
         if (!inStructure) return
 
-        // 1. Collections: No header, just data
+        // 1. Collections: optional bitmap header (null markers or bool values), then data
         if (isCollection) {
+            if (collectionBitmapValues.isNotEmpty()) {
+                val n = collectionBitmapValues.size
+                val bitmap = ByteArray((n + 7) / 8)
+                collectionBitmapValues.forEachIndexed { i, v ->
+                    if (v) bitmap[i / 8] = (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
+                }
+                output.write(bitmap)
+            }
             dataBuffer.writeTo(output)
             inStructure = false
             return
         }
 
-        // 2. Classes: Write Bitmask Header -> Data
+        // 2. Classes: schema-derived fixed-width bitmask (8 bits/byte, no VarLong overhead), then data
         val totalFlagsCount = booleanValues.size + nullValues.size
         if (totalFlagsCount > 0) {
             val combined = BooleanArray(totalFlagsCount)
-            if (booleanValues.isNotEmpty()) booleanValues.copyInto(combined, 0)
-            if (nullValues.isNotEmpty()) nullValues.copyInto(
-                combined,
-                booleanValues.size
-            )
-
-            if (totalFlagsCount > 64) {
-                val flagBytes = PackedUtils.packFlags(combined)
-                PackedUtils.writeVarInt(flagBytes.size, output)
-                output.write(flagBytes)
-            } else {
-                val flagsLong = PackedUtils.packFlagsToLong(combined)
-                PackedUtils.writeVarLong(flagsLong, output)
+            booleanValues.copyInto(combined, 0)
+            nullValues.copyInto(combined, booleanValues.size)
+            val bitmap = ByteArray((totalFlagsCount + 7) / 8)
+            combined.forEachIndexed { i, v ->
+                if (v) bitmap[i / 8] = (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
             }
+            output.write(bitmap)
         }
 
         dataBuffer.writeTo(output)
-
         inStructure = false
         currentIndex = -1
         booleanLookup = intArrayOf()
@@ -220,21 +208,13 @@ class PackedEncoder(
     private fun nullablePos(index: Int): Int =
         if (index < nullableLookup.size) nullableLookup[index] else -1
 
-    override fun encodeBooleanElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Boolean
-    ) {
+    override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
         val pos = booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
     }
 
-    override fun encodeIntElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Int
-    ) {
+    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
             IntEncoding.ZIGZAG -> PackedUtils.writeVarInt(PackedUtils.zigZagEncodeInt(value), dataBuffer)
             IntEncoding.VARINT -> PackedUtils.writeVarInt(value, dataBuffer)
@@ -242,11 +222,7 @@ class PackedEncoder(
         }
     }
 
-    override fun encodeLongElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Long
-    ) {
+    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
             IntEncoding.ZIGZAG -> PackedUtils.writeVarLong(PackedUtils.zigZagEncodeLong(value), dataBuffer)
             IntEncoding.VARINT -> PackedUtils.writeVarLong(value, dataBuffer)
@@ -254,67 +230,34 @@ class PackedEncoder(
         }
     }
 
-    override fun encodeByteElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Byte
-    ) {
+    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) {
         dataBuffer.write(value.toInt() and 0xFF)
     }
 
-    override fun encodeShortElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Short
-    ) {
+    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) {
         PackedUtils.writeShort(value, dataBuffer)
     }
 
-    override fun encodeCharElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Char
-    ) {
+    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) {
         writeUtf8Char(value, dataBuffer)
     }
 
-    override fun encodeFloatElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Float
-    ) {
-        PackedUtils.writeInt(
-            java.lang.Float.floatToRawIntBits(value),
-            dataBuffer
-        )
+    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
+        PackedUtils.writeInt(java.lang.Float.floatToRawIntBits(value), dataBuffer)
     }
 
-    override fun encodeDoubleElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Double
-    ) {
-        PackedUtils.writeLong(
-            java.lang.Double.doubleToRawLongBits(value),
-            dataBuffer
-        )
+    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
+        PackedUtils.writeLong(java.lang.Double.doubleToRawLongBits(value), dataBuffer)
     }
 
-    override fun encodeStringElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: String
-    ) {
+    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
         val bytes = value.toByteArray(Charsets.UTF_8)
         PackedUtils.writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
 
     @ExperimentalSerializationApi
-    override fun encodeInlineElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Encoder {
+    override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
         currentIndex = index
         return this
     }
@@ -338,7 +281,6 @@ class PackedEncoder(
         value: T?
     ) {
         if (isCollection) {
-            // Collections use inline markers
             if (value == null) {
                 encodeNull()
             } else {
@@ -348,7 +290,6 @@ class PackedEncoder(
             return
         }
 
-        // Classes use bitmask
         val pos = nullablePos(index)
         if (value == null) {
             if (pos == -1) error("Element $index is not declared nullable")
@@ -360,7 +301,11 @@ class PackedEncoder(
     }
 
     private fun writeUtf8Char(value: Char, out: ByteArrayOutputStream) {
-        val bytes = value.toString().toByteArray(Charsets.UTF_8)
-        out.write(bytes)
+        val cp = value.code
+        when {
+            cp < 0x80  -> out.write(cp)
+            cp < 0x800 -> { out.write(0xC0 or (cp shr 6)); out.write(0x80 or (cp and 0x3F)) }
+            else       -> { out.write(0xE0 or (cp shr 12)); out.write(0x80 or ((cp shr 6) and 0x3F)); out.write(0x80 or (cp and 0x3F)) }
+        }
     }
 }
