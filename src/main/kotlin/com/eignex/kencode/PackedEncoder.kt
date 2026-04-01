@@ -24,8 +24,10 @@ class PackedEncoder(
     // Bitmask arrays for CLASSES only
     private var booleanIndices: IntArray = intArrayOf()
     private lateinit var booleanValues: BooleanArray
+    private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
     private var nullableIndices: IntArray = intArrayOf()
     private lateinit var nullValues: BooleanArray
+    private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
     // Buffer for field data
     private val dataBuffer = ByteArrayOutputStream()
@@ -69,18 +71,24 @@ class PackedEncoder(
             }
             booleanIndices = boolIdx.toIntArray()
             booleanValues = BooleanArray(booleanIndices.size)
+            booleanLookup = IntArray(descriptor.elementsCount) { -1 }
+            booleanIndices.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
 
             val nullableIdx = (0 until descriptor.elementsCount).filter {
                 descriptor.getElementDescriptor(it).isNullable
             }
             nullableIndices = nullableIdx.toIntArray()
             nullValues = BooleanArray(nullableIndices.size)
+            nullableLookup = IntArray(descriptor.elementsCount) { -1 }
+            nullableIndices.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
         } else {
             // Collections do not use bitmasks
             booleanIndices = intArrayOf()
             booleanValues = BooleanArray(0)
+            booleanLookup = intArrayOf()
             nullableIndices = intArrayOf()
             nullValues = BooleanArray(0)
+            nullableLookup = intArrayOf()
         }
 
         dataBuffer.reset()
@@ -181,7 +189,7 @@ class PackedEncoder(
 
         // 1. Collections: No header, just data
         if (isCollection) {
-            output.write(dataBuffer.toByteArray())
+            dataBuffer.writeTo(output)
             inStructure = false
             return
         }
@@ -201,28 +209,26 @@ class PackedEncoder(
                 PackedUtils.writeVarInt(flagBytes.size, output)
                 output.write(flagBytes)
             } else {
-                val flagsLong = PackedUtils.packFlagsToLong(*combined)
+                val flagsLong = PackedUtils.packFlagsToLong(combined)
                 PackedUtils.writeVarLong(flagsLong, output)
             }
         }
 
-        output.write(dataBuffer.toByteArray())
+        dataBuffer.writeTo(output)
 
         inStructure = false
         currentIndex = -1
         booleanIndices = intArrayOf()
+        booleanLookup = intArrayOf()
         nullableIndices = intArrayOf()
+        nullableLookup = intArrayOf()
     }
 
-    private fun booleanPos(index: Int): Int {
-        for (i in booleanIndices.indices) if (booleanIndices[i] == index) return i
-        return -1
-    }
+    private fun booleanPos(index: Int): Int =
+        if (index < booleanLookup.size) booleanLookup[index] else -1
 
-    private fun nullablePos(index: Int): Int {
-        for (i in nullableIndices.indices) if (nullableIndices[i] == index) return i
-        return -1
-    }
+    private fun nullablePos(index: Int): Int =
+        if (index < nullableLookup.size) nullableLookup[index] else -1
 
     override fun encodeBooleanElement(
         descriptor: SerialDescriptor,
@@ -239,28 +245,10 @@ class PackedEncoder(
         index: Int,
         value: Int
     ) {
-        val anns = descriptor.getElementAnnotations(index)
-        val hasFixedInt = anns.hasFixedInt()
-        val hasVarInt = anns.hasVarInt()
-        val hasVarUInt = anns.hasVarUInt()
-
-        val isVar = when {
-            hasFixedInt -> false
-            hasVarInt || hasVarUInt -> true
-            else -> config.defaultVarInt || config.defaultZigZag
-        }
-
-        val zigZag = when {
-            hasVarInt -> true
-            hasVarUInt || hasFixedInt -> false
-            else -> config.defaultZigZag
-        }
-
-        if (isVar) {
-            val v = if (zigZag) PackedUtils.zigZagEncodeInt(value) else value
-            PackedUtils.writeVarInt(v, dataBuffer)
-        } else {
-            PackedUtils.writeInt(value, dataBuffer)
+        when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+            IntEncoding.ZIGZAG -> PackedUtils.writeVarInt(PackedUtils.zigZagEncodeInt(value), dataBuffer)
+            IntEncoding.VARINT -> PackedUtils.writeVarInt(value, dataBuffer)
+            IntEncoding.FIXED  -> PackedUtils.writeInt(value, dataBuffer)
         }
     }
 
@@ -269,28 +257,10 @@ class PackedEncoder(
         index: Int,
         value: Long
     ) {
-        val anns = descriptor.getElementAnnotations(index)
-        val hasFixedInt = anns.hasFixedInt()
-        val hasVarInt = anns.hasVarInt()
-        val hasVarUInt = anns.hasVarUInt()
-
-        val isVar = when {
-            hasFixedInt -> false
-            hasVarInt || hasVarUInt -> true
-            else -> config.defaultVarInt || config.defaultZigZag
-        }
-
-        val zigZag = when {
-            hasVarInt -> true
-            hasVarUInt || hasFixedInt -> false
-            else -> config.defaultZigZag
-        }
-
-        if (isVar) {
-            val v = if (zigZag) PackedUtils.zigZagEncodeLong(value) else value
-            PackedUtils.writeVarLong(v, dataBuffer)
-        } else {
-            PackedUtils.writeLong(value, dataBuffer)
+        when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+            IntEncoding.ZIGZAG -> PackedUtils.writeVarLong(PackedUtils.zigZagEncodeLong(value), dataBuffer)
+            IntEncoding.VARINT -> PackedUtils.writeVarLong(value, dataBuffer)
+            IntEncoding.FIXED  -> PackedUtils.writeLong(value, dataBuffer)
         }
     }
 

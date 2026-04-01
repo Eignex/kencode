@@ -25,8 +25,10 @@ class PackedDecoder(
 
     private var booleanIndices: IntArray = intArrayOf()
     private lateinit var booleanValues: BooleanArray
+    private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
     private var nullableIndices: IntArray = intArrayOf()
     private lateinit var nullValues: BooleanArray
+    private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
     private var collectionSize = -1
     private var collectionIndex = 0
@@ -40,7 +42,9 @@ class PackedDecoder(
 
         if (isCollection) {
             booleanIndices = intArrayOf()
+            booleanLookup = intArrayOf()
             nullableIndices = intArrayOf()
+            nullableLookup = intArrayOf()
             return this
         }
 
@@ -48,11 +52,15 @@ class PackedDecoder(
             descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
         }
         booleanIndices = boolIdx.toIntArray()
+        booleanLookup = IntArray(descriptor.elementsCount) { -1 }
+        booleanIndices.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
 
         val nullableIdx = (0 until descriptor.elementsCount).filter {
             descriptor.getElementDescriptor(it).isNullable
         }
         nullableIndices = nullableIdx.toIntArray()
+        nullableLookup = IntArray(descriptor.elementsCount) { -1 }
+        nullableIndices.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
 
         val totalFlags = booleanIndices.size + nullableIndices.size
 
@@ -196,15 +204,11 @@ class PackedDecoder(
         currentIndex = -1
     }
 
-    private fun booleanPos(index: Int): Int {
-        for (i in booleanIndices.indices) if (booleanIndices[i] == index) return i
-        return -1
-    }
+    private fun booleanPos(index: Int): Int =
+        if (index < booleanLookup.size) booleanLookup[index] else -1
 
-    private fun nullablePos(index: Int): Int {
-        for (i in nullableIndices.indices) if (nullableIndices[i] == index) return i
-        return -1
-    }
+    private fun nullablePos(index: Int): Int =
+        if (index < nullableLookup.size) nullableLookup[index] else -1
 
     override fun decodeBooleanElement(
         descriptor: SerialDescriptor,
@@ -231,61 +235,35 @@ class PackedDecoder(
     override fun decodeIntElement(
         descriptor: SerialDescriptor,
         index: Int
-    ): Int {
-        val anns = descriptor.getElementAnnotations(index)
-        val hasFixedInt = anns.hasFixedInt()
-        val hasVarInt = anns.hasVarInt()
-        val hasVarUInt = anns.hasVarUInt()
-
-        val isVar = when {
-            hasFixedInt -> false
-            hasVarInt || hasVarUInt -> true
-            else -> config.defaultVarInt || config.defaultZigZag
-        }
-
-        val zigZag = when {
-            hasVarInt -> true
-            hasVarUInt || hasFixedInt -> false
-            else -> config.defaultZigZag
-        }
-
-        return if (isVar) {
+    ): Int = when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+        IntEncoding.ZIGZAG -> {
             val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
             position += bytesRead
-            if (zigZag) PackedUtils.zigZagDecodeInt(raw) else raw
-        } else {
-            readIntPos()
+            PackedUtils.zigZagDecodeInt(raw)
         }
+        IntEncoding.VARINT -> {
+            val (raw, bytesRead) = PackedUtils.decodeVarInt(input, position)
+            position += bytesRead
+            raw
+        }
+        IntEncoding.FIXED  -> readIntPos()
     }
 
     override fun decodeLongElement(
         descriptor: SerialDescriptor,
         index: Int
-    ): Long {
-        val anns = descriptor.getElementAnnotations(index)
-        val hasFixedInt = anns.hasFixedInt()
-        val hasVarInt = anns.hasVarInt()
-        val hasVarUInt = anns.hasVarUInt()
-
-        val isVar = when {
-            hasFixedInt -> false
-            hasVarInt || hasVarUInt -> true
-            else -> config.defaultVarInt || config.defaultZigZag
-        }
-
-        val zigZag = when {
-            hasVarInt -> true
-            hasVarUInt || hasFixedInt -> false
-            else -> config.defaultZigZag
-        }
-
-        return if (isVar) {
+    ): Long = when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
+        IntEncoding.ZIGZAG -> {
             val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
             position += bytesRead
-            if (zigZag) PackedUtils.zigZagDecodeLong(raw) else raw
-        } else {
-            readLongPos()
+            PackedUtils.zigZagDecodeLong(raw)
         }
+        IntEncoding.VARINT -> {
+            val (raw, bytesRead) = PackedUtils.decodeVarLong(input, position)
+            position += bytesRead
+            raw
+        }
+        IntEncoding.FIXED  -> readLongPos()
     }
 
     override fun decodeFloatElement(
@@ -330,7 +308,7 @@ class PackedDecoder(
         val kind = deserializer.descriptor.kind
         val isInline = deserializer.descriptor.isInline
 
-        if ((kind is StructureKind.CLASS || kind is StructureKind.OBJECT || kind is StructureKind.LIST || kind is StructureKind.MAP || kind is PolymorphicKind) && !isInline) {
+        if (!isInline && (kind is StructureKind || kind is PolymorphicKind)) {
             val subDecoder = PackedDecoder(input, config, serializersModule)
             subDecoder.position = this.position
             val value = deserializer.deserialize(subDecoder)
