@@ -23,10 +23,9 @@ class PackedDecoder(
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
-    private var booleanIndices: IntArray = intArrayOf()
+    // Bitmask state for CLASSES only
     private lateinit var booleanValues: BooleanArray
     private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
-    private var nullableIndices: IntArray = intArrayOf()
     private lateinit var nullValues: BooleanArray
     private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
@@ -41,9 +40,9 @@ class PackedDecoder(
         isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
 
         if (isCollection) {
-            booleanIndices = intArrayOf()
+            booleanValues = BooleanArray(0)
             booleanLookup = intArrayOf()
-            nullableIndices = intArrayOf()
+            nullValues = BooleanArray(0)
             nullableLookup = intArrayOf()
             return this
         }
@@ -51,18 +50,16 @@ class PackedDecoder(
         val boolIdx = (0 until descriptor.elementsCount).filter {
             descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
         }
-        booleanIndices = boolIdx.toIntArray()
         booleanLookup = IntArray(descriptor.elementsCount) { -1 }
-        booleanIndices.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
+        boolIdx.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
 
         val nullableIdx = (0 until descriptor.elementsCount).filter {
             descriptor.getElementDescriptor(it).isNullable
         }
-        nullableIndices = nullableIdx.toIntArray()
         nullableLookup = IntArray(descriptor.elementsCount) { -1 }
-        nullableIndices.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
+        nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
 
-        val totalFlags = booleanIndices.size + nullableIndices.size
+        val totalFlags = boolIdx.size + nullableIdx.size
 
         if (totalFlags == 0) {
             booleanValues = BooleanArray(0)
@@ -70,28 +67,21 @@ class PackedDecoder(
         } else {
             val allFlags: BooleanArray
             if (totalFlags > 64) {
-                val (byteCount, bytesRead) = PackedUtils.decodeVarInt(
-                    input,
-                    position
-                )
+                val (byteCount, bytesRead) = PackedUtils.decodeVarInt(input, position)
                 position += bytesRead
                 allFlags = PackedUtils.unpackFlags(input, position, byteCount)
                 position += byteCount
             } else {
-                val (flagsLong, bytesRead) = PackedUtils.decodeVarLong(
-                    input,
-                    position
-                )
+                val (flagsLong, bytesRead) = PackedUtils.decodeVarLong(input, position)
                 position += bytesRead
-                allFlags =
-                    PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
+                allFlags = PackedUtils.unpackFlagsFromLong(flagsLong, totalFlags)
             }
 
-            booleanValues = BooleanArray(booleanIndices.size) { i ->
+            booleanValues = BooleanArray(boolIdx.size) { i ->
                 if (i < allFlags.size) allFlags[i] else false
             }
-            val nullOffset = booleanIndices.size
-            nullValues = BooleanArray(nullableIndices.size) { i ->
+            val nullOffset = boolIdx.size
+            nullValues = BooleanArray(nullableIdx.size) { i ->
                 val flagIdx = nullOffset + i
                 if (flagIdx < allFlags.size) allFlags[flagIdx] else false
             }

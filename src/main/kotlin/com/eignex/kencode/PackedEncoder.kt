@@ -21,11 +21,9 @@ class PackedEncoder(
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
-    // Bitmask arrays for CLASSES only
-    private var booleanIndices: IntArray = intArrayOf()
+    // Bitmask state for CLASSES only
     private lateinit var booleanValues: BooleanArray
     private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
-    private var nullableIndices: IntArray = intArrayOf()
     private lateinit var nullValues: BooleanArray
     private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
@@ -65,28 +63,22 @@ class PackedEncoder(
         isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
 
         if (!isCollection) {
-            // Calculate indices for Class bitmasks
             val boolIdx = (0 until descriptor.elementsCount).filter {
                 descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
             }
-            booleanIndices = boolIdx.toIntArray()
-            booleanValues = BooleanArray(booleanIndices.size)
+            booleanValues = BooleanArray(boolIdx.size)
             booleanLookup = IntArray(descriptor.elementsCount) { -1 }
-            booleanIndices.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
+            boolIdx.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
 
             val nullableIdx = (0 until descriptor.elementsCount).filter {
                 descriptor.getElementDescriptor(it).isNullable
             }
-            nullableIndices = nullableIdx.toIntArray()
-            nullValues = BooleanArray(nullableIndices.size)
+            nullValues = BooleanArray(nullableIdx.size)
             nullableLookup = IntArray(descriptor.elementsCount) { -1 }
-            nullableIndices.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
+            nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
         } else {
-            // Collections do not use bitmasks
-            booleanIndices = intArrayOf()
             booleanValues = BooleanArray(0)
             booleanLookup = intArrayOf()
-            nullableIndices = intArrayOf()
             nullValues = BooleanArray(0)
             nullableLookup = intArrayOf()
         }
@@ -218,9 +210,7 @@ class PackedEncoder(
 
         inStructure = false
         currentIndex = -1
-        booleanIndices = intArrayOf()
         booleanLookup = intArrayOf()
-        nullableIndices = intArrayOf()
         nullableLookup = intArrayOf()
     }
 
