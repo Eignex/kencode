@@ -87,3 +87,14 @@ annotation class FixedInt
 fun List<Annotation>.hasVarInt(): Boolean = any { it is VarInt }
 fun List<Annotation>.hasVarUInt(): Boolean = any { it is VarUInt }
 fun List<Annotation>.hasFixedInt(): Boolean = any { it is FixedInt }
+
+internal enum class IntEncoding { FIXED, VARINT, ZIGZAG }
+
+internal fun resolveIntEncoding(anns: List<Annotation>, config: PackedConfiguration): IntEncoding = when {
+    anns.hasFixedInt()   -> IntEncoding.FIXED
+    anns.hasVarInt()     -> IntEncoding.ZIGZAG
+    anns.hasVarUInt()    -> IntEncoding.VARINT
+    config.defaultZigZag -> IntEncoding.ZIGZAG
+    config.defaultVarInt -> IntEncoding.VARINT
+    else                 -> IntEncoding.FIXED
+}
