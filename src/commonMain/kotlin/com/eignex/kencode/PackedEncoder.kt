@@ -11,8 +11,12 @@ import kotlinx.serialization.modules.SerializersModule
 class PackedEncoder internal constructor(
     private val output: ByteOutput,
     private val config: PackedConfiguration = PackedConfiguration(),
-    override val serializersModule: SerializersModule = EmptySerializersModule()
+    override val serializersModule: SerializersModule = EmptySerializersModule(),
+    headerCtx: HeaderContext? = null,
 ) : Encoder, CompositeEncoder {
+
+    private val ctx: HeaderContext = headerCtx ?: HeaderContext()
+    private val isRoot: Boolean = headerCtx == null
 
     private var inStructure: Boolean = false
     private var isCollection: Boolean = false
@@ -25,6 +29,13 @@ class PackedEncoder internal constructor(
     private lateinit var nullValues: BooleanArray
     private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
+    // Start index in the shared HeaderContext where this class's bits are reserved.
+    // Only valid when isMergedKind=true; -1 otherwise.
+    private var headerStart: Int = -1
+
+    // True when the current structure uses the merged-header path (CLASS/OBJECT only).
+    private var isMergedKind: Boolean = false
+
     // Bitmap state for nullable/boolean LIST elements
     private var isNullableCollection: Boolean = false
     private var isBooleanCollection: Boolean = false
@@ -35,7 +46,17 @@ class PackedEncoder internal constructor(
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            val childEncoder = PackedEncoder(dataBuffer, config, serializersModule)
+            // Share ctx only when the current encoder is in merged mode and the child is a
+            // non-nullable, non-inline CLASS/OBJECT in a non-collection context.
+            val shouldShareCtx = isMergedKind &&
+                !isCollection &&
+                currentIndex >= 0 &&
+                !currentDescriptor.getElementDescriptor(currentIndex).isNullable &&
+                !descriptor.isInline &&
+                (descriptor.kind is StructureKind.CLASS || descriptor.kind is StructureKind.OBJECT)
+            val childEncoder = PackedEncoder(
+                dataBuffer, config, serializersModule, if (shouldShareCtx) ctx else null
+            )
             childEncoder.initializeStructure(descriptor)
             return childEncoder
         }
@@ -75,6 +96,13 @@ class PackedEncoder internal constructor(
 
             isNullableCollection = false
             isBooleanCollection = false
+
+            // Only CLASS and OBJECT use the shared merged-header context.
+            // Polymorphic, enum, and other kinds use the old per-class inline header.
+            isMergedKind = kind is StructureKind.CLASS || kind is StructureKind.OBJECT
+            if (isMergedKind) {
+                headerStart = ctx.reserve(boolIdx.size + nullableIdx.size)
+            }
         } else {
             booleanValues = BooleanArray(0)
             booleanLookup = intArrayOf()
@@ -180,17 +208,26 @@ class PackedEncoder internal constructor(
             return
         }
 
-        // 2. Classes: schema-derived fixed-width bitmask (8 bits/byte, no VarLong overhead), then data
-        val totalFlagsCount = booleanValues.size + nullValues.size
-        if (totalFlagsCount > 0) {
-            val combined = BooleanArray(totalFlagsCount)
-            booleanValues.copyInto(combined, 0)
-            nullValues.copyInto(combined, booleanValues.size)
-            val bitmap = ByteArray((totalFlagsCount + 7) / 8)
-            combined.forEachIndexed { i, v ->
-                if (v) bitmap[i / 8] = (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
+        if (isMergedKind) {
+            // 2a. CLASS/OBJECT: fill reserved bits; root writes merged header.
+            ctx.set(headerStart, booleanValues, nullValues)
+            if (isRoot) {
+                val headerBytes = ctx.toByteArray()
+                if (headerBytes.isNotEmpty()) output.write(headerBytes)
             }
-            output.write(bitmap)
+        } else {
+            // 2b. Other (polymorphic, etc.): write a local inline bitmask as before.
+            val totalFlagsCount = booleanValues.size + nullValues.size
+            if (totalFlagsCount > 0) {
+                val combined = BooleanArray(totalFlagsCount)
+                booleanValues.copyInto(combined, 0)
+                nullValues.copyInto(combined, booleanValues.size)
+                val bitmap = ByteArray((totalFlagsCount + 7) / 8)
+                combined.forEachIndexed { i, v ->
+                    if (v) bitmap[i / 8] = (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
+                }
+                output.write(bitmap)
+            }
         }
 
         dataBuffer.writeTo(output)

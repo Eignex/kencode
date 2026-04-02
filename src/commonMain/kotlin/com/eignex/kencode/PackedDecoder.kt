@@ -10,16 +10,28 @@ import kotlinx.serialization.modules.SerializersModule
 
 @Suppress("UNCHECKED_CAST")
 @OptIn(ExperimentalSerializationApi::class)
-class PackedDecoder(
+class PackedDecoder internal constructor(
     private val input: ByteArray,
-    private val config: PackedConfiguration = PackedConfiguration(),
-    override val serializersModule: SerializersModule = EmptySerializersModule()
+    private val config: PackedConfiguration,
+    override val serializersModule: SerializersModule,
+    headerCtx: HeaderContext?,
 ) : Decoder, CompositeDecoder {
+
+    constructor(
+        input: ByteArray,
+        config: PackedConfiguration = PackedConfiguration(),
+        serializersModule: SerializersModule = EmptySerializersModule(),
+    ) : this(input, config, serializersModule, null)
+
+    private val ctx: HeaderContext = headerCtx ?: HeaderContext()
+    private val isRoot: Boolean = headerCtx == null
 
     internal var position: Int = 0
 
     private var inStructure: Boolean = false
     private var isCollection: Boolean = false
+    // True when the current structure uses the shared merged-header path (CLASS/OBJECT only).
+    private var isMergedKind: Boolean = false
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
@@ -78,17 +90,28 @@ class PackedDecoder(
         nullableLookup = IntArray(descriptor.elementsCount) { -1 }
         nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
 
-        val totalFlags = boolIdx.size + nullableIdx.size
-        if (totalFlags == 0) {
-            booleanValues = BooleanArray(0)
-            nullValues = BooleanArray(0)
+        // Only CLASS and OBJECT use the shared merged-header context.
+        // Polymorphic, enum, and other kinds read their own inline bitmask as before.
+        isMergedKind = kind is StructureKind.CLASS || kind is StructureKind.OBJECT
+        if (isMergedKind) {
+            if (isRoot) {
+                val totalBits = countAllBits(descriptor)
+                position += ctx.load(input, position, totalBits)
+            }
+            booleanValues = BooleanArray(boolIdx.size) { ctx.read() }
+            nullValues = BooleanArray(nullableIdx.size) { ctx.read() }
         } else {
-            // Schema-derived fixed-width bitmask: (totalFlags + 7) / 8 bytes, no length prefix needed
-            val numBytes = (totalFlags + 7) / 8
-            val allFlags = PackedUtils.unpackFlags(input, position, numBytes)
-            position += numBytes
-            booleanValues = BooleanArray(boolIdx.size) { i -> allFlags[i] }
-            nullValues = BooleanArray(nullableIdx.size) { i -> allFlags[boolIdx.size + i] }
+            val totalFlags = boolIdx.size + nullableIdx.size
+            if (totalFlags == 0) {
+                booleanValues = BooleanArray(0)
+                nullValues = BooleanArray(0)
+            } else {
+                val numBytes = (totalFlags + 7) / 8
+                val allFlags = PackedUtils.unpackFlags(input, position, numBytes)
+                position += numBytes
+                booleanValues = BooleanArray(boolIdx.size) { i -> allFlags[i] }
+                nullValues = BooleanArray(nullableIdx.size) { i -> allFlags[boolIdx.size + i] }
+            }
         }
 
         return this
@@ -280,7 +303,16 @@ class PackedDecoder(
         }
 
         if (!isInline && (kind is StructureKind || kind is PolymorphicKind)) {
-            val subDecoder = PackedDecoder(input, config, serializersModule)
+            // Share the HeaderContext only when the current decoder is in merged mode
+            // and the child is a non-nullable, non-inline CLASS/OBJECT in a non-collection context.
+            val shouldShareCtx = isMergedKind &&
+                !isCollection &&
+                !deserializer.descriptor.isInline &&
+                (deserializer.descriptor.kind is StructureKind.CLASS || deserializer.descriptor.kind is StructureKind.OBJECT) &&
+                index >= 0 && !descriptor.getElementDescriptor(index).isNullable
+            val subDecoder = PackedDecoder(
+                input, config, serializersModule, if (shouldShareCtx) ctx else null
+            )
             subDecoder.position = this.position
             val value = deserializer.deserialize(subDecoder)
             this.position = subDecoder.position

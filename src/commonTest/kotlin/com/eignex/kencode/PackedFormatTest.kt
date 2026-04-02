@@ -503,6 +503,128 @@ class PackedFormatTest {
         }
     }
 
+    // --- Merged bitmask header ---
+
+    @Test
+    fun `class with only nested booleans and nullables encodes to header byte only`() {
+        // Level1(active: Boolean, level2: Level2?) — all info fits in the 2-bit merged header.
+        // active=true  → bit 0 = 1
+        // level2=null  → bit 1 = 1 (null-marker)
+        // No data bytes remain, so total = 1 byte.
+        val bytes = PackedFormat.encodeToByteArray(Level1.serializer(), Level1(true, null))
+        assertEquals(1, bytes.size)
+        assertEquals(0b00000011, bytes[0].toInt() and 0xFF)
+    }
+
+    @Test
+    fun `merged header bit pattern matches field order and value`() {
+        // active=false → bit 0 = 0
+        // level2 not null → bit 1 = 0 (null-marker = false means present)
+        // header byte = 0b00000000 = 0
+        val bytes = PackedFormat.encodeToByteArray(
+            Level1.serializer(), Level1(false, Level2("", emptyList()))
+        )
+        assertEquals(0, bytes[0].toInt() and 0xFF)
+        assertPackedRoundtrip(Level1.serializer(), Level1(false, Level2("", emptyList())))
+    }
+
+    @Test
+    fun `non-nullable nested class flags are promoted into root merged header`() {
+        // DeepNested.level1 is a non-nullable Level1 — its bits merge into DeepNested's header.
+        // countAllBits(DeepNested) = countAllBits(Level1) = 2.
+        // Header byte: bit 0=active=true, bit 1=level2_null=true → 0b00000011 = 3.
+        // Data after header: "x" (varint 1 + byte) = 2 bytes. Total = 3.
+        val value = DeepNested("x", Level1(active = true, level2 = null))
+        val bytes = PackedFormat.encodeToByteArray(DeepNested.serializer(), value)
+        assertEquals(3, bytes.size)
+        assertEquals(0b00000011, bytes[0].toInt() and 0xFF)
+        assertPackedRoundtrip(DeepNested.serializer(), value)
+    }
+
+    @Test
+    fun `multiple non-nullable nested class fields share a single header byte`() {
+        // DeepBreadth has three non-nullable Level1 fields (2 bits each = 6 bits total → 1 byte).
+        // Old format: 3 separate 1-byte headers = 3 bytes overhead.
+        // New format: 1 merged byte.
+        // Bit layout (depth-first, booleans before nullables per class):
+        //   bit 0: branchA.active=true,    bit 1: branchA.level2_null=true
+        //   bit 2: branchB.active=false,   bit 3: branchB.level2_null=true
+        //   bit 4: branchC.active=true,    bit 5: branchC.level2_null=true
+        // byte = 0b00111011 = 59
+        // Data: rootValue=42 (4 bytes). Total = 5.
+        val value = DeepBreadth(
+            branchA = Level1(true, null),
+            branchB = Level1(false, null),
+            branchC = Level1(true, null),
+            rootValue = 42,
+        )
+        val bytes = PackedFormat.encodeToByteArray(DeepBreadth.serializer(), value)
+        assertEquals(5, bytes.size)
+        assertEquals(59, bytes[0].toInt() and 0xFF)
+        assertPackedRoundtrip(DeepBreadth.serializer(), value)
+    }
+
+    @Test
+    fun `nullable nested class field keeps local inline header not merged`() {
+        // level2 is nullable → its own boolean/nullable bits are NOT merged up.
+        // Only the null-marker for level2 itself is in Level1's merged header.
+        // Level2 has no boolean or nullable fields, so no extra header when present.
+        val withLevel2 = Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
+        val withoutLevel2 = Level1(active = true, level2 = null)
+        assertPackedRoundtrip(Level1.serializer(), withLevel2)
+        assertPackedRoundtrip(Level1.serializer(), withoutLevel2)
+        // Present level2 → header bit 1 = 0; absent → header bit 1 = 1
+        val bytesPresent = PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
+        val bytesAbsent = PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
+        assertEquals(0b00000001, bytesPresent[0].toInt() and 0xFF)  // active=1, level2_null=0
+        assertEquals(0b00000011, bytesAbsent[0].toInt() and 0xFF)   // active=1, level2_null=1
+    }
+
+    @Test
+    fun `non-nullable nested class with no flags contributes no header bytes`() {
+        // Parent(id: Int, child: Child) — Child has no booleans or nullables.
+        // countAllBits = 0 → no header byte at all.
+        val bytes = PackedFormat.encodeToByteArray(Parent.serializer(), Parent(7, Child(42)))
+        assertEquals(8, bytes.size)  // 4 bytes id + 4 bytes child.value
+        assertPackedRoundtrip(Parent.serializer(), Parent(7, Child(42)))
+    }
+
+    @Test
+    fun `flipping a merged header bit changes the corresponding nested field`() {
+        val value = DeepNested("root", Level1(active = true, level2 = null))
+        val bytes = PackedFormat.encodeToByteArray(DeepNested.serializer(), value).copyOf()
+        // Flip bit 0 (active) in the merged header byte
+        bytes[0] = (bytes[0].toInt() xor 0x01).toByte()
+        val decoded = PackedFormat.decodeFromByteArray(DeepNested.serializer(), bytes)
+        assertEquals(false, decoded.level1.active)
+        assertEquals(null, decoded.level1.level2)
+    }
+
+    @Test
+    fun `truncated merged header throws for nested structure`() {
+        // DeepNested requires 1 byte for its merged header; empty input should fail.
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(DeepNested.serializer(), byteArrayOf())
+        }
+    }
+
+    @Test
+    fun `DeepBreadth roundtrip with all flag combinations`() {
+        val cases = listOf(
+            DeepBreadth(Level1(false, null), Level1(false, null), Level1(false, null), 0),
+            DeepBreadth(Level1(true, null), Level1(true, null), Level1(true, null), -1),
+            DeepBreadth(
+                Level1(true, Level2("a", emptyList())),
+                Level1(false, null),
+                Level1(true, Level2("c", listOf(listOf(1, 2)))),
+                999,
+            ),
+        )
+        for (value in cases) {
+            assertPackedRoundtrip(DeepBreadth.serializer(), value)
+        }
+    }
+
     @Test
     fun `decodeElementIndex simulates sequential decoding for classes and collections`() {
         val classSerializer = UnannotatedPayload.serializer()
