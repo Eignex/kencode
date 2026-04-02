@@ -37,8 +37,9 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
     private val bigFF = BigInteger.fromLong(0xFFL)
     private val zeroChar: Char get() = alphabet[0]
 
+    private val maxAlphabetChar: Int = alphabet.maxOf { it.code }
     private val inverseAlphabet: IntArray =
-        IntArray(65536) { -1 }.also { lookup ->
+        IntArray(maxAlphabetChar + 1) { -1 }.also { lookup ->
             alphabet.forEachIndexed { index, c -> lookup[c.code] = index }
         }
 
@@ -89,26 +90,22 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
             throw IllegalArgumentException("Invalid encoded length: ${input.length}")
         }
 
-        val output =
-            ByteArray(input.length * ceil(invLengths.last() / fullBlockLen.toDouble()).toInt())
+        val lastOutLen = if (lastBlockLen > 0) invLengths[lastBlockLen - 1] else 0
+        val output = ByteArray(fullBlocks * invLengths.last() + lastOutLen)
         var inPos = 0
         var outPos = 0
 
         repeat(fullBlocks) {
-            decodeBlock(
-                input, inPos, fullBlockLen, output, outPos, invLengths.last()
-            )
+            decodeBlock(input, inPos, fullBlockLen, output, outPos, invLengths.last())
             inPos += fullBlockLen
             outPos += invLengths.last()
         }
 
         if (lastBlockLen != 0) {
-            val outLen = invLengths[lastBlockLen - 1]
-            decodeBlock(input, inPos, lastBlockLen, output, outPos, outLen)
-            outPos += outLen
+            decodeBlock(input, inPos, lastBlockLen, output, outPos, lastOutLen)
         }
 
-        return output.copyOf(outPos)
+        return output
     }
 
     internal fun encodeBlock(
@@ -121,16 +118,15 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
         var n = BigInteger.fromByteArray(
             input.sliceArray(inPos until inPos + inLen), Sign.POSITIVE
         )
-        val chars = CharArray(outLen) { zeroChar }
-        var writeIndex = outLen - 1
-        while (n > bigZero && writeIndex >= 0) {
+        val startPos = output.length
+        repeat(outLen) { output.append(zeroChar) }
+        var writeIndex = output.length - 1
+        while (n > bigZero && writeIndex >= startPos) {
             val remainder = n.rem(base)
-            chars[writeIndex] =
-                alphabet[remainder.intValue(exactRequired = false)]
-            writeIndex--
+            output[writeIndex--] = alphabet[remainder.intValue(exactRequired = false)]
             n /= base
         }
-        return output.append(chars.concatToString())
+        return output
     }
 
     internal fun decodeBlock(
