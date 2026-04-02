@@ -143,4 +143,42 @@ class BaseRadixTest {
         assertFailsWith<IllegalArgumentException> { BaseRadix("x", 4) }
         assertFailsWith<IllegalArgumentException> { BaseRadix("abcdea", 4) }
     }
+
+    @Test
+    fun `char with code beyond alphabet range should throw`() {
+        // Base62 max char is 'Z' (code=90); '{' (code=123) exceeds the inverseAlphabet table
+        val encoded = Base62.encode(byteArrayOf(1, 2, 3))
+        val withHighChar = encoded.dropLast(1) + "{"
+        assertFailsWith<IllegalArgumentException> {
+            Base62.decode(withHighChar)
+        }
+    }
+
+    @Test
+    fun `known encoding output is deterministic`() {
+        // Base16 (hex) has deterministic, human-verifiable output
+        val hex = BaseRadix("0123456789abcdef")
+        // 0x00 → "00", 0xFF → "ff", 0xAB → "ab"
+        assertEquals("00", hex.encode(byteArrayOf(0x00)))
+        assertEquals("ff", hex.encode(byteArrayOf(0xFF.toByte())))
+        assertEquals("0102", hex.encode(byteArrayOf(0x01, 0x02)))
+        assertEquals("deadbeef", hex.encode(byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())))
+    }
+
+    @Test
+    fun `encodeBlock appends to non-empty StringBuilder`() {
+        val hex = BaseRadix("0123456789abcdef")
+        val sb = StringBuilder("prefix:")
+        hex.encodeBlock(byteArrayOf(0xAB.toByte()), output = sb)
+        assertEquals("prefix:ab", sb.toString())
+    }
+
+    @Test
+    fun `multi-block input roundtrips correctly`() {
+        // Explicitly test an input that spans more than one block (blockSize + 1 bytes)
+        for (codec in listOf(Base62, Base36)) {
+            val bytes = ByteArray(codec.blockSize + 1) { it.toByte() }
+            assertRoundtrip(codec, bytes, "Multi-block failed for ${codec::class.simpleName}")
+        }
+    }
 }
