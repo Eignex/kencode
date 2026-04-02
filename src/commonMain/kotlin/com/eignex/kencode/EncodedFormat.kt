@@ -7,14 +7,15 @@ import kotlinx.serialization.modules.SerializersModule
  * Holds the configuration for an [EncodedFormat] instance.
  *
  * @property codec The ASCII-safe byte codec used to turn raw bytes into text (e.g., Base62, Base64).
- * @property checksum An optional checksum appended to the binary payload and verified upon decoding.
+ * @property transform An optional [PayloadTransform] applied after serialization and before encoding.
+ *   Common uses: integrity checks via [Checksum.asTransform], encryption, or error-correcting codes.
  * @property binaryFormat The underlying binary serialization format used before encoding to text.
  * @property compactZeros When true, leading zero bytes are stripped before encoding and restored on decode.
  *   A varint prefix encodes the count, costing 1 byte for up to 127 stripped bytes.
  */
 data class EncodedConfiguration(
     val codec: ByteEncoding = Base62,
-    val checksum: Checksum? = null,
+    val transform: PayloadTransform? = null,
     val binaryFormat: BinaryFormat = PackedFormat.Default,
     val compactZeros: Boolean = false,
 )
@@ -23,16 +24,16 @@ data class EncodedConfiguration(
  * Text `StringFormat` that produces short, predictable string tokens by composing:
  *
  * 1. A binary format (e.g. [PackedFormat], `ProtoBuf`).
- * 2. An optional checksum.
+ * 2. An optional [PayloadTransform] (checksum, encryption, ECC, …).
  * 3. An ASCII-safe byte encoding (e.g. [Base62], [Base64], [Base36], [Base85]).
  *
  * Typical use:
- * - `encodeToString`: serialize -> (optionally) append checksum -> encode bytes to text.
- * - `decodeFromString`: decode text to bytes -> (optionally) verify checksum -> deserialize.
+ * - `encodeToString`: serialize -> transform.encode -> (optionally) compact zeros -> encode bytes to text.
+ * - `decodeFromString`: decode text to bytes -> (optionally) restore zeros -> transform.decode -> deserialize.
  *
  * Use the [EncodedFormat] builder function to create a customized instance.
  *
- * @property configuration The active configuration dictating the codec, checksum, and binary format.
+ * @property configuration The active configuration dictating the codec, transform, and binary format.
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class EncodedFormat(
@@ -44,10 +45,10 @@ open class EncodedFormat(
      */
     constructor(
         codec: ByteEncoding = Base62,
-        checksum: Checksum? = null,
+        transform: PayloadTransform? = null,
         binaryFormat: BinaryFormat = PackedFormat,
         compactZeros: Boolean = true,
-    ) : this(EncodedConfiguration(codec, checksum, binaryFormat, compactZeros))
+    ) : this(EncodedConfiguration(codec, transform, binaryFormat, compactZeros))
 
     /**
      * Delegates to the underlying [BinaryFormat]'s serializers module.
@@ -55,61 +56,34 @@ open class EncodedFormat(
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
     /**
-     * Default format: `PackedFormat` + `Base62` without a checksum.
+     * Default format: `PackedFormat` + `Base62` without a transform.
      */
     companion object Default : EncodedFormat()
 
     /**
-     * Serializes [value] with the configured binary format, optionally appends a checksum,
+     * Serializes [value] with the configured binary format, applies the transform,
      * and encodes the resulting byte array using the text codec.
      */
-    override fun <T> encodeToString(
-        serializer: SerializationStrategy<T>, value: T
-    ): String {
-        val bytes =
-            configuration.binaryFormat.encodeToByteArray(serializer, value)
-        val checked = if (configuration.checksum != null) {
-            bytes + configuration.checksum.digest(bytes)
-        } else bytes
-        val payload = if (configuration.compactZeros) compactZerosEncode(checked) else checked
+    override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
+        val bytes = configuration.binaryFormat.encodeToByteArray(serializer, value)
+        val transformed = configuration.transform?.encode(bytes) ?: bytes
+        val payload = if (configuration.compactZeros) compactZerosEncode(transformed) else transformed
         return configuration.codec.encode(payload)
     }
 
     /**
-     * Decodes [string] using the text codec, optionally verifies and strips the checksum,
-     * then deserializes the remaining bytes with the configured binary format.
+     * Decodes [string] using the text codec, applies the inverse transform,
+     * then deserializes with the configured binary format.
      *
-     * @throws IllegalArgumentException if a checksum is configured and the verification fails.
+     * @throws IllegalArgumentException if the transform's decode step fails (e.g. checksum mismatch).
      */
-    override fun <T> decodeFromString(
-        deserializer: DeserializationStrategy<T>, string: String
-    ): T {
+    override fun <T> decodeFromString(deserializer: DeserializationStrategy<T>, string: String): T {
         val input = configuration.codec.decode(string)
         val raw = if (configuration.compactZeros) compactZerosDecode(input) else input
-        val bytes = if (configuration.checksum != null) {
-            require(raw.size >= configuration.checksum.size) {
-                "Input too short to contain checksum: expected at least ${configuration.checksum.size} bytes but got ${raw.size}."
-            }
-            val bytes =
-                raw.sliceArray(0..<raw.size - configuration.checksum.size)
-            val actual =
-                raw.sliceArray(raw.size - configuration.checksum.size..<raw.size)
-            val expected = configuration.checksum.digest(bytes)
-            require(actual.contentEquals(expected)) {
-                "Checksum mismatch."
-            }
-            bytes
-        } else raw
-        return configuration.binaryFormat.decodeFromByteArray(
-            deserializer,
-            bytes
-        )
+        val bytes = configuration.transform?.decode(raw) ?: raw
+        return configuration.binaryFormat.decodeFromByteArray(deserializer, bytes)
     }
 
-    /**
-     * Strips leading zero bytes from [bytes], prepends a varint encoding of the
-     * count, and returns the result.
-     */
     private fun compactZerosEncode(bytes: ByteArray): ByteArray {
         var k = 0
         while (k < bytes.size && bytes[k] == 0.toByte()) k++
@@ -120,10 +94,6 @@ open class EncodedFormat(
         return result
     }
 
-    /**
-     * Reads a varint prefix written by [compactZerosEncode] and restores the leading
-     * zero bytes, returning the original byte array.
-     */
     private fun compactZerosDecode(bytes: ByteArray): ByteArray {
         require(bytes.isNotEmpty()) { "Compact payload cannot be empty." }
         val (k, prefixLen) = varintDecode(bytes)
@@ -146,26 +116,14 @@ open class EncodedFormat(
  * Builder for configuring [EncodedFormat] instances.
  */
 class EncodedFormatBuilder {
-    /**
-     * The ASCII-safe byte codec used to turn raw bytes into text. Defaults to [Base62].
-     */
     var codec: ByteEncoding = Base62
-
-    /**
-     * An optional checksum appended to the binary payload. Defaults to `null`.
-     */
-    var checksum: Checksum? = null
-
-    /**
-     * The underlying binary serialization format. Defaults to [PackedFormat.Default].
-     */
+    var transform: PayloadTransform? = null
     var binaryFormat: BinaryFormat = PackedFormat.Default
-
-    /**
-     * When true, leading zero bytes are stripped before encoding and restored on decode.
-     * Defaults to `true`.
-     */
     var compactZeros: Boolean = true
+
+    var checksum: Checksum?
+        get() = null
+        set(value) { transform = value?.asTransform() }
 }
 
 /**
@@ -173,8 +131,8 @@ class EncodedFormatBuilder {
  *
  * ```
  * val format = EncodedFormat {
- * codec = Base36
- * checksum = Crc16
+ *     codec = Base36
+ *     transform = Crc16.asTransform()
  * }
  * ```
  *
@@ -187,18 +145,15 @@ fun EncodedFormat(
 ): EncodedFormat {
     val builder = EncodedFormatBuilder().apply {
         codec = from.configuration.codec
-        checksum = from.configuration.checksum
+        transform = from.configuration.transform
         binaryFormat = from.configuration.binaryFormat
         compactZeros = from.configuration.compactZeros
     }
     builder.builderAction()
-
-    val newConfig = EncodedConfiguration(
+    return EncodedFormat(EncodedConfiguration(
         builder.codec,
-        builder.checksum,
+        builder.transform,
         builder.binaryFormat,
         builder.compactZeros,
-    )
-
-    return EncodedFormat(newConfig)
+    ))
 }

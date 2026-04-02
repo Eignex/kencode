@@ -10,7 +10,7 @@ class EncodedFormatTest {
     data class Payload(val x: Int, val s: String)
 
     private val formatNoChecksum: StringFormat = EncodedFormat(Base62, null)
-    private val formatWithChecksum: StringFormat = EncodedFormat(Base62, Crc16)
+    private val formatWithChecksum: StringFormat = EncodedFormat(Base62, Crc16.asTransform())
 
     @Test
     fun `roundtrip without checksum`() {
@@ -103,7 +103,7 @@ class EncodedFormatTest {
 
         val customFormat = EncodedFormat {
             codec = Base85
-            checksum = Crc32
+            transform = Crc32.asTransform()
             binaryFormat = PackedFormat.Default
         }
 
