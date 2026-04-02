@@ -21,7 +21,8 @@ class PackedContextTest {
     @Test
     fun `ClassBitmask counts boolean fields`() {
         // SimpleIntsAndBooleans(id: Int, score: Int, active: Boolean, deleted: Boolean)
-        val bitmask = ClassBitmask(SimpleIntsAndBooleans.serializer().descriptor)
+        val bitmask =
+            ClassBitmask(SimpleIntsAndBooleans.serializer().descriptor)
         assertEquals(2, bitmask.boolCount)
         assertEquals(0, bitmask.nullCount)
         assertEquals(2, bitmask.totalCount)
@@ -30,11 +31,12 @@ class PackedContextTest {
     @Test
     fun `ClassBitmask boolean lookup maps field indices`() {
         // fields: 0=id, 1=score, 2=active, 3=deleted
-        val bitmask = ClassBitmask(SimpleIntsAndBooleans.serializer().descriptor)
+        val bitmask =
+            ClassBitmask(SimpleIntsAndBooleans.serializer().descriptor)
         assertEquals(-1, bitmask.booleanPos(0))
         assertEquals(-1, bitmask.booleanPos(1))
-        assertEquals(0,  bitmask.booleanPos(2))
-        assertEquals(1,  bitmask.booleanPos(3))
+        assertEquals(0, bitmask.booleanPos(2))
+        assertEquals(1, bitmask.booleanPos(3))
     }
 
     @Test
@@ -51,7 +53,7 @@ class PackedContextTest {
         // Level1: fields 0=active, 1=level2?
         val bitmask = ClassBitmask(Level1.serializer().descriptor)
         assertEquals(-1, bitmask.nullablePos(0))
-        assertEquals(0,  bitmask.nullablePos(1))
+        assertEquals(0, bitmask.nullablePos(1))
     }
 
     @Test
@@ -59,21 +61,22 @@ class PackedContextTest {
         // NullableBooleansAndNonBooleans(flag1: Boolean?, flag2: Boolean, flag3: Boolean?, count: Int?, label: String)
         // booleans: flag1?, flag2, flag3? → boolCount=3
         // nullables: flag1?, flag3?, count? → nullCount=3
-        val bitmask = ClassBitmask(NullableBooleansAndNonBooleans.serializer().descriptor)
+        val bitmask =
+            ClassBitmask(NullableBooleansAndNonBooleans.serializer().descriptor)
         assertEquals(3, bitmask.boolCount)
         assertEquals(3, bitmask.nullCount)
         assertEquals(6, bitmask.totalCount)
         // bool positions: flag1?→0, flag2→1, flag3?→2, count→-1, label→-1
-        assertEquals(0,  bitmask.booleanPos(0))
-        assertEquals(1,  bitmask.booleanPos(1))
-        assertEquals(2,  bitmask.booleanPos(2))
+        assertEquals(0, bitmask.booleanPos(0))
+        assertEquals(1, bitmask.booleanPos(1))
+        assertEquals(2, bitmask.booleanPos(2))
         assertEquals(-1, bitmask.booleanPos(3))
         assertEquals(-1, bitmask.booleanPos(4))
         // null positions: flag1?→0, flag2→-1, flag3?→1, count?→2, label→-1
-        assertEquals(0,  bitmask.nullablePos(0))
+        assertEquals(0, bitmask.nullablePos(0))
         assertEquals(-1, bitmask.nullablePos(1))
-        assertEquals(1,  bitmask.nullablePos(2))
-        assertEquals(2,  bitmask.nullablePos(3))
+        assertEquals(1, bitmask.nullablePos(2))
+        assertEquals(2, bitmask.nullablePos(3))
         assertEquals(-1, bitmask.nullablePos(4))
     }
 
@@ -98,7 +101,11 @@ class PackedContextTest {
         // active=true, level2_null=true → bit0=1, bit1=1 → 0b00000011 = 3
         val bitmask = ClassBitmask(Level1.serializer().descriptor)
         val out = ByteOutput()
-        bitmask.writeInlineBitmask(booleanArrayOf(true), booleanArrayOf(true), out)
+        bitmask.writeInlineBitmask(
+            booleanArrayOf(true),
+            booleanArrayOf(true),
+            out
+        )
         val bytes = out.toByteArray()
         assertEquals(1, bytes.size)
         assertEquals(3, bytes[0].toInt() and 0xFF)
@@ -108,7 +115,11 @@ class PackedContextTest {
     fun `ClassBitmask writeInlineBitmask all false produces zero byte`() {
         val bitmask = ClassBitmask(Level1.serializer().descriptor)
         val out = ByteOutput()
-        bitmask.writeInlineBitmask(booleanArrayOf(false), booleanArrayOf(false), out)
+        bitmask.writeInlineBitmask(
+            booleanArrayOf(false),
+            booleanArrayOf(false),
+            out
+        )
         val bytes = out.toByteArray()
         assertEquals(1, bytes.size)
         assertEquals(0, bytes[0].toInt() and 0xFF)
@@ -121,7 +132,11 @@ class PackedContextTest {
         val bitmask = ClassBitmask(BooleanFlags64.serializer().descriptor)
         assertEquals(64, bitmask.boolCount)
         val out = ByteOutput()
-        bitmask.writeInlineBitmask(BooleanArray(64) { it == 0 }, BooleanArray(0), out)
+        bitmask.writeInlineBitmask(
+            BooleanArray(64) { it == 0 },
+            BooleanArray(0),
+            out
+        )
         val bytes = out.toByteArray()
         assertEquals(8, bytes.size)
         assertEquals(1, bytes[0].toInt() and 0xFF)  // only bit 0 set
@@ -171,8 +186,16 @@ class PackedContextTest {
         val ctx = HeaderContext()
         val start1 = ctx.reserve(2)
         val start2 = ctx.reserve(2)
-        ctx.set(start1, booleanArrayOf(true), booleanArrayOf(false))   // bit0=1, bit1=0
-        ctx.set(start2, booleanArrayOf(false), booleanArrayOf(true))   // bit2=0, bit3=1
+        ctx.set(
+            start1,
+            booleanArrayOf(true),
+            booleanArrayOf(false)
+        )   // bit0=1, bit1=0
+        ctx.set(
+            start2,
+            booleanArrayOf(false),
+            booleanArrayOf(true)
+        )   // bit2=0, bit3=1
         // 0b00001001 = 9
         val bytes = ctx.toByteArray()
         assertEquals(1, bytes.size)
@@ -183,7 +206,10 @@ class PackedContextTest {
     fun `HeaderContext load returns bytes consumed`() {
         assertEquals(0, HeaderContext().load(byteArrayOf(), 0, 0))
         assertEquals(1, HeaderContext().load(byteArrayOf(0xFF.toByte()), 0, 8))
-        assertEquals(2, HeaderContext().load(byteArrayOf(0xFF.toByte(), 0x00), 0, 9))
+        assertEquals(
+            2,
+            HeaderContext().load(byteArrayOf(0xFF.toByte(), 0x00), 0, 9)
+        )
     }
 
     @Test
@@ -191,10 +217,10 @@ class PackedContextTest {
         // byte 0b00001101 = 13 → bits: true, false, true, true, false, false, false, false
         val ctx = HeaderContext()
         ctx.load(byteArrayOf(13), 0, 5)
-        assertEquals(true,  ctx.read())
+        assertEquals(true, ctx.read())
         assertEquals(false, ctx.read())
-        assertEquals(true,  ctx.read())
-        assertEquals(true,  ctx.read())
+        assertEquals(true, ctx.read())
+        assertEquals(true, ctx.read())
         assertEquals(false, ctx.read())
     }
 
@@ -218,10 +244,10 @@ class PackedContextTest {
 
         val decoder = HeaderContext()
         decoder.load(bytes, 0, 4)
-        assertEquals(true,  decoder.read())  // class1 bool
+        assertEquals(true, decoder.read())  // class1 bool
         assertEquals(false, decoder.read())  // class1 null
         assertEquals(false, decoder.read())  // class2 bool
-        assertEquals(true,  decoder.read())  // class2 null
+        assertEquals(true, decoder.read())  // class2 null
     }
 
     // --- countAllBits ---
@@ -234,7 +260,10 @@ class PackedContextTest {
     @Test
     fun `countAllBits class with booleans only`() {
         // SimpleIntsAndBooleans: 2 boolean fields
-        assertEquals(2, countAllBits(SimpleIntsAndBooleans.serializer().descriptor))
+        assertEquals(
+            2,
+            countAllBits(SimpleIntsAndBooleans.serializer().descriptor)
+        )
     }
 
     @Test
@@ -257,7 +286,10 @@ class PackedContextTest {
         // Level2 has 0 bits, so if recursion happened the result would still be 2.
         // Use NullableFieldsPayload which has maybeFlag: Boolean? (→ 1 bool + 1 null)
         // and no non-nullable nested classes. Total = 5 nullables + 1 bool = 6.
-        assertEquals(6, countAllBits(NullableFieldsPayload.serializer().descriptor))
+        assertEquals(
+            6,
+            countAllBits(NullableFieldsPayload.serializer().descriptor)
+        )
     }
 
     @Test
@@ -284,82 +316,96 @@ class PackedContextTest {
     @Test
     fun `shouldMergeChildCtx true for non-nullable nested class`() {
         // DeepNested: level1 at index 1 is a non-nullable Level1 CLASS
-        assertTrue(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = false,
-            parentDescriptor    = DeepNested.serializer().descriptor,
-            fieldIndex          = 1,
-            childDescriptor     = Level1.serializer().descriptor,
-        ))
+        assertTrue(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = false,
+                parentDescriptor = DeepNested.serializer().descriptor,
+                fieldIndex = 1,
+                childDescriptor = Level1.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when parent is not merged kind`() {
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = false,
-            parentIsCollection  = false,
-            parentDescriptor    = DeepNested.serializer().descriptor,
-            fieldIndex          = 1,
-            childDescriptor     = Level1.serializer().descriptor,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = false,
+                parentIsCollection = false,
+                parentDescriptor = DeepNested.serializer().descriptor,
+                fieldIndex = 1,
+                childDescriptor = Level1.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when parent is a collection`() {
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = true,
-            parentDescriptor    = DeepNested.serializer().descriptor,
-            fieldIndex          = 1,
-            childDescriptor     = Level1.serializer().descriptor,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = true,
+                parentDescriptor = DeepNested.serializer().descriptor,
+                fieldIndex = 1,
+                childDescriptor = Level1.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when field index is negative`() {
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = false,
-            parentDescriptor    = DeepNested.serializer().descriptor,
-            fieldIndex          = -1,
-            childDescriptor     = Level1.serializer().descriptor,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = false,
+                parentDescriptor = DeepNested.serializer().descriptor,
+                fieldIndex = -1,
+                childDescriptor = Level1.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when field is nullable`() {
         // Level1: level2 at index 1 is Level2? (nullable)
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = false,
-            parentDescriptor    = Level1.serializer().descriptor,
-            fieldIndex          = 1,
-            childDescriptor     = Level2.serializer().descriptor,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = false,
+                parentDescriptor = Level1.serializer().descriptor,
+                fieldIndex = 1,
+                childDescriptor = Level2.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when child is an inline class`() {
         // InlineHeavyPayload: userId at index 4 is UserId (non-nullable inline value class)
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = false,
-            parentDescriptor    = InlineHeavyPayload.serializer().descriptor,
-            fieldIndex          = 4,
-            childDescriptor     = UserId.serializer().descriptor,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = false,
+                parentDescriptor = InlineHeavyPayload.serializer().descriptor,
+                fieldIndex = 4,
+                childDescriptor = UserId.serializer().descriptor,
+            )
+        )
     }
 
     @Test
     fun `shouldMergeChildCtx false when child is not a class or object`() {
         // WithList: items at index 1 is List<Int>
         val listDesc = ListSerializer(serializer<Int>()).descriptor
-        assertFalse(shouldMergeChildCtx(
-            parentIsMergedKind  = true,
-            parentIsCollection  = false,
-            parentDescriptor    = WithList.serializer().descriptor,
-            fieldIndex          = 1,
-            childDescriptor     = listDesc,
-        ))
+        assertFalse(
+            shouldMergeChildCtx(
+                parentIsMergedKind = true,
+                parentIsCollection = false,
+                parentDescriptor = WithList.serializer().descriptor,
+                fieldIndex = 1,
+                childDescriptor = listDesc,
+            )
+        )
     }
 }

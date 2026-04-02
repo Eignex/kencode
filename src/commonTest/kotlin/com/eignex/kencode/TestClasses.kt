@@ -2,8 +2,8 @@
 
 package com.eignex.kencode
 
-import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 import kotlin.time.*
 
 @Serializable
@@ -75,8 +75,8 @@ data class StringHeavyPayload(
 
 @Serializable
 data class VarIntVarUIntPayload(
-    @PackedType(PackedIntegerType.SIGNED)  val signedIntVar: Int,
-    @PackedType(PackedIntegerType.SIGNED)  val signedLongVar: Long,
+    @PackedType(PackedIntegerType.SIGNED) val signedIntVar: Int,
+    @PackedType(PackedIntegerType.SIGNED) val signedLongVar: Long,
     @PackedType(PackedIntegerType.DEFAULT) val unsignedIntVar: Int,
     @PackedType(PackedIntegerType.DEFAULT) val unsignedLongVar: Long,
     val plainInt: Int,

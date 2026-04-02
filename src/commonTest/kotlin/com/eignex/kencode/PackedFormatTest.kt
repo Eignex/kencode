@@ -2,10 +2,8 @@
 
 package com.eignex.kencode
 
-import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.KSerializer
+import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
-import kotlinx.serialization.serializer
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -268,17 +266,30 @@ class PackedFormatTest {
         val payload = UnannotatedPayload(5, 10L)
 
         val standardFormat = PackedFormat.Default
-        val optimizedFormat = PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
+        val optimizedFormat =
+            PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
 
-        val standardBytes = standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
-        val optimizedBytes = optimizedFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val standardBytes = standardFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
+        val optimizedBytes = optimizedFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
 
         // Standard size: 4 bytes (Int) + 8 bytes (Long) = 12 bytes
         assertEquals(12, standardBytes.size)
         // Optimized size: 1 byte (VarInt 5) + 1 byte (VarLong 10) = 2 bytes
         assertEquals(2, optimizedBytes.size)
 
-        assertEquals(payload, optimizedFormat.decodeFromByteArray(UnannotatedPayload.serializer(), optimizedBytes))
+        assertEquals(
+            payload,
+            optimizedFormat.decodeFromByteArray(
+                UnannotatedPayload.serializer(),
+                optimizedBytes
+            )
+        )
     }
 
     @Test
@@ -286,29 +297,62 @@ class PackedFormatTest {
         val payload = UnannotatedPayload(-1, -1L)
 
         val standardFormat = PackedFormat.Default
-        val varIntFormat = PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
-        val zigZagFormat = PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
+        val varIntFormat =
+            PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
+        val zigZagFormat =
+            PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
 
         // Standard: 12 bytes
-        assertEquals(12, standardFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload).size)
+        assertEquals(
+            12,
+            standardFormat.encodeToByteArray(
+                UnannotatedPayload.serializer(),
+                payload
+            ).size
+        )
         // Unsigned VarInt of -1 uses max bytes: 5 + 10 = 15 bytes
-        assertEquals(15, varIntFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload).size)
+        assertEquals(
+            15,
+            varIntFormat.encodeToByteArray(
+                UnannotatedPayload.serializer(),
+                payload
+            ).size
+        )
         // ZigZag folds -1 into 1: 1 + 1 = 2 bytes
-        val zigZagBytes = zigZagFormat.encodeToByteArray(UnannotatedPayload.serializer(), payload)
+        val zigZagBytes = zigZagFormat.encodeToByteArray(
+            UnannotatedPayload.serializer(),
+            payload
+        )
         assertEquals(2, zigZagBytes.size)
 
-        assertEquals(payload, zigZagFormat.decodeFromByteArray(UnannotatedPayload.serializer(), zigZagBytes))
+        assertEquals(
+            payload,
+            zigZagFormat.decodeFromByteArray(
+                UnannotatedPayload.serializer(),
+                zigZagBytes
+            )
+        )
     }
 
     @Test
     fun `defaultEncoding SIGNED is overridden by PackedType FIXED annotation`() {
         val payload = InversePayload(5, -10L, 6u, 7uL)
 
-        val optimizedFormat = PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
+        val optimizedFormat =
+            PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
 
-        val bytes = optimizedFormat.encodeToByteArray(InversePayload.serializer(), payload)
+        val bytes = optimizedFormat.encodeToByteArray(
+            InversePayload.serializer(),
+            payload
+        )
         assertEquals(24, bytes.size)
-        assertEquals(payload, optimizedFormat.decodeFromByteArray(InversePayload.serializer(), bytes))
+        assertEquals(
+            payload,
+            optimizedFormat.decodeFromByteArray(
+                InversePayload.serializer(),
+                bytes
+            )
+        )
     }
 
     @Test
@@ -356,15 +400,24 @@ class PackedFormatTest {
 
     @Test
     fun `empty list encodes as single zero byte`() {
-        val bytes = PackedFormat.encodeToByteArray(ListSerializer(Int.serializer()), emptyList())
+        val bytes = PackedFormat.encodeToByteArray(
+            ListSerializer(Int.serializer()),
+            emptyList()
+        )
         assertEquals(1, bytes.size)
         assertEquals(0, bytes[0])
     }
 
     @Test
     fun `empty map roundtrip`() {
-        assertPackedRoundtrip(MapHolder.serializer(), MapHolder(emptyMap(), null))
-        assertPackedRoundtrip(MapHolder.serializer(), MapHolder(emptyMap(), emptyMap()))
+        assertPackedRoundtrip(
+            MapHolder.serializer(),
+            MapHolder(emptyMap(), null)
+        )
+        assertPackedRoundtrip(
+            MapHolder.serializer(),
+            MapHolder(emptyMap(), emptyMap())
+        )
     }
 
     // --- VarInt / VarUInt encoding distinction ---
@@ -372,11 +425,17 @@ class PackedFormatTest {
     @Test
     fun `VarUInt does not apply zigzag so negative inputs encode large`() {
         val uintNegative = VarIntVarUIntPayload(0, 0L, -1, -1L, 0, 0)
-        val bytes = PackedFormat.encodeToByteArray(VarIntVarUIntPayload.serializer(), uintNegative)
+        val bytes = PackedFormat.encodeToByteArray(
+            VarIntVarUIntPayload.serializer(),
+            uintNegative
+        )
         assertEquals(29, bytes.size)
 
         val intNegative = VarIntVarUIntPayload(-1, -1L, 0, 0L, 0, 0)
-        val bytes2 = PackedFormat.encodeToByteArray(VarIntVarUIntPayload.serializer(), intNegative)
+        val bytes2 = PackedFormat.encodeToByteArray(
+            VarIntVarUIntPayload.serializer(),
+            intNegative
+        )
         assertEquals(16, bytes2.size)
 
         assertPackedRoundtrip(VarIntVarUIntPayload.serializer(), uintNegative)
@@ -385,7 +444,10 @@ class PackedFormatTest {
 
     @Test
     fun `deep null mid-chain roundtrip`() {
-        assertPackedRoundtrip(DeepNested.serializer(), DeepNested("root", Level1(false, null)))
+        assertPackedRoundtrip(
+            DeepNested.serializer(),
+            DeepNested("root", Level1(false, null))
+        )
     }
 
     @Test
@@ -399,27 +461,45 @@ class PackedFormatTest {
     @Test
     fun `nullable list of complex types roundtrip`() {
         val list = listOf(Child(1), null, Child(3), null, Child(5))
-        val bytes = PackedFormat.encodeToByteArray(ListSerializer(Child.serializer().nullable), list)
-        val decoded = PackedFormat.decodeFromByteArray(ListSerializer(Child.serializer().nullable), bytes)
+        val bytes = PackedFormat.encodeToByteArray(
+            ListSerializer(Child.serializer().nullable),
+            list
+        )
+        val decoded = PackedFormat.decodeFromByteArray(
+            ListSerializer(Child.serializer().nullable),
+            bytes
+        )
         assertEquals(list, decoded)
     }
 
     @Test
     fun `truncated bool list bitmap throws`() {
-        val valid = PackedFormat.encodeToByteArray(ListSerializer(Boolean.serializer()), List(16) { true })
-        val truncated = valid.copyOfRange(0, 2) // size byte + first bitmap byte only
+        val valid = PackedFormat.encodeToByteArray(
+            ListSerializer(Boolean.serializer()),
+            List(16) { true })
+        val truncated =
+            valid.copyOfRange(0, 2) // size byte + first bitmap byte only
         assertFailsWith<IllegalArgumentException> {
-            PackedFormat.decodeFromByteArray(ListSerializer(Boolean.serializer()), truncated)
+            PackedFormat.decodeFromByteArray(
+                ListSerializer(Boolean.serializer()),
+                truncated
+            )
         }
     }
 
     @Test
     fun `truncated nullable list bitmap throws`() {
         val list = List(16) { if (it % 2 == 0) "x" else null }
-        val valid = PackedFormat.encodeToByteArray(ListSerializer(String.serializer().nullable), list)
+        val valid = PackedFormat.encodeToByteArray(
+            ListSerializer(String.serializer().nullable),
+            list
+        )
         val truncated = valid.copyOfRange(0, 2)
         assertFailsWith<IllegalArgumentException> {
-            PackedFormat.decodeFromByteArray(ListSerializer(String.serializer().nullable), truncated)
+            PackedFormat.decodeFromByteArray(
+                ListSerializer(String.serializer().nullable),
+                truncated
+            )
         }
     }
 
@@ -442,14 +522,18 @@ class PackedFormatTest {
     @Test
     fun `truncated bitmask header throws`() {
         assertFailsWith<IllegalArgumentException> {
-            PackedFormat.decodeFromByteArray(NullableFieldsPayload.serializer(), byteArrayOf())
+            PackedFormat.decodeFromByteArray(
+                NullableFieldsPayload.serializer(),
+                byteArrayOf()
+            )
         }
     }
 
     @Test
     fun `schema-derived bitmask is more compact than VarLong for 8-flag boundary`() {
         val allTrue = BooleanFlags64(BooleanArray(64) { true })
-        val bytes = PackedFormat.encodeToByteArray(BooleanFlags64.serializer(), allTrue)
+        val bytes =
+            PackedFormat.encodeToByteArray(BooleanFlags64.serializer(), allTrue)
         assertEquals(8, bytes.size)
         assertPackedRoundtrip(BooleanFlags64.serializer(), allTrue)
     }
@@ -457,7 +541,8 @@ class PackedFormatTest {
     @Test
     fun `schema-derived bitmask handles 65-flag class without length prefix`() {
         val allTrue = BooleanFlags65(BooleanArray(65) { true })
-        val bytes = PackedFormat.encodeToByteArray(BooleanFlags65.serializer(), allTrue)
+        val bytes =
+            PackedFormat.encodeToByteArray(BooleanFlags65.serializer(), allTrue)
         assertEquals(9, bytes.size)
         assertPackedRoundtrip(BooleanFlags65.serializer(), allTrue)
     }
@@ -465,7 +550,10 @@ class PackedFormatTest {
     @Test
     fun `boolean list encodes all values as a single bitmap`() {
         val payload = BooleanListPayload(0, List(8) { it % 2 == 0 })
-        val bytes = PackedFormat.encodeToByteArray(BooleanListPayload.serializer(), payload)
+        val bytes = PackedFormat.encodeToByteArray(
+            BooleanListPayload.serializer(),
+            payload
+        )
         assertEquals(6, bytes.size)
         assertPackedRoundtrip(BooleanListPayload.serializer(), payload)
     }
@@ -481,9 +569,15 @@ class PackedFormatTest {
     @Test
     fun `nullable list encodes null markers as a bitmap`() {
         val list = listOf("a", null, "b", null, "c", null, "d", null)
-        val bytes = PackedFormat.encodeToByteArray(ListSerializer(String.serializer().nullable), list)
+        val bytes = PackedFormat.encodeToByteArray(
+            ListSerializer(String.serializer().nullable),
+            list
+        )
         assertEquals(10, bytes.size)
-        val decoded = PackedFormat.decodeFromByteArray(ListSerializer(String.serializer().nullable), bytes)
+        val decoded = PackedFormat.decodeFromByteArray(
+            ListSerializer(String.serializer().nullable),
+            bytes
+        )
         assertEquals(list, decoded)
     }
 
@@ -497,8 +591,14 @@ class PackedFormatTest {
             listOf(null)
         )
         for (list in lists) {
-            val bytes = PackedFormat.encodeToByteArray(ListSerializer(String.serializer().nullable), list)
-            val decoded = PackedFormat.decodeFromByteArray(ListSerializer(String.serializer().nullable), bytes)
+            val bytes = PackedFormat.encodeToByteArray(
+                ListSerializer(String.serializer().nullable),
+                list
+            )
+            val decoded = PackedFormat.decodeFromByteArray(
+                ListSerializer(String.serializer().nullable),
+                bytes
+            )
             assertEquals(list, decoded)
         }
     }
@@ -511,7 +611,10 @@ class PackedFormatTest {
         // active=true  → bit 0 = 1
         // level2=null  → bit 1 = 1 (null-marker)
         // No data bytes remain, so total = 1 byte.
-        val bytes = PackedFormat.encodeToByteArray(Level1.serializer(), Level1(true, null))
+        val bytes = PackedFormat.encodeToByteArray(
+            Level1.serializer(),
+            Level1(true, null)
+        )
         assertEquals(1, bytes.size)
         assertEquals(0b00000011, bytes[0].toInt() and 0xFF)
     }
@@ -525,7 +628,10 @@ class PackedFormatTest {
             Level1.serializer(), Level1(false, Level2("", emptyList()))
         )
         assertEquals(0, bytes[0].toInt() and 0xFF)
-        assertPackedRoundtrip(Level1.serializer(), Level1(false, Level2("", emptyList())))
+        assertPackedRoundtrip(
+            Level1.serializer(),
+            Level1(false, Level2("", emptyList()))
+        )
     }
 
     @Test
@@ -535,7 +641,8 @@ class PackedFormatTest {
         // Header byte: bit 0=active=true, bit 1=level2_null=true → 0b00000011 = 3.
         // Data after header: "x" (varint 1 + byte) = 2 bytes. Total = 3.
         val value = DeepNested("x", Level1(active = true, level2 = null))
-        val bytes = PackedFormat.encodeToByteArray(DeepNested.serializer(), value)
+        val bytes =
+            PackedFormat.encodeToByteArray(DeepNested.serializer(), value)
         assertEquals(3, bytes.size)
         assertEquals(0b00000011, bytes[0].toInt() and 0xFF)
         assertPackedRoundtrip(DeepNested.serializer(), value)
@@ -558,7 +665,8 @@ class PackedFormatTest {
             branchC = Level1(true, null),
             rootValue = 42,
         )
-        val bytes = PackedFormat.encodeToByteArray(DeepBreadth.serializer(), value)
+        val bytes =
+            PackedFormat.encodeToByteArray(DeepBreadth.serializer(), value)
         assertEquals(5, bytes.size)
         assertEquals(59, bytes[0].toInt() and 0xFF)
         assertPackedRoundtrip(DeepBreadth.serializer(), value)
@@ -569,22 +677,34 @@ class PackedFormatTest {
         // level2 is nullable → its own boolean/nullable bits are NOT merged up.
         // Only the null-marker for level2 itself is in Level1's merged header.
         // Level2 has no boolean or nullable fields, so no extra header when present.
-        val withLevel2 = Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
+        val withLevel2 =
+            Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
         val withoutLevel2 = Level1(active = true, level2 = null)
         assertPackedRoundtrip(Level1.serializer(), withLevel2)
         assertPackedRoundtrip(Level1.serializer(), withoutLevel2)
         // Present level2 → header bit 1 = 0; absent → header bit 1 = 1
-        val bytesPresent = PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
-        val bytesAbsent = PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
-        assertEquals(0b00000001, bytesPresent[0].toInt() and 0xFF)  // active=1, level2_null=0
-        assertEquals(0b00000011, bytesAbsent[0].toInt() and 0xFF)   // active=1, level2_null=1
+        val bytesPresent =
+            PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
+        val bytesAbsent =
+            PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
+        assertEquals(
+            0b00000001,
+            bytesPresent[0].toInt() and 0xFF
+        )  // active=1, level2_null=0
+        assertEquals(
+            0b00000011,
+            bytesAbsent[0].toInt() and 0xFF
+        )   // active=1, level2_null=1
     }
 
     @Test
     fun `non-nullable nested class with no flags contributes no header bytes`() {
         // Parent(id: Int, child: Child) — Child has no booleans or nullables.
         // countAllBits = 0 → no header byte at all.
-        val bytes = PackedFormat.encodeToByteArray(Parent.serializer(), Parent(7, Child(42)))
+        val bytes = PackedFormat.encodeToByteArray(
+            Parent.serializer(),
+            Parent(7, Child(42))
+        )
         assertEquals(8, bytes.size)  // 4 bytes id + 4 bytes child.value
         assertPackedRoundtrip(Parent.serializer(), Parent(7, Child(42)))
     }
@@ -592,10 +712,13 @@ class PackedFormatTest {
     @Test
     fun `flipping a merged header bit changes the corresponding nested field`() {
         val value = DeepNested("root", Level1(active = true, level2 = null))
-        val bytes = PackedFormat.encodeToByteArray(DeepNested.serializer(), value).copyOf()
+        val bytes =
+            PackedFormat.encodeToByteArray(DeepNested.serializer(), value)
+                .copyOf()
         // Flip bit 0 (active) in the merged header byte
         bytes[0] = (bytes[0].toInt() xor 0x01).toByte()
-        val decoded = PackedFormat.decodeFromByteArray(DeepNested.serializer(), bytes)
+        val decoded =
+            PackedFormat.decodeFromByteArray(DeepNested.serializer(), bytes)
         assertEquals(false, decoded.level1.active)
         assertEquals(null, decoded.level1.level2)
     }
@@ -604,15 +727,28 @@ class PackedFormatTest {
     fun `truncated merged header throws for nested structure`() {
         // DeepNested requires 1 byte for its merged header; empty input should fail.
         assertFailsWith<IllegalArgumentException> {
-            PackedFormat.decodeFromByteArray(DeepNested.serializer(), byteArrayOf())
+            PackedFormat.decodeFromByteArray(
+                DeepNested.serializer(),
+                byteArrayOf()
+            )
         }
     }
 
     @Test
     fun `DeepBreadth roundtrip with all flag combinations`() {
         val cases = listOf(
-            DeepBreadth(Level1(false, null), Level1(false, null), Level1(false, null), 0),
-            DeepBreadth(Level1(true, null), Level1(true, null), Level1(true, null), -1),
+            DeepBreadth(
+                Level1(false, null),
+                Level1(false, null),
+                Level1(false, null),
+                0
+            ),
+            DeepBreadth(
+                Level1(true, null),
+                Level1(true, null),
+                Level1(true, null),
+                -1
+            ),
             DeepBreadth(
                 Level1(true, Level2("a", emptyList())),
                 Level1(false, null),
@@ -628,7 +764,10 @@ class PackedFormatTest {
     @Test
     fun `decodeElementIndex simulates sequential decoding for classes and collections`() {
         val classSerializer = UnannotatedPayload.serializer()
-        val classBytes = PackedFormat.encodeToByteArray(classSerializer, UnannotatedPayload(1, 2L))
+        val classBytes = PackedFormat.encodeToByteArray(
+            classSerializer,
+            UnannotatedPayload(1, 2L)
+        )
 
         val classDecoder = PackedDecoder(classBytes)
         val classDescriptor = classSerializer.descriptor
@@ -643,7 +782,8 @@ class PackedFormatTest {
         )
 
         val listSerializer = ListSerializer(serializer<Int>())
-        val listBytes = PackedFormat.encodeToByteArray(listSerializer, listOf(10, 20))
+        val listBytes =
+            PackedFormat.encodeToByteArray(listSerializer, listOf(10, 20))
 
         val listDecoder = PackedDecoder(listBytes)
         val listDescriptor = listSerializer.descriptor

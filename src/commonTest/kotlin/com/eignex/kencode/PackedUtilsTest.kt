@@ -310,7 +310,7 @@ class BitPackingTest {
 
     @Test
     fun `comprehensive truncation coverage`() {
-        val types:List<Pair<String, (ByteOutput) -> Unit>> = listOf(
+        val types: List<Pair<String, (ByteOutput) -> Unit>> = listOf(
             "Short" to {
                 PackedUtils.writeShort(
                     1102,

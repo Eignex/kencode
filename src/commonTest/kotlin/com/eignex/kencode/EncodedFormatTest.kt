@@ -49,26 +49,34 @@ class EncodedFormatTest {
     @Test
     fun `compactZeros roundtrip without checksum`() {
         val value = Payload(1, "hi")
-        val encoded = formatNoChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = formatNoChecksum.decodeFromString(Payload.serializer(), encoded)
+        val encoded =
+            formatNoChecksum.encodeToString(Payload.serializer(), value)
+        val decoded =
+            formatNoChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
         val uncompressed = EncodedFormat(Base62, compactZeros = false)
             .encodeToString(Payload.serializer(), value)
-        assertTrue(encoded.length <= uncompressed.length,
-            "compactZeros ($encoded) should be <= uncompressed ($uncompressed)")
+        assertTrue(
+            encoded.length <= uncompressed.length,
+            "compactZeros ($encoded) should be <= uncompressed ($uncompressed)"
+        )
     }
 
     @Test
     fun `compactZeros roundtrip with checksum`() {
         val value = Payload(0, "zero")
-        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = formatWithChecksum.decodeFromString(Payload.serializer(), encoded)
+        val encoded =
+            formatWithChecksum.encodeToString(Payload.serializer(), value)
+        val decoded =
+            formatWithChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
     }
 
     @Test
     fun `compactZeros all-zero payload roundtrip`() {
-        @Serializable data class Z(val a: Int, val b: Int)
+        @Serializable
+        data class Z(val a: Int, val b: Int)
+
         val value = Z(0, 0)
         val encoded = formatNoChecksum.encodeToString(Z.serializer(), value)
         val decoded = formatNoChecksum.decodeFromString(Z.serializer(), encoded)
@@ -78,7 +86,8 @@ class EncodedFormatTest {
     @Test
     fun `compactZeros checksum mismatch throws`() {
         val value = Payload(7, "x")
-        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
+        val encoded =
+            formatWithChecksum.encodeToString(Payload.serializer(), value)
         val tampered = encoded.dropLast(1) + when (encoded.last()) {
             'A' -> 'B'
             else -> 'A'
