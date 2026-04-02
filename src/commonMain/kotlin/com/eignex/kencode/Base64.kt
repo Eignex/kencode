@@ -10,18 +10,6 @@ object Base64UrlSafe : Base64(BASE_64_URL_SAFE.toCharArray())
 
 /**
  * RFC 4648–compatible Base64 encoder/decoder.
- *
- * Features:
- * - Uses a configurable 64-character alphabet.
- * - Produces '=' padding to align output to 4-character blocks.
- * - Handles input in 3-byte groups → 4 Base64 characters.
- *
- * Decoding:
- * - Accepts only input lengths divisible by 4.
- * - Validates and strips up to two padding characters.
- * - Throws on encountering non-alphabet characters.
- *
- * @property alphabet the 64-symbol Base64 alphabet.
  */
 open class Base64(val alphabet: CharArray) : ByteEncoding {
 
@@ -81,7 +69,6 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
         require(len % 4 == 0) { "Base64 input length must be a multiple of 4" }
         if (len == 0) return ByteArray(0)
 
-        // Count padding
         var pad = 0
         if (input[len - 1] == '=') pad++
         if (input[len - 2] == '=') pad++
