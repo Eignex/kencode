@@ -48,45 +48,43 @@ class EncodedFormatTest {
 
     @Test
     fun `compactZeros roundtrip without checksum`() {
-        val format = EncodedFormat(Base62, compactZeros = true)
         val value = Payload(1, "hi")
-        val compactZeros = format.encodeToString(Payload.serializer(), value)
-        val standard = formatNoChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = format.decodeFromString(Payload.serializer(), compactZeros)
+        val encoded = formatNoChecksum.encodeToString(Payload.serializer(), value)
+        val decoded = formatNoChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
-        assertTrue(compactZeros.length <= standard.length, "compactZeros ($compactZeros) should be <= standard ($standard)")
+        val uncompressed = EncodedFormat(Base62, compactZeros = false)
+            .encodeToString(Payload.serializer(), value)
+        assertTrue(encoded.length <= uncompressed.length,
+            "compactZeros ($encoded) should be <= uncompressed ($uncompressed)")
     }
 
     @Test
     fun `compactZeros roundtrip with checksum`() {
-        val format = EncodedFormat(Base62, Crc16, compactZeros = true)
         val value = Payload(0, "zero")
-        val encoded = format.encodeToString(Payload.serializer(), value)
-        val decoded = format.decodeFromString(Payload.serializer(), encoded)
+        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
+        val decoded = formatWithChecksum.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
     }
 
     @Test
     fun `compactZeros all-zero payload roundtrip`() {
         @Serializable data class Z(val a: Int, val b: Int)
-        val format = EncodedFormat(Base62, compactZeros = true)
         val value = Z(0, 0)
-        val encoded = format.encodeToString(Z.serializer(), value)
-        val decoded = format.decodeFromString(Z.serializer(), encoded)
+        val encoded = formatNoChecksum.encodeToString(Z.serializer(), value)
+        val decoded = formatNoChecksum.decodeFromString(Z.serializer(), encoded)
         assertEquals(value, decoded)
     }
 
     @Test
     fun `compactZeros checksum mismatch throws`() {
-        val format = EncodedFormat(Base62, Crc16, compactZeros = true)
         val value = Payload(7, "x")
-        val encoded = format.encodeToString(Payload.serializer(), value)
+        val encoded = formatWithChecksum.encodeToString(Payload.serializer(), value)
         val tampered = encoded.dropLast(1) + when (encoded.last()) {
             'A' -> 'B'
             else -> 'A'
         }
         assertFailsWith<IllegalArgumentException> {
-            format.decodeFromString(Payload.serializer(), tampered)
+            formatWithChecksum.decodeFromString(Payload.serializer(), tampered)
         }
     }
 

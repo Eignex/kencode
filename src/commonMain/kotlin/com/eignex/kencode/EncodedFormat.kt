@@ -46,7 +46,7 @@ open class EncodedFormat(
         codec: ByteEncoding = Base62,
         checksum: Checksum? = null,
         binaryFormat: BinaryFormat = PackedFormat,
-        compactZeros: Boolean = false,
+        compactZeros: Boolean = true,
     ) : this(EncodedConfiguration(codec, checksum, binaryFormat, compactZeros))
 
     /**
@@ -126,38 +126,20 @@ open class EncodedFormat(
      */
     private fun compactZerosDecode(bytes: ByteArray): ByteArray {
         require(bytes.isNotEmpty()) { "Compact payload cannot be empty." }
-        val (k, prefixLen) = varintDecode(bytes, 0)
+        val (k, prefixLen) = varintDecode(bytes)
         val result = ByteArray(k + bytes.size - prefixLen)
         bytes.copyInto(result, destinationOffset = k, startIndex = prefixLen)
         return result
     }
 
     private fun varintEncode(value: Int): ByteArray {
-        require(value >= 0) { "varint value must be non-negative" }
-        val buf = ByteArray(5)
-        var v = value
-        var pos = 0
-        while (v > 0x7F) {
-            buf[pos++] = ((v and 0x7F) or 0x80).toByte()
-            v = v ushr 7
-        }
-        buf[pos++] = v.toByte()
-        return buf.copyOf(pos)
+        val out = ByteOutput()
+        PackedUtils.writeVarInt(value, out)
+        return out.toByteArray()
     }
 
-    private fun varintDecode(bytes: ByteArray, offset: Int): Pair<Int, Int> {
-        var value = 0
-        var shift = 0
-        var pos = offset
-        while (true) {
-            require(pos < bytes.size) { "Truncated varint in compactZeros payload." }
-            val b = bytes[pos++].toInt() and 0xFF
-            value = value or ((b and 0x7F) shl shift)
-            shift += 7
-            if (b and 0x80 == 0) break
-        }
-        return Pair(value, pos - offset)
-    }
+    private fun varintDecode(bytes: ByteArray): Pair<Int, Int> =
+        PackedUtils.decodeVarInt(bytes, 0)
 }
 
 /**
@@ -181,9 +163,9 @@ class EncodedFormatBuilder {
 
     /**
      * When true, leading zero bytes are stripped before encoding and restored on decode.
-     * Defaults to `false`.
+     * Defaults to `true`.
      */
-    var compactZeros: Boolean = false
+    var compactZeros: Boolean = true
 }
 
 /**
