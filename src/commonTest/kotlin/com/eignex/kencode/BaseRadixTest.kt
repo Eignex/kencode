@@ -162,7 +162,17 @@ class BaseRadixTest {
         assertEquals("00", hex.encode(byteArrayOf(0x00)))
         assertEquals("ff", hex.encode(byteArrayOf(0xFF.toByte())))
         assertEquals("0102", hex.encode(byteArrayOf(0x01, 0x02)))
-        assertEquals("deadbeef", hex.encode(byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte())))
+        assertEquals(
+            "deadbeef",
+            hex.encode(
+                byteArrayOf(
+                    0xDE.toByte(),
+                    0xAD.toByte(),
+                    0xBE.toByte(),
+                    0xEF.toByte()
+                )
+            )
+        )
     }
 
     @Test
@@ -178,7 +188,11 @@ class BaseRadixTest {
         // Explicitly test an input that spans more than one block (blockSize + 1 bytes)
         for (codec in listOf(Base62, Base36)) {
             val bytes = ByteArray(codec.blockSize + 1) { it.toByte() }
-            assertRoundtrip(codec, bytes, "Multi-block failed for ${codec::class.simpleName}")
+            assertRoundtrip(
+                codec,
+                bytes,
+                "Multi-block failed for ${codec::class.simpleName}"
+            )
         }
     }
 }
