@@ -19,7 +19,7 @@ class Examples {
     // Exmaple from readme
 
     @Serializable
-    data class Payload constructor(
+    data class Payload(
 
         // only uses as many bytes as needed
         @PackedType(PackedIntegerType.DEFAULT)
@@ -91,8 +91,6 @@ class Examples {
 
     @Test
     fun `encryption serialization`() {
-
-        // Initialization
         Security.addProvider(BouncyCastleProvider())
         val random = SecureRandom()
 
@@ -100,29 +98,32 @@ class Examples {
         val keyBytes = ByteArray(16)
         random.nextBytes(keyBytes)
         val key = SecretKeySpec(keyBytes, "XTEA")
-        val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
 
-        // Encrypt one payload
-        // we use 8 bytes as the initialization vector
+        // Wrap XTEA/CTR as a PayloadTransform.
+        // Each encode prepends a fresh 8-byte IV; decode reads it back.
+        val xteaTransform = object : PayloadTransform {
+            override fun encode(data: ByteArray): ByteArray {
+                val iv = ByteArray(8).also { random.nextBytes(it) }
+                val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
+                cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv))
+                return iv + cipher.doFinal(data)
+            }
+
+            override fun decode(data: ByteArray): ByteArray {
+                val iv = data.copyOfRange(0, 8)
+                val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
+                cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv))
+                return cipher.doFinal(data.copyOfRange(8, data.size))
+            }
+        }
+
+        val secureFormat = EncodedFormat { transform = xteaTransform }
+
         val payload = SensitiveData(random.nextLong())
-        val iv8 = ByteArray(8)
-        random.nextBytes(iv8)
-        cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv8))
+        val token = secureFormat.encodeToString(SensitiveData.serializer(), payload)
+        println(token)
 
-        // This particular encryption adds 16-bytes in an initialization vector
-        // regardless of how big the payload is.
-        val encrypted =
-            iv8 + cipher.doFinal(PackedFormat.encodeToByteArray(payload))
-        val encoded = Base62.encode(encrypted)
-        println(encoded)
-
-        // This recovers the initial payload
-        val iv8received = encrypted.copyOfRange(0, 8)
-        val received = encrypted.copyOfRange(8, encrypted.size)
-        cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv8received))
-        val decoded = Base62.decode(encoded)
-        val decrypted = cipher.doFinal(received)
-        val result: SensitiveData = PackedFormat.decodeFromByteArray(decrypted)
+        val result = secureFormat.decodeFromString(SensitiveData.serializer(), token)
         println(result)
 
         assertEquals(payload, result)

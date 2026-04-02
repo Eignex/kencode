@@ -102,14 +102,16 @@ composing three layers:
 
 1. Binary Layer: PackedFormat (default) or ProtoBuf (recommended for
    cross-language compatibility).
-2. Checksum Layer: Optional Crc16 or Crc32 appended to the binary payload.
+2. Transform Layer: Optional `PayloadTransform` applied after serialization —
+   use `Checksum.asTransform()` for integrity checks, or supply your own for
+   encryption or error-correcting codes.
 3. Text Layer: Base62 (default), Base36, Base64, or Base85.
 
 ```kotlin
 val customFormat = EncodedFormat {
-    codec = Base36          // Use Base36 instead of Base62 (for lowercase)
-    checksum = Crc16        // Append a 2-byte checksum
-    binaryFormat = ProtoBuf // Use ProtoBuf instead of PackedFormat (or the compactFormat from previous example)
+    codec = Base36                  // Use Base36 instead of Base62 (for lowercase)
+    checksum = Crc16                // Convenience shorthand for transform = Crc16.asTransform()
+    binaryFormat = ProtoBuf         // Use ProtoBuf instead of PackedFormat
 }
 
 val token = customFormat.encodeToString(payload)
@@ -132,20 +134,23 @@ implementations support custom alphabets.
 
 ## Encryption
 
-Typical confidential payload pattern:
+Wrap a cipher as a `PayloadTransform` and pass it to `EncodedFormat`:
 
 ```kotlin
 @Serializable
 data class SecretPayload(val id: Long)
 
-// 1. Serialize
-val binary = PackedFormat.encodeToByteArray(payload)
+val encryptingTransform = object : PayloadTransform {
+    override fun encode(data: ByteArray): ByteArray = cipher.encrypt(data)
+    override fun decode(data: ByteArray): ByteArray = cipher.decrypt(data)
+}
 
-// 2. Encrypt (e.g., AES or XTEA)
-val encrypted = cipher.doFinal(binary)
+val secureFormat = EncodedFormat {
+    transform = encryptingTransform
+}
 
-// 3. Encode to Text
-val token = Base62.encode(encrypted)
+val token = secureFormat.encodeToString(SecretPayload.serializer(), payload)
+val decoded = secureFormat.decodeFromString(SecretPayload.serializer(), token)
 ```
 
 See [Examples](https://github.com/Eignex/kencode/blob/main/src/test/kotlin/com/eignex/kencode/Examples.kt)
