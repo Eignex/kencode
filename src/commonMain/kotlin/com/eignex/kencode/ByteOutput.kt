@@ -1,7 +1,7 @@
 package com.eignex.kencode
 
-internal class ByteOutput {
-    private var buf = ByteArray(64)
+internal class ByteOutput(initialCapacity: Int = 64) {
+    private var buf = ByteArray(initialCapacity)
     private var size = 0
 
     fun write(b: Int) {

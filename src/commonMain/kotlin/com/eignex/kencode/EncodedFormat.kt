@@ -133,7 +133,7 @@ open class EncodedFormat(
     }
 
     private fun varintEncode(value: Int): ByteArray {
-        val out = ByteOutput()
+        val out = ByteOutput(5)
         PackedUtils.writeVarInt(value, out)
         return out.toByteArray()
     }
