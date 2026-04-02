@@ -8,28 +8,26 @@ import kotlinx.serialization.modules.SerializersModule
  *
  * @property codec The ASCII-safe byte codec used to turn raw bytes into text (e.g., Base62, Base64).
  * @property transform An optional [PayloadTransform] applied after serialization and before encoding.
- *   Common uses: integrity checks via [Checksum.asTransform], encryption, or error-correcting codes.
+ *   Common uses: [CompactZeros] to strip leading zeros, integrity checks via [Checksum.asTransform],
+ *   encryption, or error-correcting codes. Use [PayloadTransform.then] to chain multiple transforms.
  * @property binaryFormat The underlying binary serialization format used before encoding to text.
- * @property compactZeros When true, leading zero bytes are stripped before encoding and restored on decode.
- *   A varint prefix encodes the count, costing 1 byte for up to 127 stripped bytes.
  */
 data class EncodedConfiguration(
     val codec: ByteEncoding = Base62,
     val transform: PayloadTransform? = null,
     val binaryFormat: BinaryFormat = PackedFormat.Default,
-    val compactZeros: Boolean = false,
 )
 
 /**
  * Text `StringFormat` that produces short, predictable string tokens by composing:
  *
  * 1. A binary format (e.g. [PackedFormat], `ProtoBuf`).
- * 2. An optional [PayloadTransform] (checksum, encryption, ECC, …).
+ * 2. An optional [PayloadTransform] ([CompactZeros], checksum, encryption, ECC, …).
  * 3. An ASCII-safe byte encoding (e.g. [Base62], [Base64], [Base36], [Base85]).
  *
  * Typical use:
- * - `encodeToString`: serialize -> transform.encode -> (optionally) compact zeros -> encode bytes to text.
- * - `decodeFromString`: decode text to bytes -> (optionally) restore zeros -> transform.decode -> deserialize.
+ * - `encodeToString`: serialize -> transform.encode -> encode bytes to text.
+ * - `decodeFromString`: decode text to bytes -> transform.decode -> deserialize.
  *
  * Use the [EncodedFormat] builder function to create a customized instance.
  *
@@ -47,8 +45,7 @@ open class EncodedFormat(
         codec: ByteEncoding = Base62,
         transform: PayloadTransform? = null,
         binaryFormat: BinaryFormat = PackedFormat,
-        compactZeros: Boolean = true,
-    ) : this(EncodedConfiguration(codec, transform, binaryFormat, compactZeros))
+    ) : this(EncodedConfiguration(codec, transform, binaryFormat))
 
     /**
      * Delegates to the underlying [BinaryFormat]'s serializers module.
@@ -56,7 +53,7 @@ open class EncodedFormat(
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
     /**
-     * Default format: `PackedFormat` + `Base62` without a transform.
+     * Default format: `PackedFormat` + `Base62` + [CompactZeros].
      */
     companion object Default : EncodedFormat()
 
@@ -66,8 +63,7 @@ open class EncodedFormat(
      */
     override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
         val bytes = configuration.binaryFormat.encodeToByteArray(serializer, value)
-        val transformed = configuration.transform?.encode(bytes) ?: bytes
-        val payload = if (configuration.compactZeros) compactZerosEncode(transformed) else transformed
+        val payload = configuration.transform?.encode(bytes) ?: bytes
         return configuration.codec.encode(payload)
     }
 
@@ -79,37 +75,9 @@ open class EncodedFormat(
      */
     override fun <T> decodeFromString(deserializer: DeserializationStrategy<T>, string: String): T {
         val input = configuration.codec.decode(string)
-        val raw = if (configuration.compactZeros) compactZerosDecode(input) else input
-        val bytes = configuration.transform?.decode(raw) ?: raw
+        val bytes = configuration.transform?.decode(input) ?: input
         return configuration.binaryFormat.decodeFromByteArray(deserializer, bytes)
     }
-
-    private fun compactZerosEncode(bytes: ByteArray): ByteArray {
-        var k = 0
-        while (k < bytes.size && bytes[k] == 0.toByte()) k++
-        val prefix = varintEncode(k)
-        val result = ByteArray(prefix.size + bytes.size - k)
-        prefix.copyInto(result)
-        bytes.copyInto(result, destinationOffset = prefix.size, startIndex = k)
-        return result
-    }
-
-    private fun compactZerosDecode(bytes: ByteArray): ByteArray {
-        require(bytes.isNotEmpty()) { "Compact payload cannot be empty." }
-        val (k, prefixLen) = varintDecode(bytes)
-        val result = ByteArray(k + bytes.size - prefixLen)
-        bytes.copyInto(result, destinationOffset = k, startIndex = prefixLen)
-        return result
-    }
-
-    private fun varintEncode(value: Int): ByteArray {
-        val out = ByteOutput(5)
-        PackedUtils.writeVarInt(value, out)
-        return out.toByteArray()
-    }
-
-    private fun varintDecode(bytes: ByteArray): Pair<Int, Int> =
-        PackedUtils.decodeVarInt(bytes, 0)
 }
 
 /**
@@ -117,9 +85,8 @@ open class EncodedFormat(
  */
 class EncodedFormatBuilder {
     var codec: ByteEncoding = Base62
-    var transform: PayloadTransform? = null
+    var transform: PayloadTransform? = CompactZeros
     var binaryFormat: BinaryFormat = PackedFormat.Default
-    var compactZeros: Boolean = true
 
     var checksum: Checksum?
         get() = null
@@ -132,7 +99,7 @@ class EncodedFormatBuilder {
  * ```
  * val format = EncodedFormat {
  *     codec = Base36
- *     transform = Crc16.asTransform()
+ *     transform = CompactZeros.then(Crc16.asTransform())
  * }
  * ```
  *
@@ -147,13 +114,11 @@ fun EncodedFormat(
         codec = from.configuration.codec
         transform = from.configuration.transform
         binaryFormat = from.configuration.binaryFormat
-        compactZeros = from.configuration.compactZeros
     }
     builder.builderAction()
     return EncodedFormat(EncodedConfiguration(
         builder.codec,
         builder.transform,
         builder.binaryFormat,
-        builder.compactZeros,
     ))
 }
