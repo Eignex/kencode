@@ -123,7 +123,7 @@ class BaseRadixTest {
             coder.encodeBlock(bytes, 0, len, tmp)
             val outLen = tmp.length
             val encoded = StringBuilder()
-            coder.encodeBlock(bytes, 0, len, encoded, 0, outLen)
+            coder.encodeBlock(bytes, 0, len, encoded, outLen)
             val decoded = coder.decodeBlock(encoded, 0, encoded.length)
             assertContentEquals(bytes, decoded, "Block len=$len")
         }
