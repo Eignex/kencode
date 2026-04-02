@@ -35,11 +35,12 @@ class PackedDecoder internal constructor(
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
+    // Schema metadata: non-null for all non-collection structures.
+    private lateinit var bitmask: ClassBitmask
+
     // Bitmask state for CLASSES only
     private lateinit var booleanValues: BooleanArray
-    private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
     private lateinit var nullValues: BooleanArray
-    private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
 
     private var collectionSize = -1
     private var collectionIndex = 0
@@ -64,10 +65,6 @@ class PackedDecoder internal constructor(
         isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
 
         if (isCollection) {
-            booleanValues = BooleanArray(0)
-            booleanLookup = intArrayOf()
-            nullValues = BooleanArray(0)
-            nullableLookup = intArrayOf()
             val isList = kind is StructureKind.LIST
             val elemDesc = descriptor.getElementDescriptor(0)
             isNullableCollection = isList && elemDesc.isNullable
@@ -78,17 +75,7 @@ class PackedDecoder internal constructor(
         isNullableCollection = false
         isBooleanCollection = false
 
-        val boolIdx = (0 until descriptor.elementsCount).filter {
-            descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
-        }
-        booleanLookup = IntArray(descriptor.elementsCount) { -1 }
-        boolIdx.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
-
-        val nullableIdx = (0 until descriptor.elementsCount).filter {
-            descriptor.getElementDescriptor(it).isNullable
-        }
-        nullableLookup = IntArray(descriptor.elementsCount) { -1 }
-        nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
+        bitmask = ClassBitmask(descriptor)
 
         // Only CLASS and OBJECT use the shared merged-header context.
         // Polymorphic, enum, and other kinds read their own inline bitmask as before.
@@ -98,10 +85,10 @@ class PackedDecoder internal constructor(
                 val totalBits = countAllBits(descriptor)
                 position += ctx.load(input, position, totalBits)
             }
-            booleanValues = BooleanArray(boolIdx.size) { ctx.read() }
-            nullValues = BooleanArray(nullableIdx.size) { ctx.read() }
+            booleanValues = BooleanArray(bitmask.boolCount) { ctx.read() }
+            nullValues = BooleanArray(bitmask.nullCount) { ctx.read() }
         } else {
-            val totalFlags = boolIdx.size + nullableIdx.size
+            val totalFlags = bitmask.totalCount
             if (totalFlags == 0) {
                 booleanValues = BooleanArray(0)
                 nullValues = BooleanArray(0)
@@ -109,8 +96,8 @@ class PackedDecoder internal constructor(
                 val numBytes = (totalFlags + 7) / 8
                 val allFlags = PackedUtils.unpackFlags(input, position, numBytes)
                 position += numBytes
-                booleanValues = BooleanArray(boolIdx.size) { i -> allFlags[i] }
-                nullValues = BooleanArray(nullableIdx.size) { i -> allFlags[boolIdx.size + i] }
+                booleanValues = BooleanArray(bitmask.boolCount) { i -> allFlags[i] }
+                nullValues = BooleanArray(bitmask.nullCount) { i -> allFlags[bitmask.boolCount + i] }
             }
         }
 
@@ -226,14 +213,8 @@ class PackedDecoder internal constructor(
         currentIndex = -1
     }
 
-    private fun booleanPos(index: Int): Int =
-        if (index < booleanLookup.size) booleanLookup[index] else -1
-
-    private fun nullablePos(index: Int): Int =
-        if (index < nullableLookup.size) nullableLookup[index] else -1
-
     override fun decodeBooleanElement(descriptor: SerialDescriptor, index: Int): Boolean {
-        val pos = booleanPos(index)
+        val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         return booleanValues[pos]
     }
@@ -305,11 +286,8 @@ class PackedDecoder internal constructor(
         if (!isInline && (kind is StructureKind || kind is PolymorphicKind)) {
             // Share the HeaderContext only when the current decoder is in merged mode
             // and the child is a non-nullable, non-inline CLASS/OBJECT in a non-collection context.
-            val shouldShareCtx = isMergedKind &&
-                !isCollection &&
-                !deserializer.descriptor.isInline &&
-                (deserializer.descriptor.kind is StructureKind.CLASS || deserializer.descriptor.kind is StructureKind.OBJECT) &&
-                index >= 0 && !descriptor.getElementDescriptor(index).isNullable
+            val shouldShareCtx = shouldMergeChildCtx(isMergedKind, isCollection,
+                descriptor, index, deserializer.descriptor)
             val subDecoder = PackedDecoder(
                 input, config, serializersModule, if (shouldShareCtx) ctx else null
             )
@@ -336,7 +314,7 @@ class PackedDecoder internal constructor(
             "decodeNullableSerializableElement should not be called for collections."
         }
 
-        val pos = nullablePos(index)
+        val pos = bitmask.nullablePos(index)
         require(pos != -1) {
             "Element $index is not declared as nullable in the descriptor."
         }

@@ -7,6 +7,7 @@ import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
+
 @OptIn(ExperimentalSerializationApi::class)
 class PackedEncoder internal constructor(
     private val output: ByteOutput,
@@ -20,43 +21,33 @@ class PackedEncoder internal constructor(
 
     private var inStructure: Boolean = false
     private var isCollection: Boolean = false
+    // True when the current structure uses the shared merged-header path (CLASS/OBJECT only).
+    private var isMergedKind: Boolean = false
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
-    // Bitmask state for CLASSES only
-    private lateinit var booleanValues: BooleanArray
-    private var booleanLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
-    private lateinit var nullValues: BooleanArray
-    private var nullableLookup: IntArray = intArrayOf()  // fieldIndex → bitmask position, or -1
+    // Schema metadata: non-null for all non-collection structures.
+    private lateinit var bitmask: ClassBitmask
 
-    // Start index in the shared HeaderContext where this class's bits are reserved.
-    // Only valid when isMergedKind=true; -1 otherwise.
+    // Live bitmask values accumulated during encoding; written in endStructure.
+    private lateinit var booleanValues: BooleanArray
+    private lateinit var nullValues: BooleanArray
+    // Start index in the shared HeaderContext for this class's reserved bits.
     private var headerStart: Int = -1
 
-    // True when the current structure uses the merged-header path (CLASS/OBJECT only).
-    private var isMergedKind: Boolean = false
-
-    // Bitmap state for nullable/boolean LIST elements
+    // Bitmap state for nullable/boolean LIST elements.
     private var isNullableCollection: Boolean = false
     private var isBooleanCollection: Boolean = false
     private val collectionBitmapValues: MutableList<Boolean> = mutableListOf()
 
-    // Buffer for field data
+    // Buffer for field data.
     private val dataBuffer = ByteOutput()
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            // Share ctx only when the current encoder is in merged mode and the child is a
-            // non-nullable, non-inline CLASS/OBJECT in a non-collection context.
-            val shouldShareCtx = isMergedKind &&
-                !isCollection &&
-                currentIndex >= 0 &&
-                !currentDescriptor.getElementDescriptor(currentIndex).isNullable &&
-                !descriptor.isInline &&
-                (descriptor.kind is StructureKind.CLASS || descriptor.kind is StructureKind.OBJECT)
-            val childEncoder = PackedEncoder(
-                dataBuffer, config, serializersModule, if (shouldShareCtx) ctx else null
-            )
+            val childCtx = if (shouldMergeChildCtx(isMergedKind, isCollection,
+                    currentDescriptor, currentIndex, descriptor)) ctx else null
+            val childEncoder = PackedEncoder(dataBuffer, config, serializersModule, childCtx)
             childEncoder.initializeStructure(descriptor)
             return childEncoder
         }
@@ -80,35 +71,18 @@ class PackedEncoder internal constructor(
         isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
 
         if (!isCollection) {
-            val boolIdx = (0 until descriptor.elementsCount).filter {
-                descriptor.getElementDescriptor(it).kind == PrimitiveKind.BOOLEAN
-            }
-            booleanValues = BooleanArray(boolIdx.size)
-            booleanLookup = IntArray(descriptor.elementsCount) { -1 }
-            boolIdx.forEachIndexed { pos, fieldIdx -> booleanLookup[fieldIdx] = pos }
-
-            val nullableIdx = (0 until descriptor.elementsCount).filter {
-                descriptor.getElementDescriptor(it).isNullable
-            }
-            nullValues = BooleanArray(nullableIdx.size)
-            nullableLookup = IntArray(descriptor.elementsCount) { -1 }
-            nullableIdx.forEachIndexed { pos, fieldIdx -> nullableLookup[fieldIdx] = pos }
+            bitmask = ClassBitmask(descriptor)
+            booleanValues = BooleanArray(bitmask.boolCount)
+            nullValues = BooleanArray(bitmask.nullCount)
 
             isNullableCollection = false
             isBooleanCollection = false
 
-            // Only CLASS and OBJECT use the shared merged-header context.
-            // Polymorphic, enum, and other kinds use the old per-class inline header.
             isMergedKind = kind is StructureKind.CLASS || kind is StructureKind.OBJECT
             if (isMergedKind) {
-                headerStart = ctx.reserve(boolIdx.size + nullableIdx.size)
+                headerStart = ctx.reserve(bitmask.totalCount)
             }
         } else {
-            booleanValues = BooleanArray(0)
-            booleanLookup = intArrayOf()
-            nullValues = BooleanArray(0)
-            nullableLookup = intArrayOf()
-
             val isList = kind is StructureKind.LIST
             val elemDesc = descriptor.getElementDescriptor(0)
             isNullableCollection = isList && elemDesc.isNullable
@@ -143,13 +117,9 @@ class PackedEncoder internal constructor(
         else PackedUtils.writeLong(value, getBuffer())
     }
 
-    override fun encodeFloat(value: Float) {
-        PackedUtils.writeInt(value.toBits(), getBuffer())
-    }
+    override fun encodeFloat(value: Float) { PackedUtils.writeInt(value.toBits(), getBuffer()) }
 
-    override fun encodeDouble(value: Double) {
-        PackedUtils.writeLong(value.toBits(), getBuffer())
-    }
+    override fun encodeDouble(value: Double) { PackedUtils.writeLong(value.toBits(), getBuffer()) }
 
     override fun encodeChar(value: Char) { writeUtf8Char(value, getBuffer()) }
 
@@ -193,7 +163,7 @@ class PackedEncoder internal constructor(
     override fun endStructure(descriptor: SerialDescriptor) {
         if (!inStructure) return
 
-        // 1. Collections: optional bitmap header (null markers or bool values), then data
+        // Collections: optional bitmap header then data.
         if (isCollection) {
             if (collectionBitmapValues.isNotEmpty()) {
                 val n = collectionBitmapValues.size
@@ -209,42 +179,24 @@ class PackedEncoder internal constructor(
         }
 
         if (isMergedKind) {
-            // 2a. CLASS/OBJECT: fill reserved bits; root writes merged header.
+            // CLASS/OBJECT: fill reserved bits; root writes the single merged header.
             ctx.set(headerStart, booleanValues, nullValues)
             if (isRoot) {
                 val headerBytes = ctx.toByteArray()
                 if (headerBytes.isNotEmpty()) output.write(headerBytes)
             }
         } else {
-            // 2b. Other (polymorphic, etc.): write a local inline bitmask as before.
-            val totalFlagsCount = booleanValues.size + nullValues.size
-            if (totalFlagsCount > 0) {
-                val combined = BooleanArray(totalFlagsCount)
-                booleanValues.copyInto(combined, 0)
-                nullValues.copyInto(combined, booleanValues.size)
-                val bitmap = ByteArray((totalFlagsCount + 7) / 8)
-                combined.forEachIndexed { i, v ->
-                    if (v) bitmap[i / 8] = (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
-                }
-                output.write(bitmap)
-            }
+            // Polymorphic/enum/other: write a local inline bitmask.
+            bitmask.writeInlineBitmask(booleanValues, nullValues, output)
         }
 
         dataBuffer.writeTo(output)
         inStructure = false
         currentIndex = -1
-        booleanLookup = intArrayOf()
-        nullableLookup = intArrayOf()
     }
 
-    private fun booleanPos(index: Int): Int =
-        if (index < booleanLookup.size) booleanLookup[index] else -1
-
-    private fun nullablePos(index: Int): Int =
-        if (index < nullableLookup.size) nullableLookup[index] else -1
-
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
-        val pos = booleanPos(index)
+        val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
     }
@@ -316,16 +268,11 @@ class PackedEncoder internal constructor(
         value: T?
     ) {
         if (isCollection) {
-            if (value == null) {
-                encodeNull()
-            } else {
-                encodeNotNullMark()
-                encodeSerializableElement(descriptor, index, serializer, value)
-            }
+            if (value == null) encodeNull() else { encodeNotNullMark(); encodeSerializableElement(descriptor, index, serializer, value) }
             return
         }
 
-        val pos = nullablePos(index)
+        val pos = bitmask.nullablePos(index)
         if (value == null) {
             if (pos == -1) error("Element $index is not declared nullable")
             nullValues[pos] = true

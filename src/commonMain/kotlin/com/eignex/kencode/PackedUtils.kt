@@ -4,6 +4,86 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
 
 /**
+ * Schema-derived boolean/nullable metadata for a single class descriptor.
+ *
+ * Encapsulates the two reverse-lookup arrays that both [PackedEncoder] and [PackedDecoder]
+ * need to map a field index to its position in the bitmask, and the write path for inline
+ * (non-merged) bitmasks used by polymorphic/enum structures.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal class ClassBitmask(descriptor: SerialDescriptor) {
+    val boolCount: Int
+    val nullCount: Int
+    /** Maps field index → boolean-bit position, or -1 if not a boolean field. */
+    val booleanLookup: IntArray
+    /** Maps field index → nullable-bit position, or -1 if not a nullable field. */
+    val nullableLookup: IntArray
+
+    init {
+        val n = descriptor.elementsCount
+        var bc = 0; var nc = 0
+        val bl = IntArray(n) { -1 }
+        val nl = IntArray(n) { -1 }
+        for (i in 0 until n) {
+            val e = descriptor.getElementDescriptor(i)
+            if (e.kind == PrimitiveKind.BOOLEAN) bl[i] = bc++
+            if (e.isNullable)                    nl[i] = nc++
+        }
+        boolCount = bc; nullCount = nc
+        booleanLookup = bl; nullableLookup = nl
+    }
+
+    val totalCount: Int get() = boolCount + nullCount
+
+    fun booleanPos(fieldIdx: Int): Int =
+        if (fieldIdx < booleanLookup.size) booleanLookup[fieldIdx] else -1
+
+    fun nullablePos(fieldIdx: Int): Int =
+        if (fieldIdx < nullableLookup.size) nullableLookup[fieldIdx] else -1
+
+    /**
+     * Packs [booleanValues] (length [boolCount]) followed by [nullValues] (length [nullCount])
+     * into a fixed-width schema-derived byte array and writes it to [out].
+     * Used for inline (non-merged) bitmasks in polymorphic and other non-CLASS structures.
+     */
+    fun writeInlineBitmask(booleanValues: BooleanArray, nullValues: BooleanArray, out: ByteOutput) {
+        val n = totalCount
+        if (n == 0) return
+        val bytes = ByteArray((n + 7) / 8)
+        booleanValues.forEachIndexed { i, v ->
+            if (v) bytes[i / 8] = (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
+        }
+        nullValues.forEachIndexed { i, v ->
+            val bit = boolCount + i
+            if (v) bytes[bit / 8] = (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
+        }
+        out.write(bytes)
+    }
+}
+
+/**
+ * Returns true when the [HeaderContext] should be shared with the child encoder/decoder for
+ * the field at [fieldIndex] in [parentDescriptor].
+ *
+ * Sharing applies only when:
+ * - the parent is a merged-kind (CLASS/OBJECT) structure and not a collection,
+ * - the child descriptor is a non-nullable, non-inline CLASS/OBJECT.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal fun shouldMergeChildCtx(
+    parentIsMergedKind: Boolean,
+    parentIsCollection: Boolean,
+    parentDescriptor: SerialDescriptor,
+    fieldIndex: Int,
+    childDescriptor: SerialDescriptor,
+): Boolean = parentIsMergedKind &&
+    !parentIsCollection &&
+    fieldIndex >= 0 &&
+    !parentDescriptor.getElementDescriptor(fieldIndex).isNullable &&
+    !childDescriptor.isInline &&
+    (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
+
+/**
  * Accumulates bitmask bits across an entire nested-class hierarchy so that the
  * encoder can write (and the decoder can read) a single header at the root.
  *
