@@ -11,7 +11,6 @@ internal object PackedUtils {
     }
 
     fun packFlags(flags: BooleanArray): ByteArray {
-        // 1. Find the last byte that actually contains a 'true' value.
         var lastTrueIndex = -1
         for (i in flags.indices) {
             if (flags[i]) lastTrueIndex = i
@@ -21,13 +20,9 @@ internal object PackedUtils {
             return ByteArray(0) // All false -> 0 bytes
         }
 
-        // 2. Calculate exact number of bytes needed (1-based)
-        // e.g. lastTrueIndex = 0 (1st bit) -> 1 byte
-        // e.g. lastTrueIndex = 8 (9th bit) -> 2 bytes
         val numBytes = (lastTrueIndex / 8) + 1
         val bytes = ByteArray(numBytes)
 
-        // 3. Pack bits (8 per byte)
         for (i in 0..lastTrueIndex) {
             if (flags[i]) {
                 val byteIndex = i / 8
@@ -40,13 +35,10 @@ internal object PackedUtils {
     }
 
     fun unpackFlags(input: ByteArray, offset: Int, length: Int): BooleanArray {
-        // Guard against OOB
         require(offset + length <= input.size) {
             "Unexpected EOF reading flags: need $length bytes"
         }
 
-        // We return an array exactly sized to the bits we have.
-        // The Decoder will handle padding this out to the full schema size.
         val totalBits = length * 8
         val result = BooleanArray(totalBits)
 
