@@ -90,7 +90,7 @@ val compactFormat = PackedFormat {
     defaultEncoding = PackedIntegerType.SIGNED
     serializersModule = myCustomModule
 }
-val bytes = PackedFormat.encodeToBytes(payload)
+val bytes = compactFormat.encodeToByteArray(payload)
 ```
 
 ---
@@ -102,9 +102,10 @@ composing three layers:
 
 1. Binary Layer: PackedFormat (default) or ProtoBuf (recommended for
    cross-language compatibility).
-2. Transform Layer: Optional `PayloadTransform` applied after serialization —
-   use `Checksum.asTransform()` for integrity checks, or supply your own for
-   encryption or error-correcting codes.
+2. Transform Layer: Optional `PayloadTransform` applied after serialization.
+   Use `CompactZeros` to strip leading zero bytes, `Checksum.asTransform()` for
+   integrity checks, or supply your own for encryption or error-correcting codes.
+   Chain multiple transforms with `PayloadTransform.then`.
 3. Text Layer: Base62 (default), Base36, Base64, or Base85.
 
 ```kotlin
@@ -115,6 +116,11 @@ val customFormat = EncodedFormat {
 }
 
 val token = customFormat.encodeToString(payload)
+
+// Chain transforms: strip leading zeros, then append checksum
+val withBoth = EncodedFormat {
+    transform = CompactZeros.then(Crc16.asTransform())
+}
 ```
 
 ---
@@ -153,5 +159,5 @@ val token = secureFormat.encodeToString(SecretPayload.serializer(), payload)
 val decoded = secureFormat.decodeFromString(SecretPayload.serializer(), token)
 ```
 
-See [Examples](https://github.com/Eignex/kencode/blob/main/src/test/kotlin/com/eignex/kencode/Examples.kt)
+See [Examples](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/Examples.kt)
 for a BouncyCastle demo.
