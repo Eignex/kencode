@@ -53,7 +53,7 @@ open class EncodedFormat(
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
     /**
-     * Default format: `PackedFormat` + `Base62` + [CompactZeros].
+     * Default format: `PackedFormat` + `Base62`, no transform.
      */
     companion object Default : EncodedFormat()
 
@@ -85,7 +85,7 @@ open class EncodedFormat(
  */
 class EncodedFormatBuilder {
     var codec: ByteEncoding = Base62
-    var transform: PayloadTransform? = CompactZeros
+    var transform: PayloadTransform? = null
     var binaryFormat: BinaryFormat = PackedFormat.Default
 
     var checksum: Checksum?
