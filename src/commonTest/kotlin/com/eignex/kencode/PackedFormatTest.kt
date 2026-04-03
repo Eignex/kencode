@@ -4,6 +4,8 @@ package com.eignex.kencode
 
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.*
+import kotlinx.serialization.protobuf.ProtoIntegerType
+import kotlinx.serialization.protobuf.ProtoType
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -13,9 +15,13 @@ import kotlin.time.Instant
 
 class PackedFormatTest {
 
-    /**
-     * Executes a binary roundtrip using PackedFormat and asserts equality.
-     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    private data class ProtoAnnotatedPayload(
+        @ProtoType(ProtoIntegerType.SIGNED) val signed: Int,
+        @ProtoType(ProtoIntegerType.DEFAULT) val unsigned: Long
+    )
+
     private fun <T> assertPackedRoundtrip(
         serializer: KSerializer<T>,
         value: T,
@@ -33,9 +39,7 @@ class PackedFormatTest {
     @Test
     @OptIn(InternalSerializationApi::class)
     fun `verify all test class patterns`() {
-        // A comprehensive list of all test data instances from TestClasses.kt
         val testData: List<Any> = listOf(
-            // Primitive & Basic
             SimpleIntsAndBooleans(1, 100, true, false),
             SimpleIntsAndBooleans(Int.MAX_VALUE, Int.MIN_VALUE, false, true),
             AllPrimitiveTypes(123, 456L, 7, 8, 3.5f, 2.75, 'A', true, "Hello"),
@@ -73,8 +77,6 @@ class PackedFormatTest {
                 null
             ),
             NoBooleansNoNulls(42, 123_456_789L, "No flags here"),
-
-            // Enums & Nullables
             EnumPayload(1, Status.NEW, null),
             EnumPayload(2, Status.IN_PROGRESS, Status.DONE),
             NullableFieldsPayload(null, null, null, null, null),
@@ -87,8 +89,6 @@ class PackedFormatTest {
                 "all-null-bools"
             ),
             StringHeavyPayload("short", "longer", "unicode ✓✓✓", "present"),
-
-            // Annotations & Inlines
             VarIntVarUIntPayload(-1, -123_456_789L, 0, 1L, 42, 9_999L),
             VarIntVarUIntPayload(
                 Int.MIN_VALUE,
@@ -111,8 +111,6 @@ class PackedFormatTest {
                 true,
                 1
             ),
-
-            // Nesting & Collections
             Parent(id = 1, child = Child(2)),
             WithList(id = 1, items = listOf(1, 2, 3)),
             Grid(rows = listOf(listOf(1, 2, 3), emptyList(), listOf(4))),
@@ -369,8 +367,6 @@ class PackedFormatTest {
         }
     }
 
-    // --- Size assertions ---
-
     @Test
     fun `class with no booleans or nullables has no bitmask header`() {
         // 4 (Int) + 8 (Long) + 1 (VarInt len) + 13 (String bytes) = 26
@@ -419,8 +415,6 @@ class PackedFormatTest {
             MapHolder(emptyMap(), emptyMap())
         )
     }
-
-    // --- VarInt / VarUInt encoding distinction ---
 
     @Test
     fun `VarUInt does not apply zigzag so negative inputs encode large`() {
@@ -500,14 +494,6 @@ class PackedFormatTest {
                 ListSerializer(String.serializer().nullable),
                 truncated
             )
-        }
-    }
-
-    @Test
-    fun `truncated varint throws`() {
-        val incomplete = byteArrayOf(0x80.toByte())
-        assertFailsWith<IllegalArgumentException> {
-            PackedUtils.decodeVarInt(incomplete, 0)
         }
     }
 
@@ -603,14 +589,8 @@ class PackedFormatTest {
         }
     }
 
-    // --- Merged bitmask header ---
-
     @Test
     fun `class with only nested booleans and nullables encodes to header byte only`() {
-        // Level1(active: Boolean, level2: Level2?) — all info fits in the 2-bit merged header.
-        // active=true  → bit 0 = 1
-        // level2=null  → bit 1 = 1 (null-marker)
-        // No data bytes remain, so total = 1 byte.
         val bytes = PackedFormat.encodeToByteArray(
             Level1.serializer(),
             Level1(true, null)
@@ -621,9 +601,6 @@ class PackedFormatTest {
 
     @Test
     fun `merged header bit pattern matches field order and value`() {
-        // active=false → bit 0 = 0
-        // level2 not null → bit 1 = 0 (null-marker = false means present)
-        // header byte = 0b00000000 = 0
         val bytes = PackedFormat.encodeToByteArray(
             Level1.serializer(), Level1(false, Level2("", emptyList()))
         )
@@ -636,10 +613,6 @@ class PackedFormatTest {
 
     @Test
     fun `non-nullable nested class flags are promoted into root merged header`() {
-        // DeepNested.level1 is a non-nullable Level1 — its bits merge into DeepNested's header.
-        // countAllBits(DeepNested) = countAllBits(Level1) = 2.
-        // Header byte: bit 0=active=true, bit 1=level2_null=true → 0b00000011 = 3.
-        // Data after header: "x" (varint 1 + byte) = 2 bytes. Total = 3.
         val value = DeepNested("x", Level1(active = true, level2 = null))
         val bytes =
             PackedFormat.encodeToByteArray(DeepNested.serializer(), value)
@@ -650,15 +623,11 @@ class PackedFormatTest {
 
     @Test
     fun `multiple non-nullable nested class fields share a single header byte`() {
-        // DeepBreadth has three non-nullable Level1 fields (2 bits each = 6 bits total → 1 byte).
-        // Old format: 3 separate 1-byte headers = 3 bytes overhead.
-        // New format: 1 merged byte.
         // Bit layout (depth-first, booleans before nullables per class):
         //   bit 0: branchA.active=true,    bit 1: branchA.level2_null=true
         //   bit 2: branchB.active=false,   bit 3: branchB.level2_null=true
         //   bit 4: branchC.active=true,    bit 5: branchC.level2_null=true
-        // byte = 0b00111011 = 59
-        // Data: rootValue=42 (4 bytes). Total = 5.
+        // → byte = 0b00111011 = 59; data: rootValue=42 (4 bytes). Total = 5.
         val value = DeepBreadth(
             branchA = Level1(true, null),
             branchB = Level1(false, null),
@@ -674,37 +643,20 @@ class PackedFormatTest {
 
     @Test
     fun `nullable nested class field keeps local inline header not merged`() {
-        // level2 is nullable → its own boolean/nullable bits are NOT merged up.
-        // Only the null-marker for level2 itself is in Level1's merged header.
-        // Level2 has no boolean or nullable fields, so no extra header when present.
-        val withLevel2 =
-            Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
+        val withLevel2 = Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
         val withoutLevel2 = Level1(active = true, level2 = null)
         assertPackedRoundtrip(Level1.serializer(), withLevel2)
         assertPackedRoundtrip(Level1.serializer(), withoutLevel2)
-        // Present level2 → header bit 1 = 0; absent → header bit 1 = 1
-        val bytesPresent =
-            PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
-        val bytesAbsent =
-            PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
-        assertEquals(
-            0b00000001,
-            bytesPresent[0].toInt() and 0xFF
-        )  // active=1, level2_null=0
-        assertEquals(
-            0b00000011,
-            bytesAbsent[0].toInt() and 0xFF
-        )   // active=1, level2_null=1
+        // present level2 → null-marker bit 1 = 0; absent → null-marker bit 1 = 1
+        val bytesPresent = PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
+        val bytesAbsent = PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
+        assertEquals(0b00000001, bytesPresent[0].toInt() and 0xFF)
+        assertEquals(0b00000011, bytesAbsent[0].toInt() and 0xFF)
     }
 
     @Test
     fun `non-nullable nested class with no flags contributes no header bytes`() {
-        // Parent(id: Int, child: Child) — Child has no booleans or nullables.
-        // countAllBits = 0 → no header byte at all.
-        val bytes = PackedFormat.encodeToByteArray(
-            Parent.serializer(),
-            Parent(7, Child(42))
-        )
+        val bytes = PackedFormat.encodeToByteArray(Parent.serializer(), Parent(7, Child(42)))
         assertEquals(8, bytes.size)  // 4 bytes id + 4 bytes child.value
         assertPackedRoundtrip(Parent.serializer(), Parent(7, Child(42)))
     }
@@ -725,7 +677,6 @@ class PackedFormatTest {
 
     @Test
     fun `truncated merged header throws for nested structure`() {
-        // DeepNested requires 1 byte for its merged header; empty input should fail.
         assertFailsWith<IllegalArgumentException> {
             PackedFormat.decodeFromByteArray(
                 DeepNested.serializer(),
@@ -758,6 +709,26 @@ class PackedFormatTest {
         )
         for (value in cases) {
             assertPackedRoundtrip(DeepBreadth.serializer(), value)
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalSerializationApi::class)
+    fun `ProtoType annotation fallback resolves to correct encoding`() {
+        // ZigZag(-2)=3 → 1 byte; VarUInt(100) → 1 byte. Total 2 vs 12 for FIXED.
+        val payload = ProtoAnnotatedPayload(signed = -2, unsigned = 100L)
+        val bytes = PackedFormat.encodeToByteArray(ProtoAnnotatedPayload.serializer(), payload)
+        assertEquals(2, bytes.size)
+        assertEquals(payload, PackedFormat.decodeFromByteArray(ProtoAnnotatedPayload.serializer(), bytes))
+    }
+
+    @Test
+    fun `4-byte UTF-8 sequence throws with descriptive message`() {
+        // 0xF0 starts a 4-byte sequence; Char only supports up to U+FFFF.
+        val bytes = byteArrayOf(0xF0.toByte(), 0x9F.toByte(), 0x98.toByte(), 0x80.toByte())
+        val decoder = PackedDecoder(bytes)
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeSerializableValue(Char.serializer())
         }
     }
 

@@ -195,4 +195,14 @@ class BaseRadixTest {
             )
         }
     }
+
+    @Test
+    fun `custom blockSize roundtrips for various lengths`() {
+        val codec = BaseRadix("0123456789abcdef", blockSize = 4)
+        val rng = Random(7777L)
+        for (len in 0..(codec.blockSize * 3)) {
+            val bytes = ByteArray(len).also { rng.nextBytes(it) }
+            assertRoundtrip(codec, bytes, "Custom blockSize=4 roundtrip failed for len=$len")
+        }
+    }
 }

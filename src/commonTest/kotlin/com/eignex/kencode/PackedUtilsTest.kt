@@ -9,8 +9,8 @@ class BitPackingTest {
         val flags = booleanArrayOf(true, false, true)
         val packed = PackedUtils.packFlags(flags)
 
-        assertEquals(1, packed.size, "Should pack into 1 byte")
-        assertEquals(5.toByte(), packed[0], "Bits should match 101 binary")
+        assertEquals(1, packed.size)
+        assertEquals(5.toByte(), packed[0])
     }
 
     @Test
@@ -21,13 +21,9 @@ class BitPackingTest {
 
         val packed = PackedUtils.packFlags(flags)
 
-        assertEquals(2, packed.size, "Should require 2 bytes")
-        assertEquals(1.toByte(), packed[0], "Byte 0 should have bit 0 set")
-        assertEquals(
-            4.toByte(),
-            packed[1],
-            "Byte 1 should have bit 2 set (index 10)"
-        )
+        assertEquals(2, packed.size)
+        assertEquals(1.toByte(), packed[0])
+        assertEquals(4.toByte(), packed[1])
     }
 
     @Test
@@ -35,7 +31,7 @@ class BitPackingTest {
         val flags = booleanArrayOf(false, false, false, false)
         val packed = PackedUtils.packFlags(flags)
 
-        assertEquals(0, packed.size, "All false should result in 0 bytes")
+        assertEquals(0, packed.size)
     }
 
     @Test
@@ -51,11 +47,7 @@ class BitPackingTest {
         val input = byteArrayOf(5)
         val unpacked = PackedUtils.unpackFlags(input, 0, 1)
 
-        assertEquals(
-            8,
-            unpacked.size,
-            "Unpacking 1 byte should yield 8 booleans"
-        )
+        assertEquals(8, unpacked.size)
         assertTrue(unpacked[0])
         assertFalse(unpacked[1])
         assertTrue(unpacked[2])
@@ -306,6 +298,38 @@ class BitPackingTest {
         val longFlags = PackedUtils.packFlagsToLong(flags)
         val unpacked = PackedUtils.unpackFlagsFromLong(longFlags, flags.size)
         assertContentEquals(flags, unpacked)
+    }
+
+    // --- ByteOutput ---
+
+    @Test
+    fun `ByteOutput reset clears written bytes`() {
+        val out = ByteOutput()
+        out.write(1)
+        out.write(2)
+        out.reset()
+        assertEquals(0, out.toByteArray().size)
+        out.write(42)
+        assertContentEquals(byteArrayOf(42), out.toByteArray())
+    }
+
+    @Test
+    fun `ByteOutput writeTo transfers all bytes to another ByteOutput`() {
+        val src = ByteOutput()
+        src.write(10)
+        src.write(20)
+        src.write(30)
+        val dst = ByteOutput()
+        src.writeTo(dst)
+        assertContentEquals(byteArrayOf(10, 20, 30), dst.toByteArray())
+    }
+
+    @Test
+    fun `ByteOutput expands capacity when writes exceed initial size`() {
+        val out = ByteOutput(initialCapacity = 4)
+        val data = ByteArray(100) { it.toByte() }
+        out.write(data)
+        assertContentEquals(data, out.toByteArray())
     }
 
     @Test

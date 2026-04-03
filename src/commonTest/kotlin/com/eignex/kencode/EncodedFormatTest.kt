@@ -57,14 +57,6 @@ class EncodedFormatTest {
     }
 
     @Test
-    fun `compactZeros roundtrip with checksum`() {
-        val value = Payload(0, "zero")
-        val encoded = formatCompactChecksum.encodeToString(Payload.serializer(), value)
-        val decoded = formatCompactChecksum.decodeFromString(Payload.serializer(), encoded)
-        assertEquals(value, decoded)
-    }
-
-    @Test
     fun `compactZeros all-zero payload roundtrip`() {
         @Serializable
         data class Z(val a: Int, val b: Int)
@@ -126,6 +118,55 @@ class EncodedFormatTest {
             transform = CompactZeros.then(Crc16.asTransform())
         }
 
+        val encoded = format.encodeToString(Payload.serializer(), value)
+        val decoded = format.decodeFromString(Payload.serializer(), encoded)
+        assertEquals(value, decoded)
+    }
+
+    @Test
+    fun `builder checksum property shorthand works for all CRC variants`() {
+        val value = Payload(1, "shorthand")
+        for (checksum in listOf(Crc8, Crc16, Crc32)) {
+            val format = EncodedFormat { this.checksum = checksum }
+            val encoded = format.encodeToString(Payload.serializer(), value)
+            val decoded = format.decodeFromString(Payload.serializer(), encoded)
+            assertEquals(value, decoded)
+        }
+    }
+
+    @Test
+    fun `asTransform decode with too-short input throws`() {
+        val transform = Crc16.asTransform()
+        assertFailsWith<IllegalArgumentException> { transform.decode(byteArrayOf(0x01)) }
+        assertFailsWith<IllegalArgumentException> { transform.decode(byteArrayOf()) }
+    }
+
+    @Test
+    fun `asTransform encode and decode of empty payload roundtrip`() {
+        val transform = Crc16.asTransform()
+        val encoded = transform.encode(byteArrayOf())
+        assertEquals(Crc16.size, encoded.size)
+        val decoded = transform.decode(encoded)
+        assertEquals(0, decoded.size)
+    }
+
+    @Test
+    fun `CompactZeros handles large leading-zero count requiring multi-byte varint`() {
+        // k=128 forces a 2-byte LEB128 varint in the sentinel prefix
+        val zeros = 128
+        val data = ByteArray(zeros + 50) { i -> if (i < zeros) 0 else (i - zeros + 1).toByte() }
+        val encoded = CompactZeros.encode(data)
+        val decoded = CompactZeros.decode(encoded)
+        assertContentEquals(data, decoded)
+        assertTrue(encoded.size < data.size)
+    }
+
+    @Test
+    fun `three transforms chained roundtrip`() {
+        val value = Payload(0, "triple")
+        val format = EncodedFormat {
+            transform = CompactZeros.then(Crc8.asTransform()).then(Crc16.asTransform())
+        }
         val encoded = format.encodeToString(Payload.serializer(), value)
         val decoded = format.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
