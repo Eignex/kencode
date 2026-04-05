@@ -228,16 +228,16 @@ class PackedDecoder internal constructor(
 
     override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int =
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntEncoding.ZIGZAG -> PackedUtils.zigZagDecodeInt(readVarInt())
-            IntEncoding.VARINT -> readVarInt()
-            IntEncoding.FIXED  -> readIntPos()
+            IntPacking.ZIGZAG -> PackedUtils.zigZagDecodeInt(readVarInt())
+            IntPacking.VARINT -> readVarInt()
+            IntPacking.FIXED  -> readIntPos()
         }
 
     override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long =
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntEncoding.ZIGZAG -> PackedUtils.zigZagDecodeLong(readVarLong())
-            IntEncoding.VARINT -> readVarLong()
-            IntEncoding.FIXED  -> readLongPos()
+            IntPacking.ZIGZAG -> PackedUtils.zigZagDecodeLong(readVarLong())
+            IntPacking.VARINT -> readVarLong()
+            IntPacking.FIXED  -> readLongPos()
         }
 
     override fun decodeFloatElement(descriptor: SerialDescriptor, index: Int): Float =

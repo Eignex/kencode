@@ -265,7 +265,7 @@ class PackedFormatTest {
 
         val standardFormat = PackedFormat.Default
         val optimizedFormat =
-            PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
+            PackedFormat { defaultEncoding = IntPacking.VARINT }
 
         val standardBytes = standardFormat.encodeToByteArray(
             UnannotatedPayload.serializer(),
@@ -296,9 +296,9 @@ class PackedFormatTest {
 
         val standardFormat = PackedFormat.Default
         val varIntFormat =
-            PackedFormat { defaultEncoding = PackedIntegerType.DEFAULT }
+            PackedFormat { defaultEncoding = IntPacking.VARINT }
         val zigZagFormat =
-            PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
+            PackedFormat { defaultEncoding = IntPacking.ZIGZAG }
 
         // Standard: 12 bytes
         assertEquals(
@@ -337,7 +337,7 @@ class PackedFormatTest {
         val payload = InversePayload(5, -10L, 6u, 7uL)
 
         val optimizedFormat =
-            PackedFormat { defaultEncoding = PackedIntegerType.SIGNED }
+            PackedFormat { defaultEncoding = IntPacking.ZIGZAG }
 
         val bytes = optimizedFormat.encodeToByteArray(
             InversePayload.serializer(),

@@ -22,10 +22,10 @@ class Examples {
     data class Payload(
 
         // only uses as many bytes as needed
-        @PackedType(PackedIntegerType.DEFAULT)
+        @PackedType(IntPacking.VARINT)
         val id: ULong,
 
-        @PackedType(PackedIntegerType.SIGNED) // zig-zag encodes small negatives efficiently
+        @PackedType(IntPacking.ZIGZAG) // zig-zag encodes small negatives efficiently
         val delta: Int,
 
         // these are packed into a bitset along with nullability flags
@@ -40,6 +40,30 @@ class Examples {
 
     enum class PayloadType {
         TYPE1, TYPE2, TYPE3
+    }
+
+    @Test
+    fun `blog post example`() {
+        @Serializable
+        data class JobState(
+            val clientId: Int,
+            val batchId: Int,
+            val retryCount: Int?,
+            val isPriority: Boolean
+        )
+
+        val state = JobState(119, 210, null, true)
+        val encodedFormat = EncodedFormat {
+            binaryFormat =
+                PackedFormat { defaultEncoding = IntPacking.VARINT }
+        }
+        val encodedState = encodedFormat.encodeToString(state)
+        println(encodedState)
+        // This encodes the object into the string:
+        // 02waa1a8
+
+        val decodedState =
+            encodedFormat.decodeFromString<JobState>(encodedState)
     }
 
     @Test
@@ -120,10 +144,12 @@ class Examples {
         val secureFormat = EncodedFormat { transform = xteaTransform }
 
         val payload = SensitiveData(random.nextLong())
-        val token = secureFormat.encodeToString(SensitiveData.serializer(), payload)
+        val token =
+            secureFormat.encodeToString(SensitiveData.serializer(), payload)
         println(token)
 
-        val result = secureFormat.decodeFromString(SensitiveData.serializer(), token)
+        val result =
+            secureFormat.decodeFromString(SensitiveData.serializer(), token)
         println(result)
 
         assertEquals(payload, result)
