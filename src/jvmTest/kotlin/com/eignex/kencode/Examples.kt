@@ -19,7 +19,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 class Examples {
 
-    // Exmaple from readme
+    // Example from readme
 
     @Serializable
     data class Payload(
@@ -37,31 +37,12 @@ class Examples {
         val external: Boolean,
         val handledAt: Instant?,
 
-        // encoded as VarUInt
+        // encoded as varint ordinal
         val type: PayloadType
     )
 
     enum class PayloadType {
         TYPE1, TYPE2, TYPE3
-    }
-
-    @Test
-    fun `blog post example`() {
-        @Serializable
-        data class JobState(
-            val clientId: Int,
-            val batchId: Int,
-            val retryCount: Int?,
-            val isPriority: Boolean
-        )
-
-        val state = JobState(119, 210, null, true)
-        val encodedState = EncodedFormat.encodeToString(state)
-        println(encodedState)
-        // This encodes the object into the string:
-        // 02waa1a8
-
-        EncodedFormat.decodeFromString<JobState>(encodedState)
     }
 
     @Test
@@ -84,26 +65,20 @@ class Examples {
     }
 
     @Serializable
-    data class ProtoBufRequired(val map: Map<String, Int>)
+    data class MapPayload(val map: Map<String, Int>)
 
     @Test
-    fun `protobuf serialization`() {
-        // This setup can handle arbitrary payloads (limited by ProtoBuf)
-        val payload = ProtoBufRequired(
-            mapOf("k1" to 1285, "k2" to 9681)
-        )
-        val format = EncodedFormat(binaryFormat = ProtoBuf)
-        val encoded = format.encodeToString(payload)
-        val result = format.decodeFromString<ProtoBufRequired>(encoded)
-        assertEquals(payload, result)
-        println(encoded)
+    fun `protobuf comparison`() {
+        val payload = MapPayload(mapOf("k1" to 1285, "k2" to 9681))
+        println(EncodedFormat(binaryFormat = ProtoBuf).encodeToString<MapPayload>(payload))
+        println(EncodedFormat.encodeToString<MapPayload>(payload))
     }
 
     @Test
     fun `standalone readme`() {
         val bytes = "any byte data".encodeToByteArray()
-        println(Base36.encode(bytes))
         println(Base62.encode(bytes))
+        println(Base36.encode(bytes))
         println(Base64.encode(bytes))
         println(Base85.encode(bytes))
     }
@@ -123,19 +98,19 @@ class Examples {
 
         // Wrap XTEA/CTR as a PayloadTransform.
         // Each encode prepends a fresh 8-byte IV; decode reads it back.
+        val encryptCipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
+        val decryptCipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
         val xteaTransform = object : PayloadTransform {
             override fun encode(data: ByteArray): ByteArray {
                 val iv = ByteArray(8).also { random.nextBytes(it) }
-                val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
-                cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv))
-                return iv + cipher.doFinal(data)
+                encryptCipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(iv))
+                return iv + encryptCipher.doFinal(data)
             }
 
             override fun decode(data: ByteArray): ByteArray {
                 val iv = data.copyOfRange(0, 8)
-                val cipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
-                cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv))
-                return cipher.doFinal(data.copyOfRange(8, data.size))
+                decryptCipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(iv))
+                return decryptCipher.doFinal(data.copyOfRange(8, data.size))
             }
         }
 
