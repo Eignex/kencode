@@ -27,6 +27,9 @@ jobs:
       - name: Grant execute permission for Gradle
         run: chmod +x gradlew
 
+      - name: Run linter
+        run: ./gradlew detekt
+
       - name: Run tests with coverage
         run: ./gradlew koverXmlReport
 
