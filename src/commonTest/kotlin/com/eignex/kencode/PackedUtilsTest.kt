@@ -83,7 +83,6 @@ class BitPackingTest {
 
     @Test
     fun `pack and unpack roundtrip padded boundary`() {
-
         val flags = BooleanArray(10)
         flags[0] = true
         flags[9] = true
@@ -216,7 +215,6 @@ class BitPackingTest {
             )
         }
     }
-
 
     @Test
     fun `varint roundtrip offset`() {

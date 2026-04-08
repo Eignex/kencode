@@ -46,7 +46,8 @@ open class PackedFormat(
      * Encodes [value] into a compact binary representation.
      */
     override fun <T> encodeToByteArray(
-        serializer: SerializationStrategy<T>, value: T
+        serializer: SerializationStrategy<T>,
+        value: T
     ): ByteArray {
         val out = ByteOutput()
         val encoder = PackedEncoder(out, configuration, serializersModule)
@@ -58,7 +59,8 @@ open class PackedFormat(
      * Decodes [bytes] produced by [PackedFormat] back into an object of type [T].
      */
     override fun <T> decodeFromByteArray(
-        deserializer: DeserializationStrategy<T>, bytes: ByteArray
+        deserializer: DeserializationStrategy<T>,
+        bytes: ByteArray
     ): T {
         val decoder = PackedDecoder(bytes, configuration, serializersModule)
         return decoder.decodeSerializableValue(deserializer)

@@ -6,7 +6,8 @@ import kotlin.test.*
 class Base85Test {
 
     private fun assertRoundtrip(
-        bytes: ByteArray, message: String? = null
+        bytes: ByteArray,
+        message: String? = null
     ) {
         val encoded = Base85.encode(bytes)
         val decoded = Base85.decode(encoded)
@@ -46,7 +47,8 @@ class Base85Test {
 
         for (bytes in patterns) {
             assertRoundtrip(
-                bytes, "ASCII85 failed for pattern=${bytes.toList()}"
+                bytes,
+                "ASCII85 failed for pattern=${bytes.toList()}"
             )
         }
     }

@@ -32,8 +32,12 @@ private class CrcEngine(
             crc = crc and mask
         }
 
-        var finalCrc = if (refout) crc else crc.toInt().reverseBits(width)
-            .toLong() and mask
+        var finalCrc = if (refout) {
+            crc
+        } else {
+            crc.toInt().reverseBits(width)
+                .toLong() and mask
+        }
         finalCrc = (finalCrc xor xorOutL) and mask
 
         return ByteArray(size) { i ->

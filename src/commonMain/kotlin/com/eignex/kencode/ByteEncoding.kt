@@ -8,7 +8,11 @@ interface ByteEncoding {
     /**
      * Encode the given byte range into a text representation.
      */
-    fun encode(input: ByteArray, offset: Int = 0, length: Int = input.size - offset): String
+    fun encode(
+        input: ByteArray,
+        offset: Int = 0,
+        length: Int = input.size - offset
+    ): String
 
     /**
      * Decode an encoded string back into the original bytes.

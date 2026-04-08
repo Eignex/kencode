@@ -139,7 +139,8 @@ class PackedFormatTest {
             BooleanFlags65(BooleanArray(65) { true }),
             BooleanFlags65(BooleanArray(65) { false }),
             RecursiveTree(
-                "root", listOf(
+                "root",
+                listOf(
                     RecursiveTree(
                         "child1",
                         listOf(RecursiveTree("grandchild1"))
@@ -149,9 +150,14 @@ class PackedFormatTest {
             ),
 
             InlineHeavyPayload(
-                255u, 65535u, 4000000000u, 18000000000000000000u,
-                UserId(9999L), Email("test@example.com"),
-                listOf(UserId(1), UserId(2)), Instant.DISTANT_PAST
+                255u,
+                65535u,
+                4000000000u,
+                18000000000000000000u,
+                UserId(9999L),
+                Email("test@example.com"),
+                listOf(UserId(1), UserId(2)),
+                Instant.DISTANT_PAST
             ),
 
             MultiLevelCollections(
@@ -461,7 +467,8 @@ class PackedFormatTest {
     fun `truncated bool list bitmap throws`() {
         val valid = PackedFormat.encodeToByteArray(
             ListSerializer(Boolean.serializer()),
-            List(16) { true })
+            List(16) { true }
+        )
         val truncated =
             valid.copyOfRange(0, 2)
         assertFailsWith<IllegalArgumentException> {
@@ -593,7 +600,8 @@ class PackedFormatTest {
     @Test
     fun `merged header bit pattern matches field order and value`() {
         val bytes = PackedFormat.encodeToByteArray(
-            Level1.serializer(), Level1(false, Level2("", emptyList()))
+            Level1.serializer(),
+            Level1(false, Level2("", emptyList()))
         )
         assertEquals(0, bytes[0].toInt() and 0xFF)
         assertPackedRoundtrip(
@@ -629,19 +637,25 @@ class PackedFormatTest {
 
     @Test
     fun `nullable nested class field keeps local inline header not merged`() {
-        val withLevel2 = Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
+        val withLevel2 =
+            Level1(active = true, level2 = Level2("data", listOf(listOf(1))))
         val withoutLevel2 = Level1(active = true, level2 = null)
         assertPackedRoundtrip(Level1.serializer(), withLevel2)
         assertPackedRoundtrip(Level1.serializer(), withoutLevel2)
-        val bytesPresent = PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
-        val bytesAbsent = PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
+        val bytesPresent =
+            PackedFormat.encodeToByteArray(Level1.serializer(), withLevel2)
+        val bytesAbsent =
+            PackedFormat.encodeToByteArray(Level1.serializer(), withoutLevel2)
         assertEquals(0b00000001, bytesPresent[0].toInt() and 0xFF)
         assertEquals(0b00000011, bytesAbsent[0].toInt() and 0xFF)
     }
 
     @Test
     fun `non-nullable nested class with no flags contributes no header bytes`() {
-        val bytes = PackedFormat.encodeToByteArray(Parent.serializer(), Parent(7, Child(42)))
+        val bytes = PackedFormat.encodeToByteArray(
+            Parent.serializer(),
+            Parent(7, Child(42))
+        )
         assertEquals(2, bytes.size)
         assertPackedRoundtrip(Parent.serializer(), Parent(7, Child(42)))
     }
@@ -700,14 +714,28 @@ class PackedFormatTest {
     @OptIn(ExperimentalSerializationApi::class)
     fun `ProtoType annotation fallback resolves to correct encoding`() {
         val payload = ProtoAnnotatedPayload(signed = -2, unsigned = 100L)
-        val bytes = PackedFormat.encodeToByteArray(ProtoAnnotatedPayload.serializer(), payload)
+        val bytes = PackedFormat.encodeToByteArray(
+            ProtoAnnotatedPayload.serializer(),
+            payload
+        )
         assertEquals(2, bytes.size)
-        assertEquals(payload, PackedFormat.decodeFromByteArray(ProtoAnnotatedPayload.serializer(), bytes))
+        assertEquals(
+            payload,
+            PackedFormat.decodeFromByteArray(
+                ProtoAnnotatedPayload.serializer(),
+                bytes
+            )
+        )
     }
 
     @Test
     fun `4-byte UTF-8 sequence throws with descriptive message`() {
-        val bytes = byteArrayOf(0xF0.toByte(), 0x9F.toByte(), 0x98.toByte(), 0x80.toByte())
+        val bytes = byteArrayOf(
+            0xF0.toByte(),
+            0x9F.toByte(),
+            0x98.toByte(),
+            0x80.toByte()
+        )
         val decoder = PackedDecoder(bytes)
         assertFailsWith<IllegalArgumentException> {
             decoder.decodeSerializableValue(Char.serializer())

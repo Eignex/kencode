@@ -206,7 +206,8 @@ class PackedContextTest {
     fun `HeaderContext read throws when exhausted`() {
         val ctx = HeaderContext()
         ctx.load(byteArrayOf(1), 0, 2)
-        ctx.read(); ctx.read()
+        ctx.read()
+        ctx.read()
         assertFailsWith<IllegalArgumentException> { ctx.read() }
     }
 

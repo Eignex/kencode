@@ -23,7 +23,8 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
 
     init {
         val n = descriptor.elementsCount
-        var bc = 0; var nc = 0
+        var bc = 0
+        var nc = 0
         booleanLookup = IntArray(n) { i ->
             val e = descriptor.getElementDescriptor(i)
             if (e.kind == PrimitiveKind.BOOLEAN) bc++ else -1
@@ -31,28 +32,42 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
         nullableLookup = IntArray(n) { i ->
             if (descriptor.getElementDescriptor(i).isNullable) nc++ else -1
         }
-        boolCount = bc; nullCount = nc
+        boolCount = bc
+        nullCount = nc
     }
 
     val totalCount: Int get() = boolCount + nullCount
 
-    fun booleanPos(fieldIdx: Int): Int = booleanLookup.getOrElse(fieldIdx) { -1 }
-    fun nullablePos(fieldIdx: Int): Int = nullableLookup.getOrElse(fieldIdx) { -1 }
+    fun booleanPos(fieldIdx: Int): Int =
+        booleanLookup.getOrElse(fieldIdx) { -1 }
+
+    fun nullablePos(fieldIdx: Int): Int =
+        nullableLookup.getOrElse(fieldIdx) { -1 }
 
     /**
      * Packs boolean values followed by null values into a fixed-width byte array.
      * Used for inline (non-merged) bitmasks in polymorphic and other non-CLASS structures.
      */
-    fun writeInlineBitmask(booleanValues: BooleanArray, nullValues: BooleanArray, out: ByteOutput) {
+    fun writeInlineBitmask(
+        booleanValues: BooleanArray,
+        nullValues: BooleanArray,
+        out: ByteOutput
+    ) {
         val n = totalCount
         if (n == 0) return
         val bytes = ByteArray((n + 7) / 8)
         booleanValues.forEachIndexed { i, v ->
-            if (v) bytes[i / 8] = (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
+            if (v) {
+                bytes[i / 8] =
+                    (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
+            }
         }
         nullValues.forEachIndexed { i, v ->
             val bit = boolCount + i
-            if (v) bytes[bit / 8] = (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
+            if (v) {
+                bytes[bit / 8] =
+                    (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
+            }
         }
         out.write(bytes)
     }
@@ -72,8 +87,8 @@ internal fun shouldMergeChildCtx(
     childDescriptor: SerialDescriptor
 ): Boolean =
     parentIsMergedKind && !parentIsCollection && fieldIndex >= 0 &&
-            !parentDescriptor.getElementDescriptor(fieldIndex).isNullable && !childDescriptor.isInline &&
-            (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
+        !parentDescriptor.getElementDescriptor(fieldIndex).isNullable && !childDescriptor.isInline &&
+        (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
 
 /**
  * Accumulates bitmask bits across an entire nested-class hierarchy so that the
@@ -84,7 +99,8 @@ internal class HeaderContext {
     private var readCursor = 0
 
     /** Reserves slots and returns the start index for a later set call. */
-    fun reserve(count: Int): Int = bits.size.also { repeat(count) { bits.add(false) } }
+    fun reserve(count: Int): Int =
+        bits.size.also { repeat(count) { bits.add(false) } }
 
     /** Fills the slots starting at [start] with booleans immediately followed by nulls. */
     fun set(start: Int, booleans: BooleanArray, nulls: BooleanArray) {
@@ -98,7 +114,10 @@ internal class HeaderContext {
         if (bits.isEmpty()) return ByteArray(0)
         val bytes = ByteArray((bits.size + 7) / 8)
         bits.forEachIndexed { i, v ->
-            if (v) bytes[i / 8] = (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
+            if (v) {
+                bytes[i / 8] =
+                    (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
+            }
         }
         return bytes
     }
@@ -132,8 +151,9 @@ internal fun countAllBits(descriptor: SerialDescriptor): Int {
     for (i in 0 until descriptor.elementsCount) {
         val elem = descriptor.getElementDescriptor(i)
         if (elem.kind == PrimitiveKind.BOOLEAN) count++
-        if (elem.isNullable) count++
-        else if (!elem.isInline && (elem.kind is StructureKind.CLASS || elem.kind is StructureKind.OBJECT)) {
+        if (elem.isNullable) {
+            count++
+        } else if (!elem.isInline && (elem.kind is StructureKind.CLASS || elem.kind is StructureKind.OBJECT)) {
             count += countAllBits(elem)
         }
     }

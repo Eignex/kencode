@@ -22,7 +22,9 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
     }
 
     override fun encode(
-        input: ByteArray, offset: Int, length: Int
+        input: ByteArray,
+        offset: Int,
+        length: Int
     ): String {
         require(offset >= 0 && length >= 0 && offset + length <= input.size) {
             "Invalid offset/length for input of size ${input.size}"

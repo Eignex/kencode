@@ -52,7 +52,7 @@ Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 @Serializable
 data class Payload(
     @PackedType(IntPacking.DEFAULT) val id: ULong, // low numbers are compacted
-    @PackedType(IntPacking.SIGNED)  val delta: Int, // zigzagged to compact small negatives
+    @PackedType(IntPacking.SIGNED) val delta: Int, // zigzagged to compact small negatives
     val urgent: Boolean,    // Packed into bitset
     val handled: Instant?,  // Nullability tracked via bitset
     val type: PayloadType

@@ -3,7 +3,10 @@ package com.eignex.kencode
 internal object PackedUtils {
 
     private fun requireAvailable(
-        data: ByteArray, offset: Int, needed: Int, what: String
+        data: ByteArray,
+        offset: Int,
+        needed: Int,
+        what: String
     ) {
         require(offset >= 0 && needed >= 0 && offset + needed <= data.size) {
             "Unexpected EOF while decoding $what: need $needed bytes " + "from offset=$offset, size=${data.size}"

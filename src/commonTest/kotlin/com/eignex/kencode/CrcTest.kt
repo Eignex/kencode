@@ -25,7 +25,11 @@ class CrcTest {
     @Test
     fun `crc8 rohc check value 123456789`() {
         val rohc = Crc8(
-            poly = 0x07, init = 0xFF, refin = true, refout = true, xorOut = 0x00
+            poly = 0x07,
+            init = 0xFF,
+            refin = true,
+            refout = true,
+            xorOut = 0x00
         )
         assertContentEquals(hex("D0"), rohc.digest("123456789"))
     }

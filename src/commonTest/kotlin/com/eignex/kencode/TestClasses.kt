@@ -16,9 +16,15 @@ data class SimpleIntsAndBooleans(
 
 @Serializable
 data class AllPrimitiveTypes(
-    val intVal: Int, val longVal: Long, val shortVal: Short, val byteVal: Byte,
-    val floatVal: Float, val doubleVal: Double, val charVal: Char,
-    val boolVal: Boolean, val stringVal: String
+    val intVal: Int,
+    val longVal: Long,
+    val shortVal: Short,
+    val byteVal: Byte,
+    val floatVal: Float,
+    val doubleVal: Double,
+    val charVal: Char,
+    val boolVal: Boolean,
+    val stringVal: String
 )
 
 @Serializable

@@ -61,8 +61,12 @@ open class EncodedFormat(
      * Serializes [value] with the configured binary format, applies the transform,
      * and encodes the resulting byte array using the text codec.
      */
-    override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
-        val bytes = configuration.binaryFormat.encodeToByteArray(serializer, value)
+    override fun <T> encodeToString(
+        serializer: SerializationStrategy<T>,
+        value: T
+    ): String {
+        val bytes =
+            configuration.binaryFormat.encodeToByteArray(serializer, value)
         val payload = configuration.transform?.encode(bytes) ?: bytes
         return configuration.codec.encode(payload)
     }
@@ -73,10 +77,16 @@ open class EncodedFormat(
      *
      * @throws IllegalArgumentException if the transform's decode step fails (e.g. checksum mismatch).
      */
-    override fun <T> decodeFromString(deserializer: DeserializationStrategy<T>, string: String): T {
+    override fun <T> decodeFromString(
+        deserializer: DeserializationStrategy<T>,
+        string: String
+    ): T {
         val input = configuration.codec.decode(string)
         val bytes = configuration.transform?.decode(input) ?: input
-        return configuration.binaryFormat.decodeFromByteArray(deserializer, bytes)
+        return configuration.binaryFormat.decodeFromByteArray(
+            deserializer,
+            bytes
+        )
     }
 }
 
@@ -90,7 +100,9 @@ class EncodedFormatBuilder {
 
     var checksum: Checksum?
         get() = null
-        set(value) { transform = value?.asTransform() }
+        set(value) {
+            transform = value?.asTransform()
+        }
 }
 
 /**
@@ -116,9 +128,11 @@ fun EncodedFormat(
         binaryFormat = from.configuration.binaryFormat
     }
     builder.builderAction()
-    return EncodedFormat(EncodedConfiguration(
-        builder.codec,
-        builder.transform,
-        builder.binaryFormat,
-    ))
+    return EncodedFormat(
+        EncodedConfiguration(
+            builder.codec,
+            builder.transform,
+            builder.binaryFormat,
+        )
+    )
 }

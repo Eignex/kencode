@@ -6,7 +6,9 @@ import kotlin.test.*
 class Base64Test {
 
     private fun assertRoundtrip(
-        codec: Base64, bytes: ByteArray, message: String? = null
+        codec: Base64,
+        bytes: ByteArray,
+        message: String? = null
     ) {
         val encoded = codec.encode(bytes)
         val decoded = codec.decode(encoded)
@@ -54,7 +56,9 @@ class Base64Test {
 
         for (bytes in patterns) {
             assertRoundtrip(
-                Base64, bytes, "Failed for pattern=${bytes.toList()}"
+                Base64,
+                bytes,
+                "Failed for pattern=${bytes.toList()}"
             )
         }
     }
@@ -73,7 +77,9 @@ class Base64Test {
 
         for (bytes in patterns) {
             assertRoundtrip(
-                Base64UrlSafe, bytes, "Failed for pattern=${bytes.toList()}"
+                Base64UrlSafe,
+                bytes,
+                "Failed for pattern=${bytes.toList()}"
             )
         }
     }
@@ -148,12 +154,16 @@ class Base64Test {
             val bytes = plain.encodeToByteArray()
             val encoded = Base64.encode(bytes, 0, bytes.size)
             assertEquals(
-                expectedEncoded, encoded, "Encoding mismatch for '$plain'"
+                expectedEncoded,
+                encoded,
+                "Encoding mismatch for '$plain'"
             )
 
             val decoded = Base64.decode(expectedEncoded)
             assertContentEquals(
-                bytes, decoded, "Decoding mismatch for '$plain'"
+                bytes,
+                decoded,
+                "Decoding mismatch for '$plain'"
             )
         }
     }
@@ -167,6 +177,4 @@ class Base64Test {
             Base64(CharArray(65))
         }
     }
-
-
 }

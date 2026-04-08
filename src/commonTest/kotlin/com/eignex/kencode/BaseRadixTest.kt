@@ -16,12 +16,17 @@ class BaseRadixTest {
     )
 
     private fun assertRoundtrip(
-        codec: BaseRadix, bytes: ByteArray, message: String? = null
+        codec: BaseRadix,
+        bytes: ByteArray,
+        message: String? = null
     ) {
         val encoded = codec.encode(bytes)
         val decoded = codec.decode(encoded)
-        if (message != null) assertContentEquals(bytes, decoded, message)
-        else assertContentEquals(bytes, decoded)
+        if (message != null) {
+            assertContentEquals(bytes, decoded, message)
+        } else {
+            assertContentEquals(bytes, decoded)
+        }
         if (bytes.isEmpty()) {
             assertTrue(encoded.isEmpty())
             assertEquals(0, codec.decode("").size)
@@ -202,7 +207,11 @@ class BaseRadixTest {
         val rng = Random(7777L)
         for (len in 0..(codec.blockSize * 3)) {
             val bytes = ByteArray(len).also { rng.nextBytes(it) }
-            assertRoundtrip(codec, bytes, "Custom blockSize=4 roundtrip failed for len=$len")
+            assertRoundtrip(
+                codec,
+                bytes,
+                "Custom blockSize=4 roundtrip failed for len=$len"
+            )
         }
     }
 }

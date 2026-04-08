@@ -12,7 +12,6 @@ const val BASE_62: String =
  */
 object Base62 : BaseRadix(BASE_62)
 
-
 /**
  * Base36 encoder/decoder using digits and lowercase characters.
  */
@@ -90,13 +89,21 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
             throw IllegalArgumentException("Invalid encoded length: ${input.length}")
         }
 
-        val lastOutLen = if (lastBlockLen > 0) invLengths[lastBlockLen - 1] else 0
+        val lastOutLen =
+            if (lastBlockLen > 0) invLengths[lastBlockLen - 1] else 0
         val output = ByteArray(fullBlocks * invLengths.last() + lastOutLen)
         var inPos = 0
         var outPos = 0
 
         repeat(fullBlocks) {
-            decodeBlock(input, inPos, fullBlockLen, output, outPos, invLengths.last())
+            decodeBlock(
+                input,
+                inPos,
+                fullBlockLen,
+                output,
+                outPos,
+                invLengths.last()
+            )
             inPos += fullBlockLen
             outPos += invLengths.last()
         }
@@ -116,14 +123,16 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
         outLen: Int = lengths[inLen - 1]
     ): StringBuilder {
         var n = BigInteger.fromByteArray(
-            input.sliceArray(inPos until inPos + inLen), Sign.POSITIVE
+            input.sliceArray(inPos until inPos + inLen),
+            Sign.POSITIVE
         )
         val startPos = output.length
         repeat(outLen) { output.append(zeroChar) }
         var writeIndex = output.length - 1
         while (n > bigZero && writeIndex >= startPos) {
             val remainder = n.rem(base)
-            output[writeIndex--] = alphabet[remainder.intValue(exactRequired = false)]
+            output[writeIndex--] =
+                alphabet[remainder.intValue(exactRequired = false)]
             n /= base
         }
         return output

@@ -27,7 +27,9 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
     }
 
     override fun encode(
-        input: ByteArray, offset: Int, length: Int
+        input: ByteArray,
+        offset: Int,
+        length: Int
     ): String {
         require(offset >= 0 && length >= 0 && offset + length <= input.size) {
             "Invalid offset/length for input of size ${input.size}"
@@ -62,7 +64,6 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
 
         return out.concatToString()
     }
-
 
     override fun decode(input: CharSequence): ByteArray {
         val len = input.length

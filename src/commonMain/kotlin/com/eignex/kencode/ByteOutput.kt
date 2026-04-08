@@ -19,7 +19,9 @@ internal class ByteOutput(initialCapacity: Int = 64) {
 
     fun toByteArray(): ByteArray = buf.copyOf(size)
 
-    fun reset() { size = 0 }
+    fun reset() {
+        size = 0
+    }
 
     private fun ensureCapacity(needed: Int) {
         if (needed <= buf.size) return

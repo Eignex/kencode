@@ -21,10 +21,14 @@ interface PayloadTransform {
  *
  * Example: `CompactZeros.then(Crc16.asTransform())` compacts bytes, then appends a checksum.
  */
-fun PayloadTransform.then(next: PayloadTransform): PayloadTransform = object : PayloadTransform {
-    override fun encode(data: ByteArray): ByteArray = next.encode(this@then.encode(data))
-    override fun decode(data: ByteArray): ByteArray = this@then.decode(next.decode(data))
-}
+fun PayloadTransform.then(next: PayloadTransform): PayloadTransform =
+    object : PayloadTransform {
+        override fun encode(data: ByteArray): ByteArray =
+            next.encode(this@then.encode(data))
+
+        override fun decode(data: ByteArray): ByteArray =
+            this@then.decode(next.decode(data))
+    }
 
 /**
  * Strips leading zero bytes before encoding and restores them on decode.
@@ -45,13 +49,17 @@ object CompactZeros : PayloadTransform {
         val result = ByteArray(1 + count.size + data.size - k)
         result[0] = 0x00
         count.copyInto(result, destinationOffset = 1)
-        data.copyInto(result, destinationOffset = 1 + count.size, startIndex = k)
+        data.copyInto(
+            result,
+            destinationOffset = 1 + count.size,
+            startIndex = k
+        )
         return result
     }
 
     override fun decode(data: ByteArray): ByteArray {
         require(data.isNotEmpty()) { "Compact payload cannot be empty." }
-        if (data[0] != 0.toByte()) return data  // k=0, no prefix was written
+        if (data[0] != 0.toByte()) return data // k=0, no prefix was written
         val (k, prefixLen) = PackedUtils.decodeVarInt(data, 1)
         val dataStart = 1 + prefixLen
         val result = ByteArray(k + data.size - dataStart)
@@ -78,7 +86,7 @@ fun Checksum.asTransform(): PayloadTransform = object : PayloadTransform {
             "Input too short to contain checksum: expected at least $size bytes but got ${data.size}."
         }
         val payload = data.copyOfRange(0, data.size - size)
-        val actual  = data.copyOfRange(data.size - size, data.size)
+        val actual = data.copyOfRange(data.size - size, data.size)
         require(actual.contentEquals(digest(payload))) { "Checksum mismatch." }
         return payload
     }
