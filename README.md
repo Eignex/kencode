@@ -170,5 +170,28 @@ val token = secureFormat.encodeToString(SecretPayload.serializer(), payload)
 val decoded = secureFormat.decodeFromString(SecretPayload.serializer(), token)
 ```
 
-See [Examples](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/Examples.kt)
+See [EncryptionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
 for a BouncyCastle demo.
+
+---
+
+## Error Correction
+
+Wrap an error-correcting code as a `PayloadTransform` to recover from corrupted bytes:
+
+```kotlin
+val eccTransform = object : PayloadTransform {
+    override fun encode(data: ByteArray): ByteArray = ecc.encode(data)
+    override fun decode(data: ByteArray): ByteArray = ecc.decode(data)
+}
+
+val robustFormat = EncodedFormat {
+    transform = eccTransform
+}
+
+val token = robustFormat.encodeToString(SecretPayload.serializer(), payload)
+val decoded = robustFormat.decodeFromString(SecretPayload.serializer(), token)
+```
+
+See [ErrorCorrectionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
+for a zxing demo with simulated byte corruption.
