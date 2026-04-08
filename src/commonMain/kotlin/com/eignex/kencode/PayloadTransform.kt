@@ -14,6 +14,15 @@ interface PayloadTransform {
 }
 
 /**
+ * Generic checksum interface that produces a fixed number of bytes.
+ */
+interface Checksum {
+    val size: Int
+    fun digest(data: ByteArray): ByteArray
+}
+
+
+/**
  * Chains two transforms into a pipeline.
  *
  * On encode: `this` is applied first, then [next].
