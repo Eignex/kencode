@@ -29,6 +29,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+            implementation("com.google.zxing:core:3.5.3")
         }
     }
 }
