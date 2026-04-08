@@ -14,7 +14,7 @@ class ErrorCorrectionExample {
 
     @Test
     fun `reed-solomon ecc serialization`() {
-        val parityBytes = 8  // corrects up to 4 corrupted bytes
+        val parityBytes = 8 // corrects up to 4 corrupted bytes
         val field = GenericGF.QR_CODE_FIELD_256
         val encoder = ReedSolomonEncoder(field)
         val decoder = ReedSolomonDecoder(field)

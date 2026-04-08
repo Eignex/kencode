@@ -21,7 +21,6 @@ interface Checksum {
     fun digest(data: ByteArray): ByteArray
 }
 
-
 /**
  * Chains two transforms into a pipeline.
  *
