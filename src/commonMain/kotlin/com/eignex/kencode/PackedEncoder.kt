@@ -108,13 +108,27 @@ class PackedEncoder internal constructor(
     override fun encodeShort(value: Short) { PackedUtils.writeShort(value, getBuffer()) }
 
     override fun encodeInt(value: Int) {
-        if (inStructure && !isCollection) encodeIntElement(currentDescriptor, currentIndex, value)
-        else PackedUtils.writeInt(value, getBuffer())
+        if (inStructure && !isCollection) {
+            encodeIntElement(currentDescriptor, currentIndex, value)
+        } else {
+            when (config.defaultEncoding) {
+                IntPacking.SIGNED -> PackedUtils.writeVarInt(PackedUtils.zigZagEncodeInt(value), getBuffer())
+                IntPacking.DEFAULT -> PackedUtils.writeVarInt(value, getBuffer())
+                IntPacking.FIXED  -> PackedUtils.writeInt(value, getBuffer())
+            }
+        }
     }
 
     override fun encodeLong(value: Long) {
-        if (inStructure && !isCollection) encodeLongElement(currentDescriptor, currentIndex, value)
-        else PackedUtils.writeLong(value, getBuffer())
+        if (inStructure && !isCollection) {
+            encodeLongElement(currentDescriptor, currentIndex, value)
+        } else {
+            when (config.defaultEncoding) {
+                IntPacking.SIGNED -> PackedUtils.writeVarLong(PackedUtils.zigZagEncodeLong(value), getBuffer())
+                IntPacking.DEFAULT -> PackedUtils.writeVarLong(value, getBuffer())
+                IntPacking.FIXED  -> PackedUtils.writeLong(value, getBuffer())
+            }
+        }
     }
 
     override fun encodeFloat(value: Float) { PackedUtils.writeInt(value.toBits(), getBuffer()) }
@@ -203,16 +217,16 @@ class PackedEncoder internal constructor(
 
     override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntPacking.ZIGZAG -> PackedUtils.writeVarInt(PackedUtils.zigZagEncodeInt(value), dataBuffer)
-            IntPacking.VARINT -> PackedUtils.writeVarInt(value, dataBuffer)
+            IntPacking.SIGNED -> PackedUtils.writeVarInt(PackedUtils.zigZagEncodeInt(value), dataBuffer)
+            IntPacking.DEFAULT -> PackedUtils.writeVarInt(value, dataBuffer)
             IntPacking.FIXED  -> PackedUtils.writeInt(value, dataBuffer)
         }
     }
 
     override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntPacking.ZIGZAG -> PackedUtils.writeVarLong(PackedUtils.zigZagEncodeLong(value), dataBuffer)
-            IntPacking.VARINT -> PackedUtils.writeVarLong(value, dataBuffer)
+            IntPacking.SIGNED -> PackedUtils.writeVarLong(PackedUtils.zigZagEncodeLong(value), dataBuffer)
+            IntPacking.DEFAULT -> PackedUtils.writeVarLong(value, dataBuffer)
             IntPacking.FIXED  -> PackedUtils.writeLong(value, dataBuffer)
         }
     }

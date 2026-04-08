@@ -161,10 +161,26 @@ class PackedDecoder internal constructor(
     override fun decodeShort(): Short = readShortPos()
 
     override fun decodeInt(): Int =
-        if (inStructure && !isCollection) decodeIntElement(currentDescriptor, currentIndex) else readIntPos()
+        if (inStructure && !isCollection) {
+            decodeIntElement(currentDescriptor, currentIndex)
+        } else {
+            when (config.defaultEncoding) {
+                IntPacking.SIGNED -> PackedUtils.zigZagDecodeInt(readVarInt())
+                IntPacking.DEFAULT -> readVarInt()
+                IntPacking.FIXED  -> readIntPos()
+            }
+        }
 
     override fun decodeLong(): Long =
-        if (inStructure && !isCollection) decodeLongElement(currentDescriptor, currentIndex) else readLongPos()
+        if (inStructure && !isCollection) {
+            decodeLongElement(currentDescriptor, currentIndex)
+        } else {
+            when (config.defaultEncoding) {
+                IntPacking.SIGNED -> PackedUtils.zigZagDecodeLong(readVarLong())
+                IntPacking.DEFAULT -> readVarLong()
+                IntPacking.FIXED  -> readLongPos()
+            }
+        }
 
     override fun decodeFloat(): Float = Float.fromBits(readIntPos())
 
@@ -228,15 +244,15 @@ class PackedDecoder internal constructor(
 
     override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int =
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntPacking.ZIGZAG -> PackedUtils.zigZagDecodeInt(readVarInt())
-            IntPacking.VARINT -> readVarInt()
+            IntPacking.SIGNED -> PackedUtils.zigZagDecodeInt(readVarInt())
+            IntPacking.DEFAULT -> readVarInt()
             IntPacking.FIXED  -> readIntPos()
         }
 
     override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long =
         when (resolveIntEncoding(descriptor.getElementAnnotations(index), config)) {
-            IntPacking.ZIGZAG -> PackedUtils.zigZagDecodeLong(readVarLong())
-            IntPacking.VARINT -> readVarLong()
+            IntPacking.SIGNED -> PackedUtils.zigZagDecodeLong(readVarLong())
+            IntPacking.DEFAULT -> readVarLong()
             IntPacking.FIXED  -> readLongPos()
         }
 
@@ -339,7 +355,7 @@ class PackedDecoder internal constructor(
             result = result or ((b and 0x7F) shl shift)
             if (b and 0x80 == 0) return result
             shift += 7
-            require(shift <= 35) { "VarInt too long" }
+            require(shift <= 28) { "VarInt too long" }
         }
     }
 
@@ -352,7 +368,7 @@ class PackedDecoder internal constructor(
             result = result or ((b and 0x7F).toLong() shl shift)
             if (b and 0x80 == 0) return result
             shift += 7
-            require(shift <= 70) { "VarLong too long" }
+            require(shift <= 63) { "VarLong too long" }
         }
     }
 

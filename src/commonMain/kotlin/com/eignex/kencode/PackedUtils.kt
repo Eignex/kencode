@@ -167,7 +167,7 @@ internal object PackedUtils {
                 return result to (pos - offset)
             }
             shift += 7
-            require(shift <= 35) { "VarInt too long" }
+            require(shift <= 28) { "VarInt too long" }
         }
     }
 
@@ -185,7 +185,7 @@ internal object PackedUtils {
                 return result to (pos - offset)
             }
             shift += 7
-            require(shift <= 70) { "VarLong too long" }
+            require(shift <= 63) { "VarLong too long" }
         }
     }
 }

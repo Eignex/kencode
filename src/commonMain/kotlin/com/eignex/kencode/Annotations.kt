@@ -14,9 +14,9 @@ import kotlinx.serialization.protobuf.ProtoType as KxProtoType
  */
 enum class IntPacking {
     /** Unsigned variable-length (LEB128). Compact for small non-negative values. */
-    VARINT,
+    DEFAULT,
     /** ZigZag variable-length. Compact for small signed values. */
-    ZIGZAG,
+    SIGNED,
     /** Fixed-width. 4 bytes for `Int`, 8 bytes for `Long`. */
     FIXED
 }
@@ -31,8 +31,8 @@ enum class IntPacking {
 annotation class PackedType(val type: IntPacking)
 
 private fun KxProtoIntegerType.toIntPacking(): IntPacking = when (this) {
-    KxProtoIntegerType.DEFAULT -> IntPacking.VARINT
-    KxProtoIntegerType.SIGNED  -> IntPacking.ZIGZAG
+    KxProtoIntegerType.DEFAULT -> IntPacking.DEFAULT
+    KxProtoIntegerType.SIGNED  -> IntPacking.SIGNED
     KxProtoIntegerType.FIXED   -> IntPacking.FIXED
 }
 

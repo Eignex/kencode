@@ -22,10 +22,10 @@ class Examples {
     data class Payload(
 
         // only uses as many bytes as needed
-        @PackedType(IntPacking.VARINT)
+        @PackedType(IntPacking.DEFAULT)
         val id: ULong,
 
-        @PackedType(IntPacking.ZIGZAG) // zig-zag encodes small negatives efficiently
+        @PackedType(IntPacking.SIGNED) // zig-zag encodes small negatives efficiently
         val delta: Int,
 
         // these are packed into a bitset along with nullability flags
@@ -53,17 +53,13 @@ class Examples {
         )
 
         val state = JobState(119, 210, null, true)
-        val encodedFormat = EncodedFormat {
-            binaryFormat =
-                PackedFormat { defaultEncoding = IntPacking.VARINT }
-        }
-        val encodedState = encodedFormat.encodeToString(state)
+        val encodedState = EncodedFormat.encodeToString(state)
         println(encodedState)
         // This encodes the object into the string:
         // 02waa1a8
 
         val decodedState =
-            encodedFormat.decodeFromString<JobState>(encodedState)
+            EncodedFormat.decodeFromString<JobState>(encodedState)
     }
 
     @Test

@@ -51,8 +51,8 @@ Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
 ```kotlin
 @Serializable
 data class Payload(
-    @PackedType(IntPacking.VARINT) val id: ULong, // low numbers are compacted
-    @PackedType(IntPacking.ZIGZAG)  val delta: Int, // zigzagged to compact small negatives
+    @PackedType(IntPacking.DEFAULT) val id: ULong, // low numbers are compacted
+    @PackedType(IntPacking.SIGNED)  val delta: Int, // zigzagged to compact small negatives
     val urgent: Boolean,    // Packed into bitset
     val handled: Instant?,  // Nullability tracked via bitset
     val type: PayloadType
@@ -76,10 +76,10 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 
 * Bit-Packing: Booleans and nullability markers are stored in a single
   bit-header (about 1 bit per field).
-* VarInts: Int/Long fields can be optimized using `@PackedType(IntPacking.VARINT)`
-  (unsigned varint) or `@PackedType(IntPacking.ZIGZAG)` (ZigZag) annotations.
-  If you already use `kotlinx-serialization-protobuf`, `@ProtoType` annotations are
-  recognized automatically as a fallback.
+* VarInts: Int/Long fields can be optimized using `@PackedType(IntPacking.DEFAULT)`
+  (unsigned varint) or `@PackedType(IntPacking.SIGNED)` (ZigZag) annotations.
+  The names match `kotlinx-serialization-protobuf`'s `ProtoIntegerType`, and
+  `@ProtoType` annotations are recognized automatically as a fallback.
 * Full Graph Support: Handles nested objects, lists, maps, and polymorphism
   recursively. While this is supported it will not produce as compact
   representations as flat structures that can pack all metadata into the same
@@ -87,7 +87,9 @@ payloads for Kotlin classes by moving structural metadata into a compact header.
 
 ```kotlin
 val compactFormat = PackedFormat {
-    defaultEncoding = IntPacking.ZIGZAG
+    // Change default from varint to fixed byte-width
+    defaultEncoding = IntPacking.FIXED
+    // Register custom serializers
     serializersModule = myCustomModule
 }
 val bytes = compactFormat.encodeToByteArray(payload)

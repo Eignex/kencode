@@ -75,10 +75,10 @@ data class StringHeavyPayload(
 
 @Serializable
 data class VarIntVarUIntPayload(
-    @PackedType(IntPacking.ZIGZAG) val signedIntVar: Int,
-    @PackedType(IntPacking.ZIGZAG) val signedLongVar: Long,
-    @PackedType(IntPacking.VARINT) val unsignedIntVar: Int,
-    @PackedType(IntPacking.VARINT) val unsignedLongVar: Long,
+    @PackedType(IntPacking.SIGNED) val signedIntVar: Int,
+    @PackedType(IntPacking.SIGNED) val signedLongVar: Long,
+    @PackedType(IntPacking.DEFAULT) val unsignedIntVar: Int,
+    @PackedType(IntPacking.DEFAULT) val unsignedLongVar: Long,
     val plainInt: Int,
     val plainLong: Long
 )

@@ -8,10 +8,10 @@ import kotlinx.serialization.modules.SerializersModule
  * Holds the configuration for a [PackedFormat] instance.
  *
  * @property defaultEncoding The encoding applied to all `Int` and `Long` fields that carry no
- *   [PackedType] annotation. Defaults to [IntPacking.FIXED] (4 / 8 raw bytes).
+ *   [PackedType] annotation. Defaults to [IntPacking.DEFAULT] varint encoding.
  */
 data class PackedConfiguration(
-    val defaultEncoding: IntPacking = IntPacking.FIXED
+    val defaultEncoding: IntPacking = IntPacking.DEFAULT
 )
 
 /**
@@ -38,7 +38,7 @@ open class PackedFormat(
 ) : BinaryFormat {
 
     /**
-     * Default instance with no default varint/zigzag optimizations applied automatically.
+     * Default instance using [IntPacking.DEFAULT] (unsigned varint) for all unannotated `Int`/`Long` fields.
      */
     companion object Default : PackedFormat()
 
@@ -76,9 +76,9 @@ class PackedFormatBuilder {
 
     /**
      * The encoding applied to all `Int` and `Long` fields that carry no [PackedType] annotation.
-     * Defaults to [IntPacking.FIXED].
+     * Defaults to [IntPacking.DEFAULT].
      */
-    var defaultEncoding: IntPacking = IntPacking.FIXED
+    var defaultEncoding: IntPacking = IntPacking.DEFAULT
 }
 
 /**
@@ -86,7 +86,7 @@ class PackedFormatBuilder {
  *
  * ```
  * val format = PackedFormat {
- *     defaultEncoding = Packing.ZIGZAG
+ *     defaultEncoding = IntPacking.SIGNED
  *     serializersModule = myCustomModule
  * }
  * ```
