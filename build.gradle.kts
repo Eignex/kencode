@@ -11,7 +11,11 @@ eignexPublish {
 kotlin {
     jvm()
     js(IR) { browser(); nodejs() }
-    linuxX64(); macosX64(); macosArm64(); mingwX64()
+    wasmJs { browser(); nodejs() }
+    wasmWasi { nodejs() }
+    linuxX64(); linuxArm64()
+    macosX64(); macosArm64(); mingwX64()
+    iosX64(); iosArm64(); iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
