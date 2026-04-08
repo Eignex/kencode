@@ -149,7 +149,11 @@ Encoding `"any byte data"` (13 bytes):
 
 ---
 
-## Encryption
+## Extensions
+
+There are examples in the jvmTest source of how to extend the encoding with encryption or error correction.
+
+### Encryption
 
 Wrap a cipher as a `PayloadTransform` and pass it to `EncodedFormat`:
 
@@ -171,11 +175,9 @@ val decoded = secureFormat.decodeFromString(SecretPayload.serializer(), token)
 ```
 
 See [EncryptionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
-for a BouncyCastle demo.
+for the full exapmle using BouncyCastle.
 
----
-
-## Error Correction
+### Error Correction
 
 Wrap an error-correcting code as a `PayloadTransform` to recover from corrupted bytes:
 
@@ -194,4 +196,4 @@ val decoded = robustFormat.decodeFromString(SecretPayload.serializer(), token)
 ```
 
 See [ErrorCorrectionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
-for a zxing demo with simulated byte corruption.
+for the full example using zxing and simulated byte corruption.
