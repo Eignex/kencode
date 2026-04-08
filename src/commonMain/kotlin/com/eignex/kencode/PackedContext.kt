@@ -1,7 +1,9 @@
 package com.eignex.kencode
 
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 
 /**
  * Schema-derived boolean/nullable metadata for a single class descriptor.

@@ -2,7 +2,10 @@ package com.eignex.kencode
 
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -334,8 +337,9 @@ class PackedDecoder internal constructor(
 
         val kind = deserializer.descriptor.kind
         val isInline = deserializer.descriptor.isInline
+        val isStructural = kind is StructureKind || kind is PolymorphicKind
 
-        if (isNullableCollection && deserializer.descriptor.isNullable && !isInline && (kind is StructureKind || kind is PolymorphicKind)) {
+        if (isNullableCollection && deserializer.descriptor.isNullable && !isInline && isStructural) {
             val isNotNull = decodeNotNullMark()
             if (!isNotNull) {
                 currentIndex = -1
@@ -351,7 +355,7 @@ class PackedDecoder internal constructor(
             return value
         }
 
-        if (!isInline && (kind is StructureKind || kind is PolymorphicKind)) {
+        if (!isInline && isStructural) {
             // Share the HeaderContext only when the current decoder is in merged mode
             // and the child is a non-nullable, non-inline CLASS/OBJECT in a non-collection context.
             val shouldShareCtx = shouldMergeChildCtx(

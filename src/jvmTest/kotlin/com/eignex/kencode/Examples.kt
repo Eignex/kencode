@@ -1,6 +1,9 @@
 package com.eignex.kencode
 
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.SecureRandom
@@ -58,8 +61,7 @@ class Examples {
         // This encodes the object into the string:
         // 02waa1a8
 
-        val decodedState =
-            EncodedFormat.decodeFromString<JobState>(encodedState)
+        EncodedFormat.decodeFromString<JobState>(encodedState)
     }
 
     @Test

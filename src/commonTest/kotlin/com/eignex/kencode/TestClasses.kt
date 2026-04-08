@@ -4,7 +4,9 @@ package com.eignex.kencode
 
 import kotlinx.serialization.Serializable
 import kotlin.jvm.JvmInline
-import kotlin.time.*
+import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @Serializable
 data class SimpleIntsAndBooleans(

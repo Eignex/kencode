@@ -1,6 +1,6 @@
 package com.eignex.kencode
 
-val ASCII85 =
+const val ASCII85 =
     "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstu"
 
 /**
@@ -68,7 +68,7 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
 
         val fullGroups = len / 5
         val rem = len % 5
-        if (rem == 1) throw IllegalArgumentException("Invalid ASCII85 length")
+        require(rem != 1) { "Invalid ASCII85 length" }
 
         val extraBytes = if (rem == 0) 0 else (rem - 1)
         val out = ByteArray(fullGroups * 4 + extraBytes)

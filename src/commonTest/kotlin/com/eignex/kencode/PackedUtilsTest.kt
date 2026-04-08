@@ -2,7 +2,7 @@ package com.eignex.kencode
 
 import kotlin.test.*
 
-class BitPackingTest {
+class PackedUtilsTest {
 
     @Test
     fun `packFlags simple bit pattern`() {

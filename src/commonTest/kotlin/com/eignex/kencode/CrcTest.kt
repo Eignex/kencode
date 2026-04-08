@@ -1,6 +1,8 @@
 package com.eignex.kencode
 
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 
 class CrcTest {
 
