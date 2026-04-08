@@ -138,6 +138,15 @@ implementations support custom alphabets.
 * Base85: High-density encoding (4 bytes to 5 characters).
 * Base64 / Base64UrlSafe: RFC 4648 compatible.
 
+Encoding `"any byte data"` (13 bytes):
+
+| Codec  | Output                  | Length | Alphabet         |
+|--------|-------------------------|--------|------------------|
+| Base62 | `2BVj6VHhfNlsGmoMQF`    | 18     | `[0-9A-Za-z]`    |
+| Base36 | `0ksef5o4kvegb70nre15t` | 21     | `[0-9a-z]`       |
+| Base64 | `YW55IGJ5dGUgZGF0YQ==`  | 20     | `[0-9A-Za-z+/=]` |
+| Base85 | `@;^?5@X3',+Cno&@/`     | 17     | ASCII 33–117     |
+
 ---
 
 ## Encryption
