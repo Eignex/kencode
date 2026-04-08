@@ -4,7 +4,7 @@ plugins {
 }
 
 eignexPublish {
-    description.set("ASCII-safe encodings and ultra-small binary serialization for Kotlin, optimized for URLs, file names, and Kubernetes labels. Generates short, predictable payloads within tight character limits.")
+    description.set("KEncode is a kotlinx.serialization library that produces short ASCII-safe texts for eg URLs or file names.")
     githubRepo.set("Eignex/kencode")
 }
 
