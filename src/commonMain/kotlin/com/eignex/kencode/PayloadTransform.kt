@@ -60,7 +60,7 @@ object CompactZeros : PayloadTransform {
     override fun decode(data: ByteArray): ByteArray {
         require(data.isNotEmpty()) { "Compact payload cannot be empty." }
         if (data[0] != 0.toByte()) return data // k=0, no prefix was written
-        val (k, prefixLen) = PackedUtils.decodeVarInt(data, 1)
+        val (k, prefixLen) = decodeVarInt(data, 1)
         val dataStart = 1 + prefixLen
         val result = ByteArray(k + data.size - dataStart)
         data.copyInto(result, destinationOffset = k, startIndex = dataStart)
@@ -69,7 +69,7 @@ object CompactZeros : PayloadTransform {
 
     private fun varintEncode(value: Int): ByteArray {
         val out = ByteOutput(5)
-        PackedUtils.writeVarInt(value, out)
+        writeVarInt(value, out)
         return out.toByteArray()
     }
 }

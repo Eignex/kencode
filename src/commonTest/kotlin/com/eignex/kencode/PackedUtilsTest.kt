@@ -7,7 +7,7 @@ class BitPackingTest {
     @Test
     fun `packFlags simple bit pattern`() {
         val flags = booleanArrayOf(true, false, true)
-        val packed = PackedUtils.packFlags(flags)
+        val packed = packFlags(flags)
 
         assertEquals(1, packed.size)
         assertEquals(5.toByte(), packed[0])
@@ -19,7 +19,7 @@ class BitPackingTest {
         flags[0] = true
         flags[10] = true
 
-        val packed = PackedUtils.packFlags(flags)
+        val packed = packFlags(flags)
 
         assertEquals(2, packed.size)
         assertEquals(1.toByte(), packed[0])
@@ -29,7 +29,7 @@ class BitPackingTest {
     @Test
     fun `packFlags all false optimizes to empty`() {
         val flags = booleanArrayOf(false, false, false, false)
-        val packed = PackedUtils.packFlags(flags)
+        val packed = packFlags(flags)
 
         assertEquals(0, packed.size)
     }
@@ -37,7 +37,7 @@ class BitPackingTest {
     @Test
     fun `packFlags empty input`() {
         val flags = BooleanArray(0)
-        val packed = PackedUtils.packFlags(flags)
+        val packed = packFlags(flags)
 
         assertEquals(0, packed.size)
     }
@@ -45,7 +45,7 @@ class BitPackingTest {
     @Test
     fun `unpackFlags simple`() {
         val input = byteArrayOf(5)
-        val unpacked = PackedUtils.unpackFlags(input, 0, 1)
+        val unpacked = unpackFlags(input, 0, 1)
 
         assertEquals(8, unpacked.size)
         assertTrue(unpacked[0])
@@ -57,7 +57,7 @@ class BitPackingTest {
     @Test
     fun `unpackFlags with offset`() {
         val input = byteArrayOf(0xFF.toByte(), 5, 0xFF.toByte())
-        val unpacked = PackedUtils.unpackFlags(input, 1, 1)
+        val unpacked = unpackFlags(input, 1, 1)
 
         assertEquals(8, unpacked.size)
         assertTrue(unpacked[0])
@@ -74,10 +74,10 @@ class BitPackingTest {
         flags[8] = true
         flags[15] = true
 
-        val packed = PackedUtils.packFlags(flags)
+        val packed = packFlags(flags)
         assertEquals(2, packed.size)
 
-        val unpacked = PackedUtils.unpackFlags(packed, 0, packed.size)
+        val unpacked = unpackFlags(packed, 0, packed.size)
         assertContentEquals(flags, unpacked)
     }
 
@@ -87,8 +87,8 @@ class BitPackingTest {
         flags[0] = true
         flags[9] = true
 
-        val packed = PackedUtils.packFlags(flags)
-        val unpacked = PackedUtils.unpackFlags(packed, 0, packed.size)
+        val packed = packFlags(flags)
+        val unpacked = unpackFlags(packed, 0, packed.size)
 
         assertEquals(16, unpacked.size)
 
@@ -105,19 +105,19 @@ class BitPackingTest {
     fun `unpackFlags throws on OOB`() {
         val input = byteArrayOf(1, 2)
         assertFailsWith<IllegalArgumentException> {
-            PackedUtils.unpackFlags(input, 0, 3)
+            unpackFlags(input, 0, 3)
         }
         assertFailsWith<IllegalArgumentException> {
-            PackedUtils.unpackFlags(input, 2, 1)
+            unpackFlags(input, 2, 1)
         }
     }
 
     @Test
     fun `short roundtrip`() {
         val out = ByteOutput()
-        PackedUtils.writeShort(0x1234.toShort(), out)
+        writeShort(0x1234.toShort(), out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readShort(bytes, 0)
+        val decoded = readShort(bytes, 0)
         assertEquals(0x1234.toShort(), decoded)
     }
 
@@ -125,18 +125,18 @@ class BitPackingTest {
     fun `short roundtrip offset`() {
         val out = ByteOutput()
         out.write(1)
-        PackedUtils.writeShort(0x1234.toShort(), out)
+        writeShort(0x1234.toShort(), out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readShort(bytes, 1)
+        val decoded = readShort(bytes, 1)
         assertEquals(0x1234.toShort(), decoded)
     }
 
     @Test
     fun `int roundtrip`() {
         val out = ByteOutput()
-        PackedUtils.writeInt(0x01020304, out)
+        writeInt(0x01020304, out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readInt(bytes, 0)
+        val decoded = readInt(bytes, 0)
         assertEquals(0x01020304, decoded)
     }
 
@@ -144,9 +144,9 @@ class BitPackingTest {
     fun `int roundtrip offset`() {
         val out = ByteOutput()
         out.write(1)
-        PackedUtils.writeInt(0x01020304, out)
+        writeInt(0x01020304, out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readInt(bytes, 1)
+        val decoded = readInt(bytes, 1)
         assertEquals(0x01020304, decoded)
     }
 
@@ -154,9 +154,9 @@ class BitPackingTest {
     fun `long roundtrip`() {
         val value = 0x0102030405060708L
         val out = ByteOutput()
-        PackedUtils.writeLong(value, out)
+        writeLong(value, out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readLong(bytes, 0)
+        val decoded = readLong(bytes, 0)
         assertEquals(value, decoded)
     }
 
@@ -165,9 +165,9 @@ class BitPackingTest {
         val value = 0x0102030405060708L
         val out = ByteOutput()
         out.write(1)
-        PackedUtils.writeLong(value, out)
+        writeLong(value, out)
         val bytes = out.toByteArray()
-        val decoded = PackedUtils.readLong(bytes, 1)
+        val decoded = readLong(bytes, 1)
         assertEquals(value, decoded)
     }
 
@@ -175,8 +175,8 @@ class BitPackingTest {
     fun `zigzag int roundtrip`() {
         val values = listOf(0, 1, -1, 2, -2, Int.MAX_VALUE, Int.MIN_VALUE)
         for (v in values) {
-            val enc = PackedUtils.zigZagEncodeInt(v)
-            val dec = PackedUtils.zigZagDecodeInt(enc)
+            val enc = zigZagEncodeInt(v)
+            val dec = zigZagDecodeInt(enc)
             assertEquals(v, dec, "Int ZigZag failed for $v")
         }
     }
@@ -186,8 +186,8 @@ class BitPackingTest {
         val values =
             listOf(0L, 1L, -1L, 2L, -2L, Long.MAX_VALUE, Long.MIN_VALUE)
         for (v in values) {
-            val enc = PackedUtils.zigZagEncodeLong(v)
-            val dec = PackedUtils.zigZagDecodeLong(enc)
+            val enc = zigZagEncodeLong(v)
+            val dec = zigZagDecodeLong(enc)
             assertEquals(v, dec, "Long ZigZag failed for $v")
         }
     }
@@ -204,9 +204,9 @@ class BitPackingTest {
         )
         for (v in values) {
             val out = ByteOutput()
-            PackedUtils.writeVarInt(v, out)
+            writeVarInt(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = PackedUtils.decodeVarInt(bytes, 0)
+            val (decoded, consumed) = decodeVarInt(bytes, 0)
             assertEquals(v, decoded, "VarInt failed for $v")
             assertEquals(
                 bytes.size,
@@ -229,9 +229,9 @@ class BitPackingTest {
         for (v in values) {
             val out = ByteOutput()
             out.write(1)
-            PackedUtils.writeVarInt(v, out)
+            writeVarInt(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = PackedUtils.decodeVarInt(bytes, 1)
+            val (decoded, consumed) = decodeVarInt(bytes, 1)
             assertEquals(v, decoded, "VarInt failed for $v")
             assertEquals(
                 bytes.size,
@@ -253,9 +253,9 @@ class BitPackingTest {
         )
         for (v in values) {
             val out = ByteOutput()
-            PackedUtils.writeVarLong(v, out)
+            writeVarLong(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = PackedUtils.decodeVarLong(bytes, 0)
+            val (decoded, consumed) = decodeVarLong(bytes, 0)
             assertEquals(v, decoded, "VarLong failed for $v")
             assertEquals(
                 bytes.size,
@@ -278,9 +278,9 @@ class BitPackingTest {
         for (v in values) {
             val out = ByteOutput()
             out.write(1)
-            PackedUtils.writeVarLong(v, out)
+            writeVarLong(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = PackedUtils.decodeVarLong(bytes, 1)
+            val (decoded, consumed) = decodeVarLong(bytes, 1)
             assertEquals(v, decoded, "VarLong failed for $v")
             assertEquals(
                 bytes.size,
@@ -293,8 +293,8 @@ class BitPackingTest {
     @Test
     fun `flags roundtrip`() {
         val flags = booleanArrayOf(true, false, true, true, false)
-        val longFlags = PackedUtils.packFlagsToLong(flags)
-        val unpacked = PackedUtils.unpackFlagsFromLong(longFlags, flags.size)
+        val longFlags = packFlagsToLong(flags)
+        val unpacked = unpackFlagsFromLong(longFlags, flags.size)
         assertContentEquals(flags, unpacked)
     }
 
@@ -334,31 +334,31 @@ class BitPackingTest {
     fun `comprehensive truncation coverage`() {
         val types: List<Pair<String, (ByteOutput) -> Unit>> = listOf(
             "Short" to {
-                PackedUtils.writeShort(
+                writeShort(
                     1102,
                     it
                 )
             },
             "Int" to {
-                PackedUtils.writeInt(
+                writeInt(
                     110258102,
                     it
                 )
             },
             "Long" to {
-                PackedUtils.writeLong(
+                writeLong(
                     1102401240912490L,
                     it
                 )
             },
             "VarInt" to {
-                PackedUtils.writeVarInt(
+                writeVarInt(
                     110249021,
                     it
                 )
             },
             "VarLong" to {
-                PackedUtils.writeVarLong(
+                writeVarLong(
                     112085102501L,
                     it
                 )
@@ -374,11 +374,11 @@ class BitPackingTest {
 
             assertFailsWith<IllegalArgumentException>("Should fail $name truncation") {
                 when (name) {
-                    "Short" -> PackedUtils.readShort(truncated, 0)
-                    "Int" -> PackedUtils.readInt(truncated, 0)
-                    "Long" -> PackedUtils.readLong(truncated, 0)
-                    "VarInt" -> PackedUtils.decodeVarInt(truncated, 0)
-                    "VarLong" -> PackedUtils.decodeVarLong(truncated, 0)
+                    "Short" -> readShort(truncated, 0)
+                    "Int" -> readInt(truncated, 0)
+                    "Long" -> readLong(truncated, 0)
+                    "VarInt" -> decodeVarInt(truncated, 0)
+                    "VarLong" -> decodeVarLong(truncated, 0)
                 }
             }
         }

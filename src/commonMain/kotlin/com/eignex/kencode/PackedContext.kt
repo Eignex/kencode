@@ -126,7 +126,7 @@ internal class HeaderContext {
     fun load(input: ByteArray, offset: Int, count: Int): Int {
         if (count == 0) return 0
         val numBytes = (count + 7) / 8
-        val flags = PackedUtils.unpackFlags(input, offset, numBytes)
+        val flags = unpackFlags(input, offset, numBytes)
         repeat(count) { bits.add(if (it < flags.size) flags[it] else false) }
         return numBytes
     }

@@ -73,7 +73,7 @@ class PackedEncoder internal constructor(
         collectionSize: Int
     ): CompositeEncoder {
         val target = if (inStructure) dataBuffer else output
-        PackedUtils.writeVarInt(collectionSize, target)
+        writeVarInt(collectionSize, target)
         val childEncoder = PackedEncoder(target, config, serializersModule)
         childEncoder.initializeStructure(descriptor)
         return childEncoder
@@ -135,7 +135,7 @@ class PackedEncoder internal constructor(
     }
 
     override fun encodeShort(value: Short) {
-        PackedUtils.writeShort(value, getBuffer())
+        writeShort(value, getBuffer())
     }
 
     override fun encodeInt(value: Int) {
@@ -143,19 +143,19 @@ class PackedEncoder internal constructor(
             encodeIntElement(currentDescriptor, currentIndex, value)
         } else {
             when (config.defaultEncoding) {
-                IntPacking.SIGNED -> PackedUtils.writeVarInt(
-                    PackedUtils.zigZagEncodeInt(
+                IntPacking.SIGNED -> writeVarInt(
+                    zigZagEncodeInt(
                         value
                     ),
                     getBuffer()
                 )
 
-                IntPacking.DEFAULT -> PackedUtils.writeVarInt(
+                IntPacking.DEFAULT -> writeVarInt(
                     value,
                     getBuffer()
                 )
 
-                IntPacking.FIXED -> PackedUtils.writeInt(value, getBuffer())
+                IntPacking.FIXED -> writeInt(value, getBuffer())
             }
         }
     }
@@ -165,29 +165,29 @@ class PackedEncoder internal constructor(
             encodeLongElement(currentDescriptor, currentIndex, value)
         } else {
             when (config.defaultEncoding) {
-                IntPacking.SIGNED -> PackedUtils.writeVarLong(
-                    PackedUtils.zigZagEncodeLong(
+                IntPacking.SIGNED -> writeVarLong(
+                    zigZagEncodeLong(
                         value
                     ),
                     getBuffer()
                 )
 
-                IntPacking.DEFAULT -> PackedUtils.writeVarLong(
+                IntPacking.DEFAULT -> writeVarLong(
                     value,
                     getBuffer()
                 )
 
-                IntPacking.FIXED -> PackedUtils.writeLong(value, getBuffer())
+                IntPacking.FIXED -> writeLong(value, getBuffer())
             }
         }
     }
 
     override fun encodeFloat(value: Float) {
-        PackedUtils.writeInt(value.toBits(), getBuffer())
+        writeInt(value.toBits(), getBuffer())
     }
 
     override fun encodeDouble(value: Double) {
-        PackedUtils.writeLong(value.toBits(), getBuffer())
+        writeLong(value.toBits(), getBuffer())
     }
 
     override fun encodeChar(value: Char) {
@@ -197,13 +197,13 @@ class PackedEncoder internal constructor(
     override fun encodeString(value: String) {
         val bytes = value.encodeToByteArray()
         val buf = getBuffer()
-        PackedUtils.writeVarInt(bytes.size, buf)
+        writeVarInt(bytes.size, buf)
         buf.write(bytes)
     }
 
     @ExperimentalSerializationApi
     override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) {
-        PackedUtils.writeVarInt(index, getBuffer())
+        writeVarInt(index, getBuffer())
     }
 
     @ExperimentalSerializationApi
@@ -212,12 +212,12 @@ class PackedEncoder internal constructor(
             if (isNullableCollection) {
                 collectionBitmapValues.add(true)
             } else {
-                PackedUtils.writeVarLong(1L, dataBuffer)
+                writeVarLong(1L, dataBuffer)
             }
         } else if (inStructure) {
             error("encodeNull should not be used inside Classes; use bitmask")
         } else {
-            PackedUtils.writeVarLong(1L, output)
+            writeVarLong(1L, output)
         }
     }
 
@@ -227,10 +227,10 @@ class PackedEncoder internal constructor(
             if (isNullableCollection) {
                 collectionBitmapValues.add(false)
             } else {
-                PackedUtils.writeVarLong(0L, dataBuffer)
+                writeVarLong(0L, dataBuffer)
             }
         } else if (!inStructure) {
-            PackedUtils.writeVarLong(0L, output)
+            writeVarLong(0L, output)
         }
     }
 
@@ -296,15 +296,15 @@ class PackedEncoder internal constructor(
                 config
             )
         ) {
-            IntPacking.SIGNED -> PackedUtils.writeVarInt(
-                PackedUtils.zigZagEncodeInt(
+            IntPacking.SIGNED -> writeVarInt(
+                zigZagEncodeInt(
                     value
                 ),
                 dataBuffer
             )
 
-            IntPacking.DEFAULT -> PackedUtils.writeVarInt(value, dataBuffer)
-            IntPacking.FIXED -> PackedUtils.writeInt(value, dataBuffer)
+            IntPacking.DEFAULT -> writeVarInt(value, dataBuffer)
+            IntPacking.FIXED -> writeInt(value, dataBuffer)
         }
     }
 
@@ -319,15 +319,15 @@ class PackedEncoder internal constructor(
                 config
             )
         ) {
-            IntPacking.SIGNED -> PackedUtils.writeVarLong(
-                PackedUtils.zigZagEncodeLong(
+            IntPacking.SIGNED -> writeVarLong(
+                zigZagEncodeLong(
                     value
                 ),
                 dataBuffer
             )
 
-            IntPacking.DEFAULT -> PackedUtils.writeVarLong(value, dataBuffer)
-            IntPacking.FIXED -> PackedUtils.writeLong(value, dataBuffer)
+            IntPacking.DEFAULT -> writeVarLong(value, dataBuffer)
+            IntPacking.FIXED -> writeLong(value, dataBuffer)
         }
     }
 
@@ -344,7 +344,7 @@ class PackedEncoder internal constructor(
         index: Int,
         value: Short
     ) {
-        PackedUtils.writeShort(value, dataBuffer)
+        writeShort(value, dataBuffer)
     }
 
     override fun encodeCharElement(
@@ -360,7 +360,7 @@ class PackedEncoder internal constructor(
         index: Int,
         value: Float
     ) {
-        PackedUtils.writeInt(value.toBits(), dataBuffer)
+        writeInt(value.toBits(), dataBuffer)
     }
 
     override fun encodeDoubleElement(
@@ -368,7 +368,7 @@ class PackedEncoder internal constructor(
         index: Int,
         value: Double
     ) {
-        PackedUtils.writeLong(value.toBits(), dataBuffer)
+        writeLong(value.toBits(), dataBuffer)
     }
 
     override fun encodeStringElement(
@@ -377,7 +377,7 @@ class PackedEncoder internal constructor(
         value: String
     ) {
         val bytes = value.encodeToByteArray()
-        PackedUtils.writeVarInt(bytes.size, dataBuffer)
+        writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
 

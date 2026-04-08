@@ -98,7 +98,7 @@ class PackedDecoder internal constructor(
             } else {
                 val numBytes = (totalFlags + 7) / 8
                 val allFlags =
-                    PackedUtils.unpackFlags(input, position, numBytes)
+                    unpackFlags(input, position, numBytes)
                 position += numBytes
                 booleanValues =
                     BooleanArray(bitmask.boolCount) { i -> allFlags[i] }
@@ -120,13 +120,13 @@ class PackedDecoder internal constructor(
             if (isNullableCollection) {
                 val numBytes = (size + 7) / 8
                 collectionNullBitmap =
-                    PackedUtils.unpackFlags(input, position, numBytes)
+                    unpackFlags(input, position, numBytes)
                 position += numBytes
             }
             if (isBooleanCollection) {
                 val numBytes = (size + 7) / 8
                 collectionBoolBitmap =
-                    PackedUtils.unpackFlags(input, position, numBytes)
+                    unpackFlags(input, position, numBytes)
                 position += numBytes
             }
         }
@@ -174,7 +174,7 @@ class PackedDecoder internal constructor(
             decodeIntElement(currentDescriptor, currentIndex)
         } else {
             when (config.defaultEncoding) {
-                IntPacking.SIGNED -> PackedUtils.zigZagDecodeInt(readVarInt())
+                IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
                 IntPacking.DEFAULT -> readVarInt()
                 IntPacking.FIXED -> readIntPos()
             }
@@ -185,7 +185,7 @@ class PackedDecoder internal constructor(
             decodeLongElement(currentDescriptor, currentIndex)
         } else {
             when (config.defaultEncoding) {
-                IntPacking.SIGNED -> PackedUtils.zigZagDecodeLong(readVarLong())
+                IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
                 IntPacking.DEFAULT -> readVarLong()
                 IntPacking.FIXED -> readLongPos()
             }
@@ -273,7 +273,7 @@ class PackedDecoder internal constructor(
                 config
             )
         ) {
-            IntPacking.SIGNED -> PackedUtils.zigZagDecodeInt(readVarInt())
+            IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
             IntPacking.DEFAULT -> readVarInt()
             IntPacking.FIXED -> readIntPos()
         }
@@ -288,7 +288,7 @@ class PackedDecoder internal constructor(
                 config
             )
         ) {
-            IntPacking.SIGNED -> PackedUtils.zigZagDecodeLong(readVarLong())
+            IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
             IntPacking.DEFAULT -> readVarLong()
             IntPacking.FIXED -> readLongPos()
         }
@@ -433,13 +433,13 @@ class PackedDecoder internal constructor(
     }
 
     private fun readShortPos(): Short =
-        PackedUtils.readShort(input, position).also { position += 2 }
+        readShort(input, position).also { position += 2 }
 
     private fun readIntPos(): Int =
-        PackedUtils.readInt(input, position).also { position += 4 }
+        readInt(input, position).also { position += 4 }
 
     private fun readLongPos(): Long =
-        PackedUtils.readLong(input, position).also { position += 8 }
+        readLong(input, position).also { position += 8 }
 
     private fun readUtf8Char(): Char {
         require(position < input.size) { "Unexpected EOF while decoding UTF-8 char" }
