@@ -85,9 +85,7 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
         val fullBlocks = input.length / fullBlockLen
         val lastBlockLen = input.length % fullBlockLen
 
-        if (lastBlockLen != 0 && lastBlockLen !in lengths) {
-            throw IllegalArgumentException("Invalid encoded length: ${input.length}")
-        }
+        require(!(lastBlockLen != 0 && lastBlockLen !in lengths)) { "Invalid encoded length: ${input.length}" }
 
         val lastOutLen =
             if (lastBlockLen > 0) invLengths[lastBlockLen - 1] else 0
@@ -151,7 +149,7 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
             val code = input[i].code
             val index =
                 if (code < inverseAlphabet.size) inverseAlphabet[code] else -1
-            if (index < 0) throw IllegalArgumentException("Not an encoding char: '${input[i]}'")
+            require(index >= 0) { "Not an encoding char: '${input[i]}'" }
             n = n * base + BigInteger.fromLong(index.toLong())
         }
 
@@ -159,7 +157,7 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
             output[outPos + i] = (n and bigFF).byteValue(exactRequired = false)
             n = n shr 8
         }
-        if (n != bigZero) throw IllegalArgumentException("Invalid encoding block.")
+        require(n == bigZero) { "Invalid encoding block." }
         return output
     }
 }
