@@ -18,29 +18,73 @@ object Base62 : BaseRadix(BASE_62)
 object Base36 : BaseRadix(BASE_62.take(36))
 
 /**
- * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
+ * Maps indices to characters (encoding) and characters back to indices (decoding).
+ * [indexOf] returns -1 for characters not in the alphabet.
  */
-open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
-    ByteEncoding {
+interface Alphabet {
+    val size: Int
+    operator fun get(index: Int): Char
+    fun indexOf(c: Char): Int
+}
 
+/**
+ * Alphabet backed by an explicit string of characters.
+ */
+class CharAlphabet(private val chars: String) : Alphabet {
     init {
-        require(alphabet.length > 1) { "Alphabet must contain at least 2 characters." }
-        require(alphabet.toSet().size == alphabet.length) { "Alphabet must not contain duplicate characters." }
+        require(chars.length > 1) { "Alphabet must contain at least 2 characters." }
+        require(chars.toSet().size == chars.length) { "Alphabet must not contain duplicate characters." }
     }
 
-    private val alphabetSize: Int = alphabet.length
-    private val base: BigInteger = BigInteger.fromLong(alphabetSize.toLong())
-    private val logBase: Double = log2(alphabetSize.toDouble())
+    override val size: Int = chars.length
+    private val maxCode: Int = chars.maxOf { it.code }
+    private val inverse: IntArray = IntArray(maxCode + 1) { -1 }.also { lookup ->
+        chars.forEachIndexed { index, c -> lookup[c.code] = index }
+    }
+
+    override fun get(index: Int): Char = chars[index]
+    override fun indexOf(c: Char): Int = if (c.code <= maxCode) inverse[c.code] else -1
+}
+
+/**
+ * Alphabet backed by a contiguous Unicode range starting at [start].
+ * Defaults to U+0020 – U+D7FF (55,264 characters), the largest BMP range
+ * that avoids surrogate code points.
+ */
+class UnicodeRangeAlphabet(
+    private val start: Int = 0x0020,
+    override val size: Int = 0xD800 - 0x0020
+) : Alphabet {
+    init {
+        require(size > 1) { "Alphabet must contain at least 2 characters." }
+        require(start >= 0) { "Unicode range start must be non-negative." }
+        require(start + size <= 0xD800 || start >= 0xE000) {
+            "Unicode range must not overlap surrogate block (U+D800–U+DFFF)."
+        }
+        require(start + size <= 0x110000) { "Unicode range out of bounds." }
+    }
+
+    override fun get(index: Int): Char = (start + index).toChar()
+    override fun indexOf(c: Char): Int {
+        val offset = c.code - start
+        return if (offset in 0 until size) offset else -1
+    }
+}
+
+/**
+ * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
+ */
+open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
+    ByteEncoding {
+
+    constructor(chars: String, blockSize: Int = 32) : this(CharAlphabet(chars), blockSize)
+
+    private val base: BigInteger = BigInteger.fromLong(alphabet.size.toLong())
+    private val logBase: Double = log2(alphabet.size.toDouble())
 
     private val bigZero = BigInteger.ZERO
     private val bigFF = BigInteger.fromLong(0xFFL)
     private val zeroChar: Char get() = alphabet[0]
-
-    private val maxAlphabetChar: Int = alphabet.maxOf { it.code }
-    private val inverseAlphabet: IntArray =
-        IntArray(maxAlphabetChar + 1) { -1 }.also { lookup ->
-            alphabet.forEachIndexed { index, c -> lookup[c.code] = index }
-        }
 
     private val lengths: IntArray = IntArray(blockSize) { blockIndex ->
         val bytesCount = blockIndex + 1
@@ -136,8 +180,7 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
         var writeIndex = output.length - 1
         while (n > bigZero && writeIndex >= startPos) {
             val remainder = n.rem(base)
-            output[writeIndex--] =
-                alphabet[remainder.intValue(exactRequired = false)]
+            output[writeIndex--] = alphabet[remainder.intValue(exactRequired = false)]
             n /= base
         }
         return output
@@ -153,9 +196,7 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
     ): ByteArray {
         var n = bigZero
         for (i in inPos until (inPos + inLen)) {
-            val code = input[i].code
-            val index =
-                if (code < inverseAlphabet.size) inverseAlphabet[code] else -1
+            val index = alphabet.indexOf(input[i])
             require(index >= 0) { "Not an encoding char: '${input[i]}'" }
             n = n * base + BigInteger.fromLong(index.toLong())
         }

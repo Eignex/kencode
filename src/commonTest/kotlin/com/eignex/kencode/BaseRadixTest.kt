@@ -214,4 +214,53 @@ class BaseRadixTest {
             )
         }
     }
+
+    @Test
+    fun `UnicodeRangeAlphabet default roundtrips for various lengths`() {
+        val codec = BaseRadix(UnicodeRangeAlphabet())
+        val rng = Random(1111L)
+        for (len in 0..(codec.blockSize * 2)) {
+            val bytes = ByteArray(len).also { rng.nextBytes(it) }
+            assertRoundtrip(codec, bytes, "UnicodeRange default roundtrip failed for len=$len")
+        }
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet produces shorter output than Base62`() {
+        val unicode = BaseRadix(UnicodeRangeAlphabet())
+        val bytes = ByteArray(32) { it.toByte() }
+        assertTrue(unicode.encode(bytes).length < Base62.encode(bytes).length)
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet custom range roundtrips`() {
+        // Narrow range: Greek letters U+0391–U+03C9 (57 chars)
+        val greek = BaseRadix(UnicodeRangeAlphabet(start = 0x0391, size = 57))
+        val rng = Random(2222L)
+        for (len in 0..greek.blockSize) {
+            val bytes = ByteArray(len).also { rng.nextBytes(it) }
+            assertRoundtrip(greek, bytes, "Greek range roundtrip failed for len=$len")
+        }
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet indexOf returns -1 for out-of-range char`() {
+        val alpha = UnicodeRangeAlphabet(start = 0x0391, size = 57)
+        assertEquals(-1, alpha.indexOf('A'))
+        assertEquals(-1, alpha.indexOf('\u0000'))
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet rejects surrogate overlap`() {
+        assertFailsWith<IllegalArgumentException> {
+            UnicodeRangeAlphabet(start = 0xD000, size = 0x1000)
+        }
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet rejects size less than 2`() {
+        assertFailsWith<IllegalArgumentException> {
+            UnicodeRangeAlphabet(start = 0x0020, size = 1)
+        }
+    }
 }
