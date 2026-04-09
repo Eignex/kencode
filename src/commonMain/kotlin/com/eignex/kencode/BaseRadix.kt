@@ -66,13 +66,16 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
     override fun encode(input: ByteArray, offset: Int, length: Int): String {
         require(offset >= 0 && length >= 0 && offset + length <= input.size)
         val output = StringBuilder(length * 2)
+        val workBuffer = ByteArray(blockSize)
         var inPos = offset
         var remaining = length
 
         while (remaining > 0) {
             val inLen = min(blockSize, remaining)
             val outLen = lengths[inLen - 1]
-            encodeBlock(input, inPos, inLen, output, outLen = outLen)
+            if (inLen < blockSize) workBuffer.fill(0, 0, blockSize - inLen)
+            input.copyInto(workBuffer, blockSize - inLen, inPos, inPos + inLen)
+            encodeBlock(workBuffer, output = output, outLen = outLen)
             inPos += inLen
             remaining -= inLen
         }
@@ -121,7 +124,11 @@ open class BaseRadix(private val alphabet: String, val blockSize: Int = 32) :
         outLen: Int = lengths[inLen - 1]
     ): StringBuilder {
         var n = BigInteger.fromByteArray(
-            input.sliceArray(inPos until inPos + inLen),
+            if (inPos == 0 && inLen == input.size) {
+                input
+            } else {
+                input.sliceArray(inPos until inPos + inLen)
+            },
             Sign.POSITIVE
         )
         val startPos = output.length
