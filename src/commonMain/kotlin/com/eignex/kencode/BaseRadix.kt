@@ -87,6 +87,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
     private val zeroChar: Char get() = alphabet[0]
 
     private val isMassiveBase = alphabet.size > 256
+
     // Full block length must exceed any partial block's so the decoder can split unambiguously.
     private val massiveFullBlockLen: Int = maxOf(
         ceil((blockSize * 8) / logBase).toInt(),
@@ -233,8 +234,11 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
         var l = from
         var r = to - 1
         while (l < r) {
-            val tmp = this[l]; this[l] = this[r]; this[r] = tmp
-            l++; r--
+            val tmp = this[l]
+            this[l] = this[r]
+            this[r] = tmp
+            l++
+            r--
         }
     }
 
@@ -290,7 +294,13 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
                 }
 
                 val bytes = n.toByteArray()
-                val actualBytes = if (bytes.size > 1 && bytes[0] == 0.toByte()) bytes.sliceArray(1 until bytes.size) else bytes
+                val actualBytes = if (bytes.size > 1 && bytes[0] == 0.toByte()) {
+                    bytes.sliceArray(
+                        1 until bytes.size
+                    )
+                } else {
+                    bytes
+                }
 
                 actualBytes.copyInto(output, outPos)
                 outPos += actualBytes.size

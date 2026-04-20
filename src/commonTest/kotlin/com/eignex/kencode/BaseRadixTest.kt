@@ -257,7 +257,11 @@ class BaseRadixTest {
     fun `massive bases handle high bit bytes without sign corruption`() {
         val codec = BaseRadix(UnicodeRangeAlphabet())
         val input = byteArrayOf(
-            0xFF.toByte(), 0x80.toByte(), 0x7F.toByte(), 0x00, 0xFF.toByte()
+            0xFF.toByte(),
+            0x80.toByte(),
+            0x7F.toByte(),
+            0x00,
+            0xFF.toByte()
         )
         assertRoundtrip(codec, input, "High bit bytes failed on massive base")
     }
