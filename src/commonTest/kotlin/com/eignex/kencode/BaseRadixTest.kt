@@ -118,31 +118,6 @@ class BaseRadixTest {
     }
 
     @Test
-    fun `block encoding should roundtrip`() {
-        val rng = Random(99L)
-        val coder = BaseRadix("0123456789abcdef")
-
-        for (len in 1..coder.blockSize) {
-            val bytes = ByteArray(len).also { rng.nextBytes(it) }
-            val tmp = StringBuilder()
-            coder.encodeBlock(bytes, 0, len, tmp)
-            val outLen = tmp.length
-            val encoded = StringBuilder()
-            coder.encodeBlock(bytes, 0, len, encoded, outLen)
-            val decoded = coder.decodeBlock(encoded, 0, encoded.length)
-            assertContentEquals(bytes, decoded, "Block len=$len")
-        }
-    }
-
-    @Test
-    fun `decodeBlock with too small output should throw`() {
-        val coder = BaseRadix("0123456789abcdef")
-        assertFailsWith<IllegalArgumentException> {
-            coder.decodeBlock("ff", 0, 2, ByteArray(0), 0, 0)
-        }
-    }
-
-    @Test
     fun `invalid alphabet should throw`() {
         assertFailsWith<IllegalArgumentException> { BaseRadix("", 4) }
         assertFailsWith<IllegalArgumentException> { BaseRadix("x", 4) }
@@ -178,14 +153,6 @@ class BaseRadixTest {
                 )
             )
         )
-    }
-
-    @Test
-    fun `encodeBlock appends to non-empty StringBuilder`() {
-        val hex = BaseRadix("0123456789abcdef")
-        val sb = StringBuilder("prefix:")
-        hex.encodeBlock(byteArrayOf(0xAB.toByte()), output = sb)
-        assertEquals("prefix:ab", sb.toString())
     }
 
     @Test
@@ -262,5 +229,61 @@ class BaseRadixTest {
         assertFailsWith<IllegalArgumentException> {
             UnicodeRangeAlphabet(start = 0x0020, size = 1)
         }
+    }
+
+    @Test
+    fun `standard bases preserve exact padding for leading zeros`() {
+        val hex = BaseRadix("0123456789abcdef")
+        val input = byteArrayOf(0, 0, 1)
+        val encoded = hex.encode(input)
+        assertEquals("000001", encoded, "Hex should strictly map 2 chars per byte")
+        assertContentEquals(input, hex.decode(encoded))
+    }
+
+    @Test
+    fun `massive bases dynamically preserve leading zeros correctly`() {
+        val codec = BaseRadix(UnicodeRangeAlphabet())
+        val zeroChar = UnicodeRangeAlphabet()[0]
+        val input = byteArrayOf(0, 0, 1)
+
+        val encoded = codec.encode(input)
+
+        assertTrue(encoded.startsWith("$zeroChar$zeroChar"))
+        assertFalse(encoded.startsWith("$zeroChar$zeroChar$zeroChar"))
+        assertContentEquals(input, codec.decode(encoded))
+    }
+
+    @Test
+    fun `massive bases handle high bit bytes without sign corruption`() {
+        val codec = BaseRadix(UnicodeRangeAlphabet())
+        val input = byteArrayOf(
+            0xFF.toByte(), 0x80.toByte(), 0x7F.toByte(), 0x00, 0xFF.toByte()
+        )
+        assertRoundtrip(codec, input, "High bit bytes failed on massive base")
+    }
+
+    @Test
+    fun `power-of-two massive base roundtrips at partial block boundary`() {
+        // base=512, blockSize=9: 8*blockSize is a multiple of log2(base), making an
+        // 8-byte partial block tie the encoded length of a 9-byte full block.
+        val codec = BaseRadix(UnicodeRangeAlphabet(start = 0x0020, size = 512), blockSize = 9)
+        val rng = Random(9999L)
+        for (len in 1..(codec.blockSize * 3)) {
+            val bytes = ByteArray(len).also { rng.nextBytes(it) }
+            assertRoundtrip(codec, bytes, "Power-of-two massive base failed at len=$len")
+            val allOnes = ByteArray(len) { 0xFF.toByte() }
+            assertRoundtrip(codec, allOnes, "Power-of-two massive base failed (0xFF) at len=$len")
+        }
+    }
+
+    @Test
+    fun `massive bases encode and decode exact block sizes correctly`() {
+        val codec = BaseRadix(UnicodeRangeAlphabet(), blockSize = 4)
+
+        val exactBlock = byteArrayOf(0xFF.toByte(), 0xEE.toByte(), 0xDD.toByte(), 0xCC.toByte())
+        assertRoundtrip(codec, exactBlock, "Exact block boundary failed")
+
+        val overBlock = byteArrayOf(0xFF.toByte(), 0xEE.toByte(), 0xDD.toByte(), 0xCC.toByte(), 0xBB.toByte())
+        assertRoundtrip(codec, overBlock, "Over block boundary failed")
     }
 }

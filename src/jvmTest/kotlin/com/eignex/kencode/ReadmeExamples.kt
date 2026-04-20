@@ -69,11 +69,12 @@ class ReadmeExamples {
     }
 
     @Test
-    fun `standalone readme`() {
+    fun `encoding examples`() {
         val bytes = "any byte data".encodeToByteArray()
         println(Base62.encode(bytes))
         println(Base36.encode(bytes))
         println(Base64.encode(bytes))
         println(Base85.encode(bytes))
+        println(BaseRadix(UnicodeRangeAlphabet()).encode(bytes))
     }
 }
