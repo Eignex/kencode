@@ -128,11 +128,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
             if (isMassiveBase) {
                 encodeMassiveBlock(input, inPos, inLen, output)
             } else {
-                val outLen = lengths[inLen - 1]
-                val workBuffer = ByteArray(blockSize)
-                if (inLen < blockSize) workBuffer.fill(0, 0, blockSize - inLen)
-                input.copyInto(workBuffer, blockSize - inLen, inPos, inPos + inLen)
-                encodeStandardBlock(workBuffer, output = output, outLen = outLen)
+                encodeStandardBlock(input, inPos, inLen, output, lengths[inLen - 1])
             }
 
             inPos += inLen
@@ -178,10 +174,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
         output: StringBuilder = StringBuilder(lengths.last()),
         outLen: Int = lengths[inLen - 1]
     ) {
-        var n = BigInteger.fromByteArray(
-            if (inPos == 0 && inLen == input.size) input else input.sliceArray(inPos until inPos + inLen),
-            Sign.POSITIVE
-        )
+        var n = bigIntOf(input, inPos, inLen)
         val startPos = output.length
         repeat(outLen) { output.append(zeroChar) }
         var writeIndex = output.length - 1
@@ -216,36 +209,43 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
 
     private fun encodeMassiveBlock(input: ByteArray, inPos: Int, inLen: Int, output: StringBuilder) {
         if (inLen == blockSize) {
-            var n = BigInteger.fromByteArray(input.sliceArray(inPos until inPos + inLen), Sign.POSITIVE)
-            val startPos = output.length
-            repeat(massiveFullBlockLen) { output.append(zeroChar) }
-            var writeIndex = output.length - 1
+            encodeStandardBlock(input, inPos, inLen, output, massiveFullBlockLen)
+            return
+        }
 
-            while (n > bigZero && writeIndex >= startPos) {
-                val remainder = n.rem(base)
-                output[writeIndex--] = alphabet[remainder.intValue(exactRequired = false)]
-                n /= base
-            }
-        } else {
-            var lz = 0
-            while (lz < inLen && input[inPos + lz] == 0.toByte()) lz++
+        var lz = 0
+        while (lz < inLen && input[inPos + lz] == 0.toByte()) lz++
+        repeat(lz) { output.append(zeroChar) }
 
-            repeat(lz) { output.append(zeroChar) }
+        if (lz == inLen) return
 
-            if (lz < inLen) {
-                var temp = BigInteger.fromByteArray(input.sliceArray((inPos + lz) until (inPos + inLen)), Sign.POSITIVE)
-                val chars = mutableListOf<Char>()
-                while (temp > bigZero) {
-                    val rem = temp.rem(base)
-                    chars.add(alphabet[rem.intValue(exactRequired = false)])
-                    temp /= base
-                }
-                for (i in chars.indices.reversed()) {
-                    output.append(chars[i])
-                }
-            }
+        var n = bigIntOf(input, inPos + lz, inLen - lz)
+        val startPos = output.length
+        while (n > bigZero) {
+            val rem = n.rem(base)
+            output.append(alphabet[rem.intValue(exactRequired = false)])
+            n /= base
+        }
+        output.reverse(startPos, output.length)
+    }
+
+    private fun StringBuilder.reverse(from: Int, to: Int) {
+        var l = from
+        var r = to - 1
+        while (l < r) {
+            val tmp = this[l]; this[l] = this[r]; this[r] = tmp
+            l++; r--
         }
     }
+
+    private fun bigIntOf(input: ByteArray, inPos: Int, inLen: Int): BigInteger =
+        BigInteger.fromByteArray(
+            if (inPos == 0 && inLen == input.size) input else input.sliceArray(inPos until inPos + inLen),
+            Sign.POSITIVE
+        )
+
+    private fun stripSignByte(bytes: ByteArray): ByteArray =
+        if (bytes.size > 1 && bytes[0] == 0.toByte()) bytes.sliceArray(1 until bytes.size) else bytes
 
     private fun decodeMassive(input: CharSequence): ByteArray {
         val fullBlocks = input.length / massiveFullBlockLen
@@ -263,8 +263,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
                 n = n * base + BigInteger.fromLong(index.toLong())
             }
 
-            val bytes = n.toByteArray()
-            val actualBytes = if (bytes.size > 1 && bytes[0] == 0.toByte()) bytes.sliceArray(1 until bytes.size) else bytes
+            val actualBytes = stripSignByte(n.toByteArray())
 
             val pad = blockSize - actualBytes.size
             require(pad >= 0) { "Decoded block exceeds expected block size." }
