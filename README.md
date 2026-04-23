@@ -136,7 +136,7 @@ implementations support custom alphabets.
   padding. Main use is to have 100% alpha-numeric output, with or without
   upper-case.
 * Base85: High-density encoding (4 bytes to 5 characters).
-* Base64 / Base64UrlSafe: RFC 4648 compatible.
+* Base64 / Base64Url: RFC 4648 compatible.
 
 Encoding `"any byte data"` (13 bytes):
 

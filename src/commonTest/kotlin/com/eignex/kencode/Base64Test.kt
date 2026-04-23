@@ -64,7 +64,7 @@ class Base64Test {
     }
 
     @Test
-    fun `fixed patterns should roundtrip for Base64UrlSafe`() {
+    fun `fixed patterns should roundtrip for Base64Url`() {
         val patterns = listOf(
             byteArrayOf(),
             byteArrayOf(0),
@@ -77,7 +77,7 @@ class Base64Test {
 
         for (bytes in patterns) {
             assertRoundtrip(
-                Base64UrlSafe,
+                Base64Url,
                 bytes,
                 "Failed for pattern=${bytes.toList()}"
             )

@@ -3,10 +3,10 @@ package com.eignex.kencode
 const val BASE_64 =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-const val BASE_64_URL_SAFE =
+const val BASE_64_URL =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
-object Base64UrlSafe : Base64(BASE_64_URL_SAFE.toCharArray())
+object Base64Url : Base64(BASE_64_URL.toCharArray())
 
 /**
  * RFC 4648–compatible Base64 encoder/decoder.
