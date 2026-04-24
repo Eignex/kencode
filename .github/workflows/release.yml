@@ -24,6 +24,16 @@ jobs:
       - name: Build and Test
         run: ./gradlew --no-daemon build -PciVersion=${{ env.RELEASE_VERSION }}
 
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: ignore
+
       - name: Publish to Maven Central (Portal)
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}

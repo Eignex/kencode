@@ -31,7 +31,17 @@ jobs:
         run: ./gradlew detekt
 
       - name: Run tests with coverage
-        run: ./gradlew koverXmlReport
+        run: ./gradlew allTests koverXmlReport
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: ignore
 
       - name: Upload results to Codecov (main only)
         if: github.ref == 'refs/heads/main'
