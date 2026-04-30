@@ -21,16 +21,15 @@ keys.
 
 ## Overview
 
-KEncode has three standalone entry points. ByteEncoding is a set of text codecs
-(Base62, Base36, Base64, Base85) for raw binary data.
+There are three entry points. ByteEncoding is a set of text codecs for raw
+binary data: Base62, Base36, Base64, Base85.
 
-PackedFormat is a kotlinx.serialization BinaryFormat that produces compact byte
-payloads for Kotlin classes, including nested objects, lists, and maps.
+PackedFormat is a kotlinx.serialization BinaryFormat that emits compact byte
+payloads for Kotlin classes, with full support for nested objects, lists, and
+maps. EncodedFormat then layers a text codec and optional payload transforms
+on top, producing short, deterministic string identifiers.
 
-EncodedFormat layers a text codec and optional payload transforms over a binary
-format to produce short, deterministic string identifiers.
-
-For a walkthrough of the bit-packing layout and design choices, see the
+For the design rationale and a walkthrough of the bit-packing layout, see the
 [technical deep dive](https://eignex.com/posts/kencode-packing-data-for-strict-limits/).
 
 ### Installation
@@ -71,13 +70,13 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 
 ## PackedFormat
 
-PackedFormat is a BinaryFormat for Kotlin classes that emits compact byte
-payloads. Booleans and nullability markers share a single bit-header (about one
-bit per field), and nested objects, lists, maps, and polymorphism are handled
+PackedFormat is a BinaryFormat aimed at the smallest feasible byte output.
+Booleans and nullability markers share a single bit-header, costing about one
+bit per field. Nested objects, lists, maps, and polymorphism all work
 recursively.
 
-Int and Long fields can be annotated with @PackedType to choose unsigned varint
-or ZigZag, and @ProtoType is recognized as a fallback.
+Int and Long fields take a @PackedType annotation to opt into unsigned varint
+or ZigZag. @ProtoType works as a fallback.
 
 ```kotlin
 val compactFormat = PackedFormat {
@@ -93,17 +92,16 @@ val bytes = compactFormat.encodeToByteArray(payload)
 
 ## EncodedFormat
 
-EncodedFormat is a StringFormat that produces short tokens by composing three
-layers. The binary layer is PackedFormat by default, but ProtoBuf is a good
-choice when cross-language compatibility matters.
+EncodedFormat is a StringFormat built from three composable layers.
 
-After serialization, an optional PayloadTransform can manipulate the bytes, for
-example CompactZeros to strip leading zeros, Checksum to append an integrity
-check, or a custom transform for encryption or error correction. Transforms
-compose with PayloadTransform.then.
+The first is binary: PackedFormat by default, or ProtoBuf when cross-language
+compatibility matters. The second is an optional PayloadTransform that
+manipulates the bytes after serialization. CompactZeros strips leading zeros,
+Checksum appends an integrity check, and custom transforms cover encryption or
+error correction; chain them with PayloadTransform.then.
 
-Finally a text codec turns the bytes into a string, with Base62 as the default
-and Base36, Base64, and Base85 available.
+A text codec finishes the job. Base62 is the default; Base36, Base64, and
+Base85 are also available.
 
 ```kotlin
 val customFormat = EncodedFormat {
@@ -124,13 +122,12 @@ val withBoth = EncodedFormat {
 
 ## Base Encoders
 
-KEncode ships standalone byte-to-text codecs, all of which accept custom
-alphabets.
+All four codecs are usable on their own and accept custom alphabets.
 
-Base62 and Base36 use fixed-block encoding for predictable lengths without
-padding, and produce purely alpha-numeric output (with or without upper-case).
-Base85 trades alphabet size for density, encoding four bytes into five
-characters. Base64 and Base64Url are RFC 4648 compatible.
+Base62 and Base36 use fixed-block encoding for predictable, unpadded output in
+a strictly alpha-numeric alphabet (with or without upper-case). Base85 is
+denser: four bytes in, five characters out. Base64 and Base64Url are RFC 4648
+compatible.
 
 Encoding `"any byte data"` (13 bytes):
 
@@ -143,9 +140,9 @@ Encoding `"any byte data"` (13 bytes):
 
 ## Extensions
 
-EncodedFormat can be extended by wrapping any byte transformation as a
-PayloadTransform. The jvmTest source includes two worked examples: an
+Any byte transformation can be wrapped as a PayloadTransform. Two worked
+examples live in the jvmTest source: an
 [encryption transform](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
 built on BouncyCastle, and an
 [error-correction transform](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
-built on zxing that recovers from simulated byte corruption.
+on zxing that recovers from simulated byte corruption.
