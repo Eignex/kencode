@@ -22,11 +22,13 @@ keys.
 ## Overview
 
 KEncode has three standalone entry points. ByteEncoding is a set of text codecs
-(Base62, Base36, Base64, Base85) for raw binary data. PackedFormat is a
-kotlinx.serialization BinaryFormat that produces compact byte payloads for
-Kotlin classes, including nested objects, lists, and maps. EncodedFormat layers
-a text codec and optional payload transforms over a binary format to produce
-short, deterministic string identifiers.
+(Base62, Base36, Base64, Base85) for raw binary data.
+
+PackedFormat is a kotlinx.serialization BinaryFormat that produces compact byte
+payloads for Kotlin classes, including nested objects, lists, and maps.
+
+EncodedFormat layers a text codec and optional payload transforms over a binary
+format to produce short, deterministic string identifiers.
 
 For a walkthrough of the bit-packing layout and design choices, see the
 [technical deep dive](https://eignex.com/posts/kencode-packing-data-for-strict-limits/).
@@ -72,8 +74,10 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 PackedFormat is a BinaryFormat for Kotlin classes that emits compact byte
 payloads. Booleans and nullability markers share a single bit-header (about one
 bit per field), and nested objects, lists, maps, and polymorphism are handled
-recursively. Int and Long fields can be annotated with @PackedType to choose
-unsigned varint or ZigZag, and @ProtoType is recognized as a fallback.
+recursively.
+
+Int and Long fields can be annotated with @PackedType to choose unsigned varint
+or ZigZag, and @ProtoType is recognized as a fallback.
 
 ```kotlin
 val compactFormat = PackedFormat {
@@ -91,12 +95,15 @@ val bytes = compactFormat.encodeToByteArray(payload)
 
 EncodedFormat is a StringFormat that produces short tokens by composing three
 layers. The binary layer is PackedFormat by default, but ProtoBuf is a good
-choice when cross-language compatibility matters. After serialization, an
-optional PayloadTransform can manipulate the bytes, for example CompactZeros to
-strip leading zeros, Checksum to append an integrity check, or a custom
-transform for encryption or error correction. Transforms compose with
-PayloadTransform.then. Finally a text codec turns the bytes into a string, with
-Base62 as the default and Base36, Base64, and Base85 available.
+choice when cross-language compatibility matters.
+
+After serialization, an optional PayloadTransform can manipulate the bytes, for
+example CompactZeros to strip leading zeros, Checksum to append an integrity
+check, or a custom transform for encryption or error correction. Transforms
+compose with PayloadTransform.then.
+
+Finally a text codec turns the bytes into a string, with Base62 as the default
+and Base36, Base64, and Base85 available.
 
 ```kotlin
 val customFormat = EncodedFormat {
@@ -118,10 +125,12 @@ val withBoth = EncodedFormat {
 ## Base Encoders
 
 KEncode ships standalone byte-to-text codecs, all of which accept custom
-alphabets. Base62 and Base36 use fixed-block encoding for predictable lengths
-without padding, and produce purely alpha-numeric output (with or without
-upper-case). Base85 trades alphabet size for density, encoding four bytes into
-five characters. Base64 and Base64Url are RFC 4648 compatible.
+alphabets.
+
+Base62 and Base36 use fixed-block encoding for predictable lengths without
+padding, and produce purely alpha-numeric output (with or without upper-case).
+Base85 trades alphabet size for density, encoding four bytes into five
+characters. Base64 and Base64Url are RFC 4648 compatible.
 
 Encoding `"any byte data"` (13 bytes):
 
