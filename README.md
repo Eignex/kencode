@@ -42,11 +42,11 @@ dependencies {
 ```
 
 For PackedFormat and EncodedFormat you also need to load the
-`kotlinx.serialization` plugin and core library.
+kotlinx.serialization plugin and core library.
 
 ## Full serialization example
 
-Minimal example using the default `EncodedFormat` (Base62 + PackedFormat):
+Minimal example using the default EncodedFormat (Base62 + PackedFormat):
 
 ```kotlin
 @Serializable
@@ -74,10 +74,8 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 PackedFormat is a BinaryFormat for Kotlin classes that emits compact byte
 payloads. Booleans and nullability markers share a single bit-header (about one
 bit per field), and nested objects, lists, maps, and polymorphism are handled
-recursively. Int and Long fields can be annotated with
-`@PackedType(IntPacking.DEFAULT)` for unsigned varint or
-`@PackedType(IntPacking.SIGNED)` for ZigZag; `@ProtoType` is recognized as a
-fallback.
+recursively. Int and Long fields can be annotated with @PackedType to choose
+unsigned varint or ZigZag, and @ProtoType is recognized as a fallback.
 
 ```kotlin
 val compactFormat = PackedFormat {
@@ -96,11 +94,11 @@ val bytes = compactFormat.encodeToByteArray(payload)
 EncodedFormat is a StringFormat that produces short tokens by composing three
 layers. The binary layer is PackedFormat by default, but ProtoBuf is a good
 choice when cross-language compatibility matters. After serialization, an
-optional PayloadTransform can manipulate the bytes — for example `CompactZeros`
-to strip leading zeros, `Checksum.asTransform()` to append an integrity check,
-or a custom transform for encryption or error correction; transforms compose
-with `PayloadTransform.then`. Finally a text codec turns the bytes into a
-string, with Base62 as the default and Base36, Base64, and Base85 available.
+optional PayloadTransform can manipulate the bytes, for example CompactZeros to
+strip leading zeros, Checksum to append an integrity check, or a custom
+transform for encryption or error correction. Transforms compose with
+PayloadTransform.then. Finally a text codec turns the bytes into a string, with
+Base62 as the default and Base36, Base64, and Base85 available.
 
 ```kotlin
 val customFormat = EncodedFormat {
@@ -140,16 +138,9 @@ Encoding `"any byte data"` (13 bytes):
 
 ## Extensions
 
-There are examples in the jvmTest source of how to extend the encoding with encryption or error correction.
-
-### Encryption
-
-Wrap a cipher as a `PayloadTransform` and pass it to `EncodedFormat`. See
-[EncryptionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
-for the full example using BouncyCastle.
-
-### Error Correction
-
-Wrap an error-correcting code as a `PayloadTransform` to recover from corrupted
-bytes. See [ErrorCorrectionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
-for the full example using zxing and simulated byte corruption.
+EncodedFormat can be extended by wrapping any byte transformation as a
+PayloadTransform. The jvmTest source includes two worked examples: an
+[encryption transform](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
+built on BouncyCastle, and an
+[error-correction transform](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
+built on zxing that recovers from simulated byte corruption.
