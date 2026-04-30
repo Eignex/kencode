@@ -19,8 +19,6 @@ KEncode produces short, predictable text payloads for environments with strict
 character or length limits such as URLs, file names, Kubernetes labels, and log
 keys.
 
----
-
 ## Overview
 
 KEncode has three standalone entry points. ByteEncoding is a set of text codecs
@@ -133,8 +131,6 @@ Encoding `"any byte data"` (13 bytes):
 | Base36 | `0ksef5o4kvegb70nre15t` | 21     | `[0-9a-z]`       |
 | Base64 | `YW55IGJ5dGUgZGF0YQ==`  | 20     | `[0-9A-Za-z+/=]` |
 | Base85 | `@;^?5@X3',+Cno&@/`     | 17     | ASCII 33–117     |
-
----
 
 ## Extensions
 
