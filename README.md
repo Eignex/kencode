@@ -144,45 +144,12 @@ There are examples in the jvmTest source of how to extend the encoding with encr
 
 ### Encryption
 
-Wrap a cipher as a `PayloadTransform` and pass it to `EncodedFormat`:
-
-```kotlin
-@Serializable
-data class SecretPayload(val id: Long)
-
-val encryptingTransform = object : PayloadTransform {
-    override fun encode(data: ByteArray): ByteArray = cipher.encrypt(data)
-    override fun decode(data: ByteArray): ByteArray = cipher.decrypt(data)
-}
-
-val secureFormat = EncodedFormat {
-    transform = encryptingTransform
-}
-
-val token = secureFormat.encodeToString(SecretPayload.serializer(), payload)
-val decoded = secureFormat.decodeFromString(SecretPayload.serializer(), token)
-```
-
-See [EncryptionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
+Wrap a cipher as a `PayloadTransform` and pass it to `EncodedFormat`. See
+[EncryptionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
 for the full example using BouncyCastle.
 
 ### Error Correction
 
-Wrap an error-correcting code as a `PayloadTransform` to recover from corrupted bytes:
-
-```kotlin
-val eccTransform = object : PayloadTransform {
-    override fun encode(data: ByteArray): ByteArray = ecc.encode(data)
-    override fun decode(data: ByteArray): ByteArray = ecc.decode(data)
-}
-
-val robustFormat = EncodedFormat {
-    transform = eccTransform
-}
-
-val token = robustFormat.encodeToString(SecretPayload.serializer(), payload)
-val decoded = robustFormat.decodeFromString(SecretPayload.serializer(), token)
-```
-
-See [ErrorCorrectionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
+Wrap an error-correcting code as a `PayloadTransform` to recover from corrupted
+bytes. See [ErrorCorrectionExample](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
 for the full example using zxing and simulated byte corruption.
