@@ -28,7 +28,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run linter
-        run: ./gradlew detekt
+        run: ./gradlew lintDocs
 
       - name: Run tests with coverage
         run: ./gradlew allTests koverXmlReport
