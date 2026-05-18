@@ -80,6 +80,7 @@ class UnicodeRangeAlphabet(
 /**
  * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
  *
+ * @param alphabet The alphabet used to map digit values to characters.
  * @property blockSize Number of input bytes processed per block; larger blocks pack more
  *   tightly but cost more BigInteger arithmetic.
  */
