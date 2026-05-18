@@ -11,6 +11,10 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
+/**
+ * Binary decoder for the [PackedFormat] wire format. Reads merged class bitmask headers
+ * and per-field data produced by [PackedEncoder].
+ */
 @Suppress("UNCHECKED_CAST")
 @OptIn(ExperimentalSerializationApi::class)
 class PackedDecoder internal constructor(

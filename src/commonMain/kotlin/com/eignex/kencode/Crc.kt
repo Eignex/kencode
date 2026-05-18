@@ -57,6 +57,7 @@ open class Crc8(
     refout: Boolean = false,
     xorOut: Int = 0x00
 ) : Checksum {
+    /** Default CRC-8/SMBUS instance. */
     companion object Default : Crc8()
 
     private val engine = CrcEngine(poly, init, refin, refout, xorOut, width = 8)
@@ -74,6 +75,7 @@ open class Crc16(
     refout: Boolean = true,
     xorOut: Int = 0xFFFF
 ) : Checksum {
+    /** Default CRC-16/X-25 instance. */
     companion object Default : Crc16()
 
     private val engine =
@@ -92,6 +94,7 @@ open class Crc32(
     refout: Boolean = true,
     xorOut: Int = 0xFFFFFFFF.toInt()
 ) : Checksum {
+    /** Default CRC-32/ISO-HDLC instance. */
     companion object Default : Crc32()
 
     private val engine =

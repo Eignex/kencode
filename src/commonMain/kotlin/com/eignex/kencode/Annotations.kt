@@ -30,7 +30,10 @@ enum class IntPacking {
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
-annotation class PackedType(val type: IntPacking)
+annotation class PackedType(
+    /** The integer encoding strategy to use for the annotated field. */
+    val type: IntPacking
+)
 
 private fun KxProtoIntegerType.toIntPacking(): IntPacking = when (this) {
     KxProtoIntegerType.DEFAULT -> IntPacking.DEFAULT

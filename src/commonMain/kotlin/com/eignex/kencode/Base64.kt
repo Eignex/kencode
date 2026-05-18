@@ -1,18 +1,24 @@
 package com.eignex.kencode
 
+/** Standard RFC 4648 Base64 alphabet (uses `+` and `/`). */
 const val BASE_64 =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+/** URL- and filename-safe Base64 alphabet from RFC 4648 §5 (uses `-` and `_`). */
 const val BASE_64_URL =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
+/** URL- and filename-safe variant of [Base64] using the [BASE_64_URL] alphabet. */
 object Base64Url : Base64(BASE_64_URL.toCharArray())
 
 /**
  * RFC 4648–compatible Base64 encoder/decoder.
+ *
+ * @property alphabet The 64-character alphabet used to map 6-bit groups to characters.
  */
 open class Base64(val alphabet: CharArray) : ByteEncoding {
 
+    /** Default Base64 instance using the standard [BASE_64] alphabet. */
     companion object Default : Base64(BASE_64.toCharArray())
 
     init {

@@ -10,6 +10,10 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
+/**
+ * Binary encoder for the [PackedFormat] wire format. Accumulates merged class bitmask
+ * headers and per-field data, producing output consumable by [PackedDecoder].
+ */
 @OptIn(ExperimentalSerializationApi::class)
 class PackedEncoder internal constructor(
     private val output: ByteOutput,

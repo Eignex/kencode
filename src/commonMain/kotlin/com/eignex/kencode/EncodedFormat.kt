@@ -94,10 +94,19 @@ open class EncodedFormat(
  * Builder for configuring [EncodedFormat] instances.
  */
 class EncodedFormatBuilder {
+    /** The ASCII-safe byte codec used to turn raw bytes into text. */
     var codec: ByteEncoding = Base62
+
+    /** Optional payload transform applied after serialization and before encoding. */
     var transform: PayloadTransform? = null
+
+    /** The underlying binary serialization format used before encoding to text. */
     var binaryFormat: BinaryFormat = PackedFormat.Default
 
+    /**
+     * Convenience setter that wraps a [Checksum] as a [PayloadTransform] and assigns
+     * it to [transform]. Always reads back as `null`.
+     */
     var checksum: Checksum?
         get() = null
         set(value) {

@@ -9,7 +9,10 @@ package com.eignex.kencode
  * Transforms must be inverse of each other: `decode(encode(data)).contentEquals(data)`.
  */
 interface PayloadTransform {
+    /** Transforms [data] on the way out, before base-encoding. */
     fun encode(data: ByteArray): ByteArray
+
+    /** Inverse of [encode]: restores the original payload after base-decoding. */
     fun decode(data: ByteArray): ByteArray
 }
 
@@ -17,7 +20,10 @@ interface PayloadTransform {
  * Generic checksum interface that produces a fixed number of bytes.
  */
 interface Checksum {
+    /** Number of bytes produced by [digest]. */
     val size: Int
+
+    /** Computes the checksum of [data] and returns it as a [size]-byte array. */
     fun digest(data: ByteArray): ByteArray
 }
 

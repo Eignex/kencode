@@ -1,5 +1,6 @@
 package com.eignex.kencode
 
+/** Standard ASCII85 alphabet (printable ASCII `!` through `u`). */
 const val ASCII85 =
     "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstu"
 
@@ -9,6 +10,7 @@ const val ASCII85 =
  */
 open class Base85(private val alphabet: CharArray) : ByteEncoding {
 
+    /** Default Base85 instance using the standard [ASCII85] alphabet. */
     companion object Default : Base85(ASCII85.toCharArray())
 
     init {

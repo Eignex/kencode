@@ -4,6 +4,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.ionspin.kotlin.bignum.integer.Sign
 import kotlin.math.*
 
+/** Base62 alphabet: digits, lowercase letters, then uppercase letters. */
 const val BASE_62: String =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -22,8 +23,13 @@ object Base36 : BaseRadix(BASE_62.take(36))
  * [indexOf] returns -1 for characters not in the alphabet.
  */
 interface Alphabet {
+    /** Number of characters in the alphabet. */
     val size: Int
+
+    /** Returns the character at [index] in the alphabet. */
     operator fun get(index: Int): Char
+
+    /** Returns the index of [c] in the alphabet, or `-1` if [c] is not present. */
     fun indexOf(c: Char): Int
 }
 
@@ -73,6 +79,9 @@ class UnicodeRangeAlphabet(
 
 /**
  * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
+ *
+ * @property blockSize Number of input bytes processed per block; larger blocks pack more
+ *   tightly but cost more BigInteger arithmetic.
  */
 open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
     ByteEncoding {
