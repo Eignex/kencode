@@ -14,16 +14,18 @@ kotlin {
     wasmJs { browser(); nodejs() }
     wasmWasi { nodejs() }
     linuxX64(); linuxArm64()
-    macosX64(); macosArm64(); mingwX64()
+    macosArm64(); mingwX64()
     iosX64(); iosArm64(); iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project.dependencies.platform("com.eignex:kbuild-platform:1.2.0"))
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core")
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
+            implementation(project.dependencies.platform("com.eignex:kbuild-platform:1.2.0"))
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
         }
