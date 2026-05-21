@@ -571,15 +571,15 @@ data class MultiLevelCollections(
 )
 
 @Serializable
-sealed class PolymorphicBase {
+sealed interface PolymorphicBase {
     @Serializable
-    data class Action(val name: String, val priority: Int) : PolymorphicBase()
+    data class Action(val name: String, val priority: Int) : PolymorphicBase
 
     @Serializable
-    data class Notification(val message: String, val silent: Boolean) : PolymorphicBase()
+    data class Notification(val message: String, val silent: Boolean) : PolymorphicBase
 
     @Serializable
-    object Heartbeat : PolymorphicBase()
+    object Heartbeat : PolymorphicBase
 }
 
 @Serializable
