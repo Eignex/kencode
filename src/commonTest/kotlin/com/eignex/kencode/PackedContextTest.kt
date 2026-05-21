@@ -91,7 +91,7 @@ class PackedContextTest {
         bitmask.writeInlineBitmask(
             booleanArrayOf(true),
             booleanArrayOf(true),
-            out
+            out,
         )
         val bytes = out.toByteArray()
         assertEquals(1, bytes.size)
@@ -105,7 +105,7 @@ class PackedContextTest {
         bitmask.writeInlineBitmask(
             booleanArrayOf(false),
             booleanArrayOf(false),
-            out
+            out,
         )
         val bytes = out.toByteArray()
         assertEquals(1, bytes.size)
@@ -120,7 +120,7 @@ class PackedContextTest {
         bitmask.writeInlineBitmask(
             BooleanArray(64) { it == 0 },
             BooleanArray(0),
-            out
+            out,
         )
         val bytes = out.toByteArray()
         assertEquals(8, bytes.size)
@@ -169,12 +169,12 @@ class PackedContextTest {
         ctx.set(
             start1,
             booleanArrayOf(true),
-            booleanArrayOf(false)
+            booleanArrayOf(false),
         )
         ctx.set(
             start2,
             booleanArrayOf(false),
-            booleanArrayOf(true)
+            booleanArrayOf(true),
         )
         val bytes = ctx.toByteArray()
         assertEquals(1, bytes.size)
@@ -187,7 +187,7 @@ class PackedContextTest {
         assertEquals(1, HeaderContext().load(byteArrayOf(0xFF.toByte()), 0, 8))
         assertEquals(
             2,
-            HeaderContext().load(byteArrayOf(0xFF.toByte(), 0x00), 0, 9)
+            HeaderContext().load(byteArrayOf(0xFF.toByte(), 0x00), 0, 9),
         )
     }
 
@@ -237,7 +237,7 @@ class PackedContextTest {
     fun `countAllBits class with booleans only`() {
         assertEquals(
             2,
-            countAllBits(SimpleIntsAndBooleans.serializer().descriptor)
+            countAllBits(SimpleIntsAndBooleans.serializer().descriptor),
         )
     }
 
@@ -255,7 +255,7 @@ class PackedContextTest {
     fun `countAllBits does not recurse into nullable nested class`() {
         assertEquals(
             6,
-            countAllBits(NullableFieldsPayload.serializer().descriptor)
+            countAllBits(NullableFieldsPayload.serializer().descriptor),
         )
     }
 
@@ -284,7 +284,7 @@ class PackedContextTest {
                 parentDescriptor = DeepNested.serializer().descriptor,
                 fieldIndex = 1,
                 childDescriptor = Level1.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -297,7 +297,7 @@ class PackedContextTest {
                 parentDescriptor = DeepNested.serializer().descriptor,
                 fieldIndex = 1,
                 childDescriptor = Level1.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -310,7 +310,7 @@ class PackedContextTest {
                 parentDescriptor = DeepNested.serializer().descriptor,
                 fieldIndex = 1,
                 childDescriptor = Level1.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -323,7 +323,7 @@ class PackedContextTest {
                 parentDescriptor = DeepNested.serializer().descriptor,
                 fieldIndex = -1,
                 childDescriptor = Level1.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -336,7 +336,7 @@ class PackedContextTest {
                 parentDescriptor = Level1.serializer().descriptor,
                 fieldIndex = 1,
                 childDescriptor = Level2.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -349,7 +349,7 @@ class PackedContextTest {
                 parentDescriptor = InlineHeavyPayload.serializer().descriptor,
                 fieldIndex = 4,
                 childDescriptor = UserId.serializer().descriptor,
-            )
+            ),
         )
     }
 
@@ -363,7 +363,7 @@ class PackedContextTest {
                 parentDescriptor = WithList.serializer().descriptor,
                 fieldIndex = 1,
                 childDescriptor = listDesc,
-            )
+            ),
         )
     }
 }

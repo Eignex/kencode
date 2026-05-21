@@ -20,7 +20,8 @@ class PackedEncoder internal constructor(
     private val config: PackedConfiguration = PackedConfiguration(),
     override val serializersModule: SerializersModule = EmptySerializersModule(),
     headerCtx: HeaderContext? = null,
-) : Encoder, CompositeEncoder {
+) : Encoder,
+    CompositeEncoder {
 
     private val ctx: HeaderContext = headerCtx ?: HeaderContext()
     private val isRoot: Boolean = headerCtx == null
@@ -58,7 +59,7 @@ class PackedEncoder internal constructor(
                     isCollection,
                     currentDescriptor,
                     currentIndex,
-                    descriptor
+                    descriptor,
                 )
             ) {
                 ctx
@@ -74,10 +75,7 @@ class PackedEncoder internal constructor(
         return this
     }
 
-    override fun beginCollection(
-        descriptor: SerialDescriptor,
-        collectionSize: Int
-    ): CompositeEncoder {
+    override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
         val target = if (inStructure) dataBuffer else output
         writeVarInt(collectionSize, target)
         val childEncoder = PackedEncoder(target, config, serializersModule)
@@ -117,19 +115,18 @@ class PackedEncoder internal constructor(
         dataBuffer.reset()
     }
 
-    private fun getBuffer(): ByteOutput =
-        if (inStructure) dataBuffer else output
+    private fun getBuffer(): ByteOutput = if (inStructure) dataBuffer else output
 
     override fun encodeBoolean(value: Boolean) {
         when {
             inStructure && !isCollection -> encodeBooleanElement(
                 currentDescriptor,
                 currentIndex,
-                value
+                value,
             )
 
             inStructure && isBooleanCollection -> collectionBitmapValues.add(
-                value
+                value,
             )
 
             else -> getBuffer().write(if (value) 1 else 0)
@@ -151,14 +148,14 @@ class PackedEncoder internal constructor(
             when (config.defaultEncoding) {
                 IntPacking.SIGNED -> writeVarInt(
                     zigZagEncodeInt(
-                        value
+                        value,
                     ),
-                    getBuffer()
+                    getBuffer(),
                 )
 
                 IntPacking.DEFAULT -> writeVarInt(
                     value,
-                    getBuffer()
+                    getBuffer(),
                 )
 
                 IntPacking.FIXED -> writeInt(value, getBuffer())
@@ -173,14 +170,14 @@ class PackedEncoder internal constructor(
             when (config.defaultEncoding) {
                 IntPacking.SIGNED -> writeVarLong(
                     zigZagEncodeLong(
-                        value
+                        value,
                     ),
-                    getBuffer()
+                    getBuffer(),
                 )
 
                 IntPacking.DEFAULT -> writeVarLong(
                     value,
-                    getBuffer()
+                    getBuffer(),
                 )
 
                 IntPacking.FIXED -> writeLong(value, getBuffer())
@@ -281,117 +278,80 @@ class PackedEncoder internal constructor(
         currentIndex = -1
     }
 
-    override fun encodeBooleanElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Boolean
-    ) {
+    override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
         val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
     }
 
-    override fun encodeIntElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Int
-    ) {
+    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
         when (
             resolveIntEncoding(
                 descriptor.getElementAnnotations(index),
-                config
+                config,
             )
         ) {
             IntPacking.SIGNED -> writeVarInt(
                 zigZagEncodeInt(
-                    value
+                    value,
                 ),
-                dataBuffer
+                dataBuffer,
             )
 
             IntPacking.DEFAULT -> writeVarInt(value, dataBuffer)
+
             IntPacking.FIXED -> writeInt(value, dataBuffer)
         }
     }
 
-    override fun encodeLongElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Long
-    ) {
+    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
         when (
             resolveIntEncoding(
                 descriptor.getElementAnnotations(index),
-                config
+                config,
             )
         ) {
             IntPacking.SIGNED -> writeVarLong(
                 zigZagEncodeLong(
-                    value
+                    value,
                 ),
-                dataBuffer
+                dataBuffer,
             )
 
             IntPacking.DEFAULT -> writeVarLong(value, dataBuffer)
+
             IntPacking.FIXED -> writeLong(value, dataBuffer)
         }
     }
 
-    override fun encodeByteElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Byte
-    ) {
+    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) {
         dataBuffer.write(value.toInt() and 0xFF)
     }
 
-    override fun encodeShortElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Short
-    ) {
+    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) {
         writeShort(value, dataBuffer)
     }
 
-    override fun encodeCharElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Char
-    ) {
+    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) {
         writeUtf8Char(value, dataBuffer)
     }
 
-    override fun encodeFloatElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Float
-    ) {
+    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
         writeInt(value.toBits(), dataBuffer)
     }
 
-    override fun encodeDoubleElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: Double
-    ) {
+    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
         writeLong(value.toBits(), dataBuffer)
     }
 
-    override fun encodeStringElement(
-        descriptor: SerialDescriptor,
-        index: Int,
-        value: String
-    ) {
+    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
         val bytes = value.encodeToByteArray()
         writeVarInt(bytes.size, dataBuffer)
         dataBuffer.write(bytes)
     }
 
     @ExperimentalSerializationApi
-    override fun encodeInlineElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Encoder {
+    override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
         currentIndex = index
         return this
     }
@@ -400,7 +360,7 @@ class PackedEncoder internal constructor(
         descriptor: SerialDescriptor,
         index: Int,
         serializer: SerializationStrategy<T>,
-        value: T
+        value: T,
     ) {
         currentIndex = index
         serializer.serialize(this, value)
@@ -412,7 +372,7 @@ class PackedEncoder internal constructor(
         descriptor: SerialDescriptor,
         index: Int,
         serializer: SerializationStrategy<T>,
-        value: T?
+        value: T?,
     ) {
         if (isCollection) {
             if (value == null) {
@@ -438,6 +398,7 @@ class PackedEncoder internal constructor(
         val cp = value.code
         when {
             cp < 0x80 -> out.write(cp)
+
             cp < 0x800 -> {
                 out.write(0xC0 or (cp shr 6))
                 out.write(0x80 or (cp and 0x3F))

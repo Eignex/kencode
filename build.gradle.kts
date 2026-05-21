@@ -1,6 +1,6 @@
 plugins {
-    id("com.eignex.kmp") version "1.1.5"
-    kotlin("plugin.serialization") version "2.3.0"
+    id("com.eignex.kmp") version "1.2.0"
+    kotlin("plugin.serialization") version "2.3.20"
 }
 
 eignexPublish {
@@ -19,13 +19,13 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
-            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
+            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core")
+            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf")
         }
         jvmTest.dependencies {
             implementation("org.bouncycastle:bcprov-jdk18on:1.83")

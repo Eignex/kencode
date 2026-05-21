@@ -23,20 +23,16 @@ class PackedFormatTest {
     @Serializable
     private data class ProtoAnnotatedPayload(
         @ProtoType(ProtoIntegerType.SIGNED) val signed: Int,
-        @ProtoType(ProtoIntegerType.DEFAULT) val unsigned: Long
+        @ProtoType(ProtoIntegerType.DEFAULT) val unsigned: Long,
     )
 
-    private fun <T> assertPackedRoundtrip(
-        serializer: KSerializer<T>,
-        value: T,
-        format: PackedFormat = PackedFormat
-    ) {
+    private fun <T> assertPackedRoundtrip(serializer: KSerializer<T>, value: T, format: PackedFormat = PackedFormat) {
         val bytes = format.encodeToByteArray(serializer, value)
         val decoded = format.decodeFromByteArray(serializer, bytes)
         assertEquals(
             value,
             decoded,
-            "Roundtrip failed for ${serializer.descriptor.serialName}"
+            "Roundtrip failed for ${serializer.descriptor.serialName}",
         )
     }
 
@@ -56,7 +52,7 @@ class PackedFormatTest {
                 Double.NaN,
                 'A',
                 true,
-                "Hello"
+                "Hello",
             ),
             AllPrimitiveTypes(
                 -123,
@@ -67,7 +63,7 @@ class PackedFormatTest {
                 -2.75,
                 'ñ',
                 true,
-                "Hello \uD83D\uDE80"
+                "Hello \uD83D\uDE80",
             ),
             AllPrimitiveTypesNullable(
                 null,
@@ -78,7 +74,7 @@ class PackedFormatTest {
                 null,
                 null,
                 null,
-                null
+                null,
             ),
             NoBooleansNoNulls(42, 123_456_789L, "No flags here"),
             EnumPayload(1, Status.NEW, null),
@@ -90,7 +86,7 @@ class PackedFormatTest {
                 false,
                 null,
                 null,
-                "all-null-bools"
+                "all-null-bools",
             ),
             StringHeavyPayload("short", "longer", "unicode ✓✓✓", "present"),
             VarIntVarUIntPayload(-1, -123_456_789L, 0, 1L, 42, 9_999L),
@@ -100,20 +96,20 @@ class PackedFormatTest {
                 Int.MAX_VALUE,
                 Long.MAX_VALUE,
                 -1000,
-                123_456L
+                123_456L,
             ),
             UIntInlinePayload(1, 0u, 1u, true),
             DurationInlinePayload(
                 "mixed",
                 5.seconds + 250.milliseconds,
                 2.minutes,
-                10
+                10,
             ),
             InstantInlinePayload(
                 Instant.fromEpochMilliseconds(0),
                 null,
                 true,
-                1
+                1,
             ),
             Parent(id = 1, child = Child(2)),
             WithList(id = 1, items = listOf(1, 2, 3)),
@@ -122,7 +118,7 @@ class PackedFormatTest {
             NestedOptionalList(2, null, emptyList()),
             DeepNested(
                 "root",
-                Level1(true, Level2("payload", listOf(listOf(1, 2))))
+                Level1(true, Level2("payload", listOf(listOf(1, 2)))),
             ),
             MapHolder(mapOf("host" to "localhost"), mapOf("retries" to 3)),
             ComplexMap(mapOf("day" to listOf(1)), mapOf(101 to Child(1))),
@@ -130,7 +126,7 @@ class PackedFormatTest {
                 42,
                 mapOf("k" to "v"),
                 listOf(Child(1)),
-                listOf(true, null, false)
+                listOf(true, null, false),
             ),
             NullableMap(mapOf("k1" to "v1", "k2" to null)),
             BooleanFlags63(BooleanArray(63) { it % 2 == 0 }),
@@ -147,10 +143,10 @@ class PackedFormatTest {
                 listOf(
                     RecursiveTree(
                         "child1",
-                        listOf(RecursiveTree("grandchild1"))
+                        listOf(RecursiveTree("grandchild1")),
                     ),
-                    RecursiveTree("child2")
-                )
+                    RecursiveTree("child2"),
+                ),
             ),
 
             InlineHeavyPayload(
@@ -161,7 +157,7 @@ class PackedFormatTest {
                 UserId(9999L),
                 Email("test@example.com"),
                 listOf(UserId(1), UserId(2)),
-                Instant.DISTANT_PAST
+                Instant.DISTANT_PAST,
             ),
 
             MultiLevelCollections(
@@ -170,19 +166,19 @@ class PackedFormatTest {
                         1 to listOf(
                             "a",
                             null,
-                            "c"
-                        )
-                    )
+                            "c",
+                        ),
+                    ),
                 ),
                 nestedLists = listOf(listOf(listOf(1, 2), listOf(3))),
-                optionalDeepMap = mapOf(42 to null)
+                optionalDeepMap = mapOf(42 to null),
             ),
 
             DeepBreadth(
                 branchA = Level1(true, Level2("data-a", listOf(listOf(1)))),
                 branchB = Level1(false, null),
                 branchC = Level1(true, Level2("data-c", emptyList())),
-                rootValue = 999
+                rootValue = 999,
             ),
 
             PolymorphicContainer(
@@ -192,7 +188,7 @@ class PackedFormatTest {
                     PolymorphicBase.Heartbeat,
                     PolymorphicBase.Action("Update", 2),
                     PolymorphicBase.Notification("Hello", true),
-                )
+                ),
             ),
 
             PolymorphicBase.Heartbeat,
@@ -223,7 +219,7 @@ class PackedFormatTest {
             3.14f,
             2.71828,
             "Stand-alone string",
-            Status.DONE
+            Status.DONE,
         )
 
         primitives.forEach { value ->
@@ -261,7 +257,7 @@ class PackedFormatTest {
     fun `invalid continuation byte should throw for top level char`() {
         val bytes = byteArrayOf(
             0xC2.toByte(),
-            0x41
+            0x41,
         )
         val decoder = PackedDecoder(bytes)
         assertFailsWith<IllegalArgumentException> {
@@ -278,11 +274,11 @@ class PackedFormatTest {
 
         val fixedBytes = fixedFormat.encodeToByteArray(
             UnannotatedPayload.serializer(),
-            payload
+            payload,
         )
         val defaultBytes = defaultFormat.encodeToByteArray(
             UnannotatedPayload.serializer(),
-            payload
+            payload,
         )
 
         assertEquals(12, fixedBytes.size)
@@ -292,8 +288,8 @@ class PackedFormatTest {
             payload,
             defaultFormat.decodeFromByteArray(
                 UnannotatedPayload.serializer(),
-                defaultBytes
-            )
+                defaultBytes,
+            ),
         )
     }
 
@@ -310,19 +306,19 @@ class PackedFormatTest {
             12,
             fixedFormat.encodeToByteArray(
                 UnannotatedPayload.serializer(),
-                payload
-            ).size
+                payload,
+            ).size,
         )
         assertEquals(
             15,
             varIntFormat.encodeToByteArray(
                 UnannotatedPayload.serializer(),
-                payload
-            ).size
+                payload,
+            ).size,
         )
         val zigZagBytes = zigZagFormat.encodeToByteArray(
             UnannotatedPayload.serializer(),
-            payload
+            payload,
         )
         assertEquals(2, zigZagBytes.size)
 
@@ -330,8 +326,8 @@ class PackedFormatTest {
             payload,
             zigZagFormat.decodeFromByteArray(
                 UnannotatedPayload.serializer(),
-                zigZagBytes
-            )
+                zigZagBytes,
+            ),
         )
     }
 
@@ -344,15 +340,15 @@ class PackedFormatTest {
 
         val bytes = optimizedFormat.encodeToByteArray(
             InversePayload.serializer(),
-            payload
+            payload,
         )
         assertEquals(24, bytes.size)
         assertEquals(
             payload,
             optimizedFormat.decodeFromByteArray(
                 InversePayload.serializer(),
-                bytes
-            )
+                bytes,
+            ),
         )
     }
 
@@ -361,7 +357,7 @@ class PackedFormatTest {
         val serializer = AllPrimitiveTypes.serializer()
         val valid = PackedFormat.encodeToByteArray(
             serializer,
-            AllPrimitiveTypes(1, 1, 1, 1, 1f, 1.0, 'a', true, "test")
+            AllPrimitiveTypes(1, 1, 1, 1, 1f, 1.0, 'a', true, "test"),
         )
 
         val truncated = valid.copyOfRange(0, valid.size - 5)
@@ -374,7 +370,7 @@ class PackedFormatTest {
     fun `class with no booleans or nullables has no bitmask header`() {
         val bytes = PackedFormat.encodeToByteArray(
             NoBooleansNoNulls.serializer(),
-            NoBooleansNoNulls(42, 42L, "No flags here")
+            NoBooleansNoNulls(42, 42L, "No flags here"),
         )
         assertEquals(16, bytes.size)
     }
@@ -383,7 +379,7 @@ class PackedFormatTest {
     fun `boolean fields pack into single bitmask byte`() {
         val bytes = PackedFormat.encodeToByteArray(
             SimpleIntsAndBooleans.serializer(),
-            SimpleIntsAndBooleans(0, 0, false, false)
+            SimpleIntsAndBooleans(0, 0, false, false),
         )
         assertEquals(3, bytes.size)
     }
@@ -399,7 +395,7 @@ class PackedFormatTest {
     fun `empty list encodes as single zero byte`() {
         val bytes = PackedFormat.encodeToByteArray(
             ListSerializer(Int.serializer()),
-            emptyList()
+            emptyList(),
         )
         assertEquals(1, bytes.size)
         assertEquals(0, bytes[0])
@@ -409,11 +405,11 @@ class PackedFormatTest {
     fun `empty map roundtrip`() {
         assertPackedRoundtrip(
             MapHolder.serializer(),
-            MapHolder(emptyMap(), null)
+            MapHolder(emptyMap(), null),
         )
         assertPackedRoundtrip(
             MapHolder.serializer(),
-            MapHolder(emptyMap(), emptyMap())
+            MapHolder(emptyMap(), emptyMap()),
         )
     }
 
@@ -422,14 +418,14 @@ class PackedFormatTest {
         val uintNegative = VarIntVarUIntPayload(0, 0L, -1, -1L, 0, 0)
         val bytes = PackedFormat.encodeToByteArray(
             VarIntVarUIntPayload.serializer(),
-            uintNegative
+            uintNegative,
         )
         assertEquals(19, bytes.size)
 
         val intNegative = VarIntVarUIntPayload(-1, -1L, 0, 0L, 0, 0)
         val bytes2 = PackedFormat.encodeToByteArray(
             VarIntVarUIntPayload.serializer(),
-            intNegative
+            intNegative,
         )
         assertEquals(6, bytes2.size)
 
@@ -441,7 +437,7 @@ class PackedFormatTest {
     fun `deep null mid-chain roundtrip`() {
         assertPackedRoundtrip(
             DeepNested.serializer(),
-            DeepNested("root", Level1(false, null))
+            DeepNested("root", Level1(false, null)),
         )
     }
 
@@ -449,7 +445,7 @@ class PackedFormatTest {
     fun `3-byte UTF-8 char roundtrip`() {
         assertPackedRoundtrip(
             AllPrimitiveTypes.serializer(),
-            AllPrimitiveTypes(0, 0L, 0, 0, 0f, 0.0, '中', false, "")
+            AllPrimitiveTypes(0, 0L, 0, 0, 0f, 0.0, '中', false, ""),
         )
     }
 
@@ -458,11 +454,11 @@ class PackedFormatTest {
         val list = listOf(Child(1), null, Child(3), null, Child(5))
         val bytes = PackedFormat.encodeToByteArray(
             ListSerializer(Child.serializer().nullable),
-            list
+            list,
         )
         val decoded = PackedFormat.decodeFromByteArray(
             ListSerializer(Child.serializer().nullable),
-            bytes
+            bytes,
         )
         assertEquals(list, decoded)
     }
@@ -471,14 +467,14 @@ class PackedFormatTest {
     fun `truncated bool list bitmap throws`() {
         val valid = PackedFormat.encodeToByteArray(
             ListSerializer(Boolean.serializer()),
-            List(16) { true }
+            List(16) { true },
         )
         val truncated =
             valid.copyOfRange(0, 2)
         assertFailsWith<IllegalArgumentException> {
             PackedFormat.decodeFromByteArray(
                 ListSerializer(Boolean.serializer()),
-                truncated
+                truncated,
             )
         }
     }
@@ -488,13 +484,13 @@ class PackedFormatTest {
         val list = List(16) { if (it % 2 == 0) "x" else null }
         val valid = PackedFormat.encodeToByteArray(
             ListSerializer(String.serializer().nullable),
-            list
+            list,
         )
         val truncated = valid.copyOfRange(0, 2)
         assertFailsWith<IllegalArgumentException> {
             PackedFormat.decodeFromByteArray(
                 ListSerializer(String.serializer().nullable),
-                truncated
+                truncated,
             )
         }
     }
@@ -512,7 +508,7 @@ class PackedFormatTest {
         assertFailsWith<IllegalArgumentException> {
             PackedFormat.decodeFromByteArray(
                 NullableFieldsPayload.serializer(),
-                byteArrayOf()
+                byteArrayOf(),
             )
         }
     }
@@ -540,7 +536,7 @@ class PackedFormatTest {
         val payload = BooleanListPayload(0, List(8) { it % 2 == 0 })
         val bytes = PackedFormat.encodeToByteArray(
             BooleanListPayload.serializer(),
-            payload
+            payload,
         )
         assertEquals(3, bytes.size)
         assertPackedRoundtrip(BooleanListPayload.serializer(), payload)
@@ -559,12 +555,12 @@ class PackedFormatTest {
         val list = listOf("a", null, "b", null, "c", null, "d", null)
         val bytes = PackedFormat.encodeToByteArray(
             ListSerializer(String.serializer().nullable),
-            list
+            list,
         )
         assertEquals(10, bytes.size)
         val decoded = PackedFormat.decodeFromByteArray(
             ListSerializer(String.serializer().nullable),
-            bytes
+            bytes,
         )
         assertEquals(list, decoded)
     }
@@ -576,16 +572,16 @@ class PackedFormatTest {
             listOf("x"),
             listOf("a", null, "b"),
             emptyList(),
-            listOf(null)
+            listOf(null),
         )
         for (list in lists) {
             val bytes = PackedFormat.encodeToByteArray(
                 ListSerializer(String.serializer().nullable),
-                list
+                list,
             )
             val decoded = PackedFormat.decodeFromByteArray(
                 ListSerializer(String.serializer().nullable),
-                bytes
+                bytes,
             )
             assertEquals(list, decoded)
         }
@@ -595,7 +591,7 @@ class PackedFormatTest {
     fun `class with only nested booleans and nullables encodes to header byte only`() {
         val bytes = PackedFormat.encodeToByteArray(
             Level1.serializer(),
-            Level1(true, null)
+            Level1(true, null),
         )
         assertEquals(1, bytes.size)
         assertEquals(0b00000011, bytes[0].toInt() and 0xFF)
@@ -605,12 +601,12 @@ class PackedFormatTest {
     fun `merged header bit pattern matches field order and value`() {
         val bytes = PackedFormat.encodeToByteArray(
             Level1.serializer(),
-            Level1(false, Level2("", emptyList()))
+            Level1(false, Level2("", emptyList())),
         )
         assertEquals(0, bytes[0].toInt() and 0xFF)
         assertPackedRoundtrip(
             Level1.serializer(),
-            Level1(false, Level2("", emptyList()))
+            Level1(false, Level2("", emptyList())),
         )
     }
 
@@ -658,7 +654,7 @@ class PackedFormatTest {
     fun `non-nullable nested class with no flags contributes no header bytes`() {
         val bytes = PackedFormat.encodeToByteArray(
             Parent.serializer(),
-            Parent(7, Child(42))
+            Parent(7, Child(42)),
         )
         assertEquals(2, bytes.size)
         assertPackedRoundtrip(Parent.serializer(), Parent(7, Child(42)))
@@ -682,7 +678,7 @@ class PackedFormatTest {
         assertFailsWith<IllegalArgumentException> {
             PackedFormat.decodeFromByteArray(
                 DeepNested.serializer(),
-                byteArrayOf()
+                byteArrayOf(),
             )
         }
     }
@@ -694,13 +690,13 @@ class PackedFormatTest {
                 Level1(false, null),
                 Level1(false, null),
                 Level1(false, null),
-                0
+                0,
             ),
             DeepBreadth(
                 Level1(true, null),
                 Level1(true, null),
                 Level1(true, null),
-                -1
+                -1,
             ),
             DeepBreadth(
                 Level1(true, Level2("a", emptyList())),
@@ -720,15 +716,15 @@ class PackedFormatTest {
         val payload = ProtoAnnotatedPayload(signed = -2, unsigned = 100L)
         val bytes = PackedFormat.encodeToByteArray(
             ProtoAnnotatedPayload.serializer(),
-            payload
+            payload,
         )
         assertEquals(2, bytes.size)
         assertEquals(
             payload,
             PackedFormat.decodeFromByteArray(
                 ProtoAnnotatedPayload.serializer(),
-                bytes
-            )
+                bytes,
+            ),
         )
     }
 
@@ -738,7 +734,7 @@ class PackedFormatTest {
             0xF0.toByte(),
             0x9F.toByte(),
             0x98.toByte(),
-            0x80.toByte()
+            0x80.toByte(),
         )
         val decoder = PackedDecoder(bytes)
         assertFailsWith<IllegalArgumentException> {
@@ -751,7 +747,7 @@ class PackedFormatTest {
         val classSerializer = UnannotatedPayload.serializer()
         val classBytes = PackedFormat.encodeToByteArray(
             classSerializer,
-            UnannotatedPayload(1, 2L)
+            UnannotatedPayload(1, 2L),
         )
 
         val classDecoder = PackedDecoder(classBytes)
@@ -763,7 +759,7 @@ class PackedFormatTest {
         assertEquals(1, classDecoder.decodeElementIndex(classDescriptor))
         assertEquals(
             kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
-            classDecoder.decodeElementIndex(classDescriptor)
+            classDecoder.decodeElementIndex(classDescriptor),
         )
 
         val listSerializer = ListSerializer(serializer<Int>())
@@ -780,7 +776,7 @@ class PackedFormatTest {
         assertEquals(1, listDecoder.decodeElementIndex(listDescriptor))
         assertEquals(
             kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
-            listDecoder.decodeElementIndex(listDescriptor)
+            listDecoder.decodeElementIndex(listDescriptor),
         )
     }
 }

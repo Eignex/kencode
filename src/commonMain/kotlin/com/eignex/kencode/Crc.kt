@@ -9,7 +9,7 @@ private class CrcEngine(
     private val refin: Boolean,
     private val refout: Boolean,
     xorOut: Int,
-    private val width: Int
+    private val width: Int,
 ) {
     private val mask: Long =
         if (width == 32) 0xFFFFFFFFL else (1L shl width) - 1L
@@ -55,7 +55,7 @@ open class Crc8(
     init: Int = 0x00,
     refin: Boolean = false,
     refout: Boolean = false,
-    xorOut: Int = 0x00
+    xorOut: Int = 0x00,
 ) : Checksum {
     /** Default CRC-8/SMBUS instance. */
     companion object Default : Crc8()
@@ -73,7 +73,7 @@ open class Crc16(
     init: Int = 0xFFFF,
     refin: Boolean = true,
     refout: Boolean = true,
-    xorOut: Int = 0xFFFF
+    xorOut: Int = 0xFFFF,
 ) : Checksum {
     /** Default CRC-16/X-25 instance. */
     companion object Default : Crc16()
@@ -92,7 +92,7 @@ open class Crc32(
     init: Int = 0xFFFFFFFF.toInt(),
     refin: Boolean = true,
     refout: Boolean = true,
-    xorOut: Int = 0xFFFFFFFF.toInt()
+    xorOut: Int = 0xFFFFFFFF.toInt(),
 ) : Checksum {
     /** Default CRC-32/ISO-HDLC instance. */
     companion object Default : Crc32()

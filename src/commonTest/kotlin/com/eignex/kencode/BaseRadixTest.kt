@@ -12,14 +12,10 @@ class BaseRadixTest {
         byteArrayOf(-1),
         byteArrayOf(0, 1, 2, 3, 4),
         byteArrayOf(-1, -2, -3, -4),
-        byteArrayOf(127, -128, 0, 42)
+        byteArrayOf(127, -128, 0, 42),
     )
 
-    private fun assertRoundtrip(
-        codec: BaseRadix,
-        bytes: ByteArray,
-        message: String? = null
-    ) {
+    private fun assertRoundtrip(codec: BaseRadix, bytes: ByteArray, message: String? = null) {
         val encoded = codec.encode(bytes)
         val decoded = codec.decode(encoded)
         if (message != null) {
@@ -40,7 +36,7 @@ class BaseRadixTest {
             assertRoundtrip(
                 codec,
                 bytes,
-                "Roundtrip failed for ${codec::class.simpleName} length=$len"
+                "Roundtrip failed for ${codec::class.simpleName} length=$len",
             )
         }
     }
@@ -52,7 +48,7 @@ class BaseRadixTest {
                 assertRoundtrip(
                     codec,
                     bytes,
-                    "Failed for ${codec::class.simpleName} pattern=${bytes.toList()}"
+                    "Failed for ${codec::class.simpleName} pattern=${bytes.toList()}",
                 )
             }
         }
@@ -106,8 +102,8 @@ class BaseRadixTest {
         assertFailsWith<IllegalArgumentException> {
             Base62.decode(
                 "!" + encoded.drop(
-                    1
-                )
+                    1,
+                ),
             )
         }
     }
@@ -149,9 +145,9 @@ class BaseRadixTest {
                     0xDE.toByte(),
                     0xAD.toByte(),
                     0xBE.toByte(),
-                    0xEF.toByte()
-                )
-            )
+                    0xEF.toByte(),
+                ),
+            ),
         )
     }
 
@@ -163,7 +159,7 @@ class BaseRadixTest {
             assertRoundtrip(
                 codec,
                 bytes,
-                "Multi-block failed for ${codec::class.simpleName}"
+                "Multi-block failed for ${codec::class.simpleName}",
             )
         }
     }
@@ -177,7 +173,7 @@ class BaseRadixTest {
             assertRoundtrip(
                 codec,
                 bytes,
-                "Custom blockSize=4 roundtrip failed for len=$len"
+                "Custom blockSize=4 roundtrip failed for len=$len",
             )
         }
     }
@@ -261,7 +257,7 @@ class BaseRadixTest {
             0x80.toByte(),
             0x7F.toByte(),
             0x00,
-            0xFF.toByte()
+            0xFF.toByte(),
         )
         assertRoundtrip(codec, input, "High bit bytes failed on massive base")
     }

@@ -22,7 +22,8 @@ class ReadmeExamples {
         @PackedType(IntPacking.DEFAULT)
         val id: ULong,
 
-        @PackedType(IntPacking.SIGNED) // zig-zag encodes small negatives efficiently
+        // zig-zag encodes small negatives efficiently
+        @PackedType(IntPacking.SIGNED)
         val delta: Int,
 
         // these are packed into a bitset along with nullability flags
@@ -32,11 +33,13 @@ class ReadmeExamples {
         val handledAt: Instant?,
 
         // encoded as varint ordinal
-        val type: PayloadType
+        val type: PayloadType,
     )
 
     enum class PayloadType {
-        TYPE1, TYPE2, TYPE3
+        TYPE1,
+        TYPE2,
+        TYPE3,
     }
 
     @Test
@@ -48,7 +51,7 @@ class ReadmeExamples {
             sensitive = false,
             external = true,
             handledAt = null,
-            type = PayloadType.TYPE1
+            type = PayloadType.TYPE1,
         )
         val message = EncodedFormat.encodeToString(payload)
         println(message)

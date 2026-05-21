@@ -200,7 +200,7 @@ class PackedUtilsTest {
             127,
             128,
             300,
-            Int.MAX_VALUE
+            Int.MAX_VALUE,
         )
         for (v in values) {
             val out = ByteOutput()
@@ -211,7 +211,7 @@ class PackedUtilsTest {
             assertEquals(
                 bytes.size,
                 consumed,
-                "VarInt consumed mismatch for $v"
+                "VarInt consumed mismatch for $v",
             )
         }
     }
@@ -224,7 +224,7 @@ class PackedUtilsTest {
             127,
             128,
             300,
-            Int.MAX_VALUE
+            Int.MAX_VALUE,
         )
         for (v in values) {
             val out = ByteOutput()
@@ -236,7 +236,7 @@ class PackedUtilsTest {
             assertEquals(
                 bytes.size,
                 consumed + 1,
-                "VarInt consumed mismatch for $v"
+                "VarInt consumed mismatch for $v",
             )
         }
     }
@@ -249,7 +249,7 @@ class PackedUtilsTest {
             127L,
             128L,
             300L,
-            Long.MAX_VALUE
+            Long.MAX_VALUE,
         )
         for (v in values) {
             val out = ByteOutput()
@@ -260,7 +260,7 @@ class PackedUtilsTest {
             assertEquals(
                 bytes.size,
                 consumed,
-                "VarLong consumed mismatch for $v"
+                "VarLong consumed mismatch for $v",
             )
         }
     }
@@ -273,7 +273,7 @@ class PackedUtilsTest {
             127L,
             128L,
             300L,
-            Long.MAX_VALUE
+            Long.MAX_VALUE,
         )
         for (v in values) {
             val out = ByteOutput()
@@ -285,7 +285,7 @@ class PackedUtilsTest {
             assertEquals(
                 bytes.size,
                 consumed + 1,
-                "VarLong consumed mismatch for $v"
+                "VarLong consumed mismatch for $v",
             )
         }
     }
@@ -336,33 +336,33 @@ class PackedUtilsTest {
             "Short" to {
                 writeShort(
                     1102,
-                    it
+                    it,
                 )
             },
             "Int" to {
                 writeInt(
                     110258102,
-                    it
+                    it,
                 )
             },
             "Long" to {
                 writeLong(
                     1102401240912490L,
-                    it
+                    it,
                 )
             },
             "VarInt" to {
                 writeVarInt(
                     110249021,
-                    it
+                    it,
                 )
             },
             "VarLong" to {
                 writeVarLong(
                     112085102501L,
-                    it
+                    it,
                 )
-            }
+            },
         )
 
         types.forEach { (name, writer) ->

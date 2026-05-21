@@ -35,14 +35,11 @@ interface Checksum {
  *
  * Example: `CompactZeros.then(Crc16.asTransform())` compacts bytes, then appends a checksum.
  */
-fun PayloadTransform.then(next: PayloadTransform): PayloadTransform =
-    object : PayloadTransform {
-        override fun encode(data: ByteArray): ByteArray =
-            next.encode(this@then.encode(data))
+fun PayloadTransform.then(next: PayloadTransform): PayloadTransform = object : PayloadTransform {
+    override fun encode(data: ByteArray): ByteArray = next.encode(this@then.encode(data))
 
-        override fun decode(data: ByteArray): ByteArray =
-            this@then.decode(next.decode(data))
-    }
+    override fun decode(data: ByteArray): ByteArray = this@then.decode(next.decode(data))
+}
 
 /**
  * Strips leading zero bytes before encoding and restores them on decode.
@@ -66,7 +63,7 @@ object CompactZeros : PayloadTransform {
         data.copyInto(
             result,
             destinationOffset = 1 + count.size,
-            startIndex = k
+            startIndex = k,
         )
         return result
     }

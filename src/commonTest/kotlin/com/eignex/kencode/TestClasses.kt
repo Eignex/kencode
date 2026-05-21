@@ -9,12 +9,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @Serializable
-data class SimpleIntsAndBooleans(
-    val id: Int,
-    val score: Int,
-    val active: Boolean,
-    val deleted: Boolean
-)
+data class SimpleIntsAndBooleans(val id: Int, val score: Int, val active: Boolean, val deleted: Boolean)
 
 @Serializable
 data class AllPrimitiveTypes(
@@ -26,7 +21,7 @@ data class AllPrimitiveTypes(
     val doubleVal: Double,
     val charVal: Char,
     val boolVal: Boolean,
-    val stringVal: String
+    val stringVal: String,
 )
 
 @Serializable
@@ -39,7 +34,7 @@ data class AllPrimitiveTypesNullable(
     val doubleVal: Double?,
     val charVal: Char?,
     val boolVal: Boolean?,
-    val stringVal: String?
+    val stringVal: String?,
 )
 
 @Serializable
@@ -49,11 +44,7 @@ data class NoBooleansNoNulls(val x: Int, val y: Long, val msg: String)
 enum class Status { NEW, IN_PROGRESS, DONE }
 
 @Serializable
-data class EnumPayload(
-    val id: Int,
-    val status: Status,
-    val secondaryStatus: Status?
-)
+data class EnumPayload(val id: Int, val status: Status, val secondaryStatus: Status?)
 
 @Serializable
 data class NullableFieldsPayload(
@@ -61,7 +52,7 @@ data class NullableFieldsPayload(
     val maybeName: String?,
     val maybeScore: Long?,
     val maybeFlag: Boolean?,
-    val maybeList: List<Int>?
+    val maybeList: List<Int>?,
 )
 
 @Serializable
@@ -70,16 +61,11 @@ data class NullableBooleansAndNonBooleans(
     val flag2: Boolean,
     val flag3: Boolean?,
     val count: Int?,
-    val label: String
+    val label: String,
 )
 
 @Serializable
-data class StringHeavyPayload(
-    val a: String,
-    val b: String,
-    val c: String,
-    val d: String?
-)
+data class StringHeavyPayload(val a: String, val b: String, val c: String, val d: String?)
 
 @Serializable
 data class VarIntVarUIntPayload(
@@ -88,32 +74,17 @@ data class VarIntVarUIntPayload(
     @PackedType(IntPacking.DEFAULT) val unsignedIntVar: Int,
     @PackedType(IntPacking.DEFAULT) val unsignedLongVar: Long,
     val plainInt: Int,
-    val plainLong: Long
+    val plainLong: Long,
 )
 
 @Serializable
-data class UIntInlinePayload(
-    val id: Int,
-    val first: UInt,
-    val second: UInt,
-    val active: Boolean
-)
+data class UIntInlinePayload(val id: Int, val first: UInt, val second: UInt, val active: Boolean)
 
 @Serializable
-data class DurationInlinePayload(
-    val label: String,
-    val primary: Duration,
-    val secondary: Duration?,
-    val count: Int
-)
+data class DurationInlinePayload(val label: String, val primary: Duration, val secondary: Duration?, val count: Int)
 
 @Serializable
-data class InstantInlinePayload(
-    val first: Instant,
-    val second: Instant?,
-    val active: Boolean,
-    val seq: Int
-)
+data class InstantInlinePayload(val first: Instant, val second: Instant?, val active: Boolean, val seq: Int)
 
 @Serializable
 data class Child(val value: Int)
@@ -128,11 +99,7 @@ data class WithList(val id: Int, val items: List<Int>)
 data class Grid(val rows: List<List<Int>>)
 
 @Serializable
-data class NestedOptionalList(
-    val id: Int,
-    val tags: List<String>?,
-    val scores: List<Int>
-)
+data class NestedOptionalList(val id: Int, val tags: List<String>?, val scores: List<Int>)
 
 @Serializable
 data class DeepNested(val name: String, val level1: Level1)
@@ -144,24 +111,13 @@ data class Level1(val active: Boolean, val level2: Level2?)
 data class Level2(val data: String, val matrix: List<List<Int>>)
 
 @Serializable
-data class MapHolder(
-    val config: Map<String, String>,
-    val counts: Map<String, Int>?
-)
+data class MapHolder(val config: Map<String, String>, val counts: Map<String, Int>?)
 
 @Serializable
-data class ComplexMap(
-    val history: Map<String, List<Int>>,
-    val registry: Map<Int, Child>
-)
+data class ComplexMap(val history: Map<String, List<Int>>, val registry: Map<Int, Child>)
 
 @Serializable
-data class MixedBag(
-    val id: Int,
-    val meta: Map<String, String>?,
-    val children: List<Child>,
-    val flags: List<Boolean?>
-)
+data class MixedBag(val id: Int, val meta: Map<String, String>?, val children: List<Child>, val flags: List<Boolean?>)
 
 @Serializable
 data class NullableMap(val data: Map<String, String?>)
@@ -230,7 +186,7 @@ data class BooleanFlags63(
     val b60: Boolean,
     val b61: Boolean,
     val b62: Boolean,
-    val b63: Boolean
+    val b63: Boolean,
 ) {
     constructor(flags: BooleanArray) : this(
         flags[0],
@@ -295,7 +251,7 @@ data class BooleanFlags63(
         flags[59],
         flags[60],
         flags[61],
-        flags[62]
+        flags[62],
     ) {
         require(flags.size == 63) { "Expected 63 flags, got ${flags.size}" }
     }
@@ -366,7 +322,7 @@ data class BooleanFlags64(
     val b61: Boolean,
     val b62: Boolean,
     val b63: Boolean,
-    val b64: Boolean
+    val b64: Boolean,
 ) {
     constructor(flags: BooleanArray) : this(
         flags[0],
@@ -432,7 +388,7 @@ data class BooleanFlags64(
         flags[60],
         flags[61],
         flags[62],
-        flags[63]
+        flags[63],
     ) {
         require(flags.size == 64) { "Expected 64 flags, got ${flags.size}" }
     }
@@ -504,7 +460,7 @@ data class BooleanFlags65(
     val b62: Boolean,
     val b63: Boolean,
     val b64: Boolean,
-    val b65: Boolean
+    val b65: Boolean,
 ) {
     constructor(flags: BooleanArray) : this(
         flags[0],
@@ -571,7 +527,7 @@ data class BooleanFlags65(
         flags[61],
         flags[62],
         flags[63],
-        flags[64]
+        flags[64],
     ) {
         require(flags.size == 65) { "Expected 65 flags, got ${flags.size}" }
     }
@@ -581,16 +537,11 @@ data class BooleanFlags65(
 data class RecursiveTree(
     val name: String,
     val children: List<RecursiveTree> = emptyList(),
-    val metadata: Map<String, RecursiveTree>? = null
+    val metadata: Map<String, RecursiveTree>? = null,
 )
 
 @Serializable
-data class DeepBreadth(
-    val branchA: Level1,
-    val branchB: Level1,
-    val branchC: Level1,
-    val rootValue: Int
-)
+data class DeepBreadth(val branchA: Level1, val branchB: Level1, val branchC: Level1, val rootValue: Int)
 
 @JvmInline
 @Serializable
@@ -609,14 +560,14 @@ data class InlineHeavyPayload(
     val userId: UserId,
     val contactEmail: Email?,
     val tags: List<UserId>,
-    val timestamp: Instant
+    val timestamp: Instant,
 )
 
 @Serializable
 data class MultiLevelCollections(
     val complexMap: Map<String, Map<Int, List<String?>>>,
     val nestedLists: List<List<List<Int>>>,
-    val optionalDeepMap: Map<Int, Map<String, Boolean>?>?
+    val optionalDeepMap: Map<Int, Map<String, Boolean>?>?,
 )
 
 @Serializable
@@ -625,18 +576,14 @@ sealed class PolymorphicBase {
     data class Action(val name: String, val priority: Int) : PolymorphicBase()
 
     @Serializable
-    data class Notification(val message: String, val silent: Boolean) :
-        PolymorphicBase()
+    data class Notification(val message: String, val silent: Boolean) : PolymorphicBase()
 
     @Serializable
     object Heartbeat : PolymorphicBase()
 }
 
 @Serializable
-data class PolymorphicContainer(
-    val main: PolymorphicBase,
-    val history: List<PolymorphicBase>
-)
+data class PolymorphicContainer(val main: PolymorphicBase, val history: List<PolymorphicBase>)
 
 @Serializable
 data class BooleanListPayload(val id: Int, val flags: List<Boolean>)
@@ -649,5 +596,5 @@ data class InversePayload(
     @PackedType(IntPacking.FIXED) val fixedX: Int,
     @PackedType(IntPacking.FIXED) val fixedY: Long,
     @PackedType(IntPacking.FIXED) val fixedUX: UInt,
-    @PackedType(IntPacking.FIXED) val fixedUY: ULong
+    @PackedType(IntPacking.FIXED) val fixedUY: ULong,
 )

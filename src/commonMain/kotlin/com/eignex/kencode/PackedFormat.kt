@@ -13,9 +13,7 @@ import kotlinx.serialization.modules.SerializersModule
  * @property defaultEncoding The encoding applied to all `Int` and `Long` fields that carry no
  *   [PackedType] annotation. Defaults to [IntPacking.DEFAULT] varint encoding.
  */
-data class PackedConfiguration(
-    val defaultEncoding: IntPacking = IntPacking.DEFAULT
-)
+data class PackedConfiguration(val defaultEncoding: IntPacking = IntPacking.DEFAULT)
 
 /**
  * Compact `BinaryFormat` optimized for small, flat Kotlin data classes.
@@ -37,7 +35,7 @@ data class PackedConfiguration(
 @OptIn(ExperimentalSerializationApi::class)
 open class PackedFormat(
     val configuration: PackedConfiguration = PackedConfiguration(),
-    override val serializersModule: SerializersModule = EmptySerializersModule()
+    override val serializersModule: SerializersModule = EmptySerializersModule(),
 ) : BinaryFormat {
 
     /**
@@ -48,10 +46,7 @@ open class PackedFormat(
     /**
      * Encodes [value] into a compact binary representation.
      */
-    override fun <T> encodeToByteArray(
-        serializer: SerializationStrategy<T>,
-        value: T
-    ): ByteArray {
+    override fun <T> encodeToByteArray(serializer: SerializationStrategy<T>, value: T): ByteArray {
         val out = ByteOutput()
         val encoder = PackedEncoder(out, configuration, serializersModule)
         encoder.encodeSerializableValue(serializer, value)
@@ -61,10 +56,7 @@ open class PackedFormat(
     /**
      * Decodes [bytes] produced by [PackedFormat] back into an object of type [T].
      */
-    override fun <T> decodeFromByteArray(
-        deserializer: DeserializationStrategy<T>,
-        bytes: ByteArray
-    ): T {
+    override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T {
         val decoder = PackedDecoder(bytes, configuration, serializersModule)
         return decoder.decodeSerializableValue(deserializer)
     }
@@ -101,7 +93,7 @@ class PackedFormatBuilder {
  */
 fun PackedFormat(
     from: PackedFormat = PackedFormat.Default,
-    builderAction: PackedFormatBuilder.() -> Unit
+    builderAction: PackedFormatBuilder.() -> Unit,
 ): PackedFormat {
     val builder = PackedFormatBuilder().apply {
         serializersModule = from.serializersModule
@@ -111,6 +103,6 @@ fun PackedFormat(
 
     return PackedFormat(
         configuration = PackedConfiguration(builder.defaultEncoding),
-        serializersModule = builder.serializersModule
+        serializersModule = builder.serializersModule,
     )
 }
