@@ -58,7 +58,7 @@ class EncodedFormatTest {
             formatBare.encodeToString(Payload.serializer(), value)
         assertTrue(
             encoded.length <= uncompressed.length,
-            "compactZeros ($encoded) should be <= uncompressed ($uncompressed)"
+            "compactZeros ($encoded) should be <= uncompressed ($uncompressed)",
         )
     }
 
@@ -85,7 +85,7 @@ class EncodedFormatTest {
         assertFailsWith<IllegalArgumentException> {
             formatCompactChecksum.decodeFromString(
                 Payload.serializer(),
-                tampered
+                tampered,
             )
         }
     }
@@ -152,8 +152,8 @@ class EncodedFormatTest {
         assertFailsWith<IllegalArgumentException> {
             transform.decode(
                 byteArrayOf(
-                    0x01
-                )
+                    0x01,
+                ),
             )
         }
         assertFailsWith<IllegalArgumentException> { transform.decode(byteArrayOf()) }

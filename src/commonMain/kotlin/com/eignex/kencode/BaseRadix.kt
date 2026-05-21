@@ -57,10 +57,7 @@ class CharAlphabet(private val chars: String) : Alphabet {
  * Defaults to U+0020 – U+D7FF (55,264 characters), the largest BMP range
  * that avoids surrogate code points.
  */
-class UnicodeRangeAlphabet(
-    private val start: Int = 0x0020,
-    override val size: Int = 0xD800 - 0x0020
-) : Alphabet {
+class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: Int = 0xD800 - 0x0020) : Alphabet {
     init {
         require(size > 1) { "Alphabet must contain at least 2 characters." }
         require(start >= 0) { "Unicode range start must be non-negative." }
@@ -84,8 +81,7 @@ class UnicodeRangeAlphabet(
  * @property blockSize Number of input bytes processed per block; larger blocks pack more
  *   tightly but cost more BigInteger arithmetic.
  */
-open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
-    ByteEncoding {
+open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : ByteEncoding {
 
     constructor(chars: String, blockSize: Int = 32) : this(CharAlphabet(chars), blockSize)
 
@@ -101,7 +97,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
     // Full block length must exceed any partial block's so the decoder can split unambiguously.
     private val massiveFullBlockLen: Int = maxOf(
         ceil((blockSize * 8) / logBase).toInt(),
-        ceil(((blockSize - 1) * 8) / logBase).toInt() + 1
+        ceil(((blockSize - 1) * 8) / logBase).toInt() + 1,
     )
 
     private val lengths: IntArray = IntArray(blockSize) { blockIndex ->
@@ -183,7 +179,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
         inPos: Int = 0,
         inLen: Int = input.size,
         output: StringBuilder = StringBuilder(lengths.last()),
-        outLen: Int = lengths[inLen - 1]
+        outLen: Int = lengths[inLen - 1],
     ) {
         var n = bigIntOf(input, inPos, inLen)
         val startPos = output.length
@@ -202,7 +198,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
         inLen: Int = input.length,
         output: ByteArray = ByteArray(invLengths[inLen - 1]),
         outPos: Int = 0,
-        outLen: Int = invLengths[inLen - 1]
+        outLen: Int = invLengths[inLen - 1],
     ) {
         var n = bigZero
         for (i in inPos until (inPos + inLen)) {
@@ -252,11 +248,10 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
         }
     }
 
-    private fun bigIntOf(input: ByteArray, inPos: Int, inLen: Int): BigInteger =
-        BigInteger.fromByteArray(
-            if (inPos == 0 && inLen == input.size) input else input.sliceArray(inPos until inPos + inLen),
-            Sign.POSITIVE
-        )
+    private fun bigIntOf(input: ByteArray, inPos: Int, inLen: Int): BigInteger = BigInteger.fromByteArray(
+        if (inPos == 0 && inLen == input.size) input else input.sliceArray(inPos until inPos + inLen),
+        Sign.POSITIVE,
+    )
 
     private fun stripSignByte(bytes: ByteArray): ByteArray =
         if (bytes.size > 1 && bytes[0] == 0.toByte()) bytes.sliceArray(1 until bytes.size) else bytes
@@ -306,7 +301,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) :
                 val bytes = n.toByteArray()
                 val actualBytes = if (bytes.size > 1 && bytes[0] == 0.toByte()) {
                     bytes.sliceArray(
-                        1 until bytes.size
+                        1 until bytes.size,
                     )
                 } else {
                     bytes

@@ -34,9 +34,7 @@ data class EncodedConfiguration(
  * @property configuration The active configuration dictating the codec, transform, and binary format.
  */
 @OptIn(ExperimentalSerializationApi::class)
-open class EncodedFormat(
-    val configuration: EncodedConfiguration,
-) : StringFormat {
+open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat {
 
     /**
      * Secondary constructor for direct instantiation without the builder.
@@ -61,10 +59,7 @@ open class EncodedFormat(
      * Serializes [value] with the configured binary format, applies the transform,
      * and encodes the resulting byte array using the text codec.
      */
-    override fun <T> encodeToString(
-        serializer: SerializationStrategy<T>,
-        value: T
-    ): String {
+    override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
         val bytes =
             configuration.binaryFormat.encodeToByteArray(serializer, value)
         val payload = configuration.transform?.encode(bytes) ?: bytes
@@ -77,15 +72,12 @@ open class EncodedFormat(
      *
      * @throws IllegalArgumentException if the transform's decode step fails (e.g. checksum mismatch).
      */
-    override fun <T> decodeFromString(
-        deserializer: DeserializationStrategy<T>,
-        string: String
-    ): T {
+    override fun <T> decodeFromString(deserializer: DeserializationStrategy<T>, string: String): T {
         val input = configuration.codec.decode(string)
         val bytes = configuration.transform?.decode(input) ?: input
         return configuration.binaryFormat.decodeFromByteArray(
             deserializer,
-            bytes
+            bytes,
         )
     }
 }
@@ -129,7 +121,7 @@ class EncodedFormatBuilder {
  */
 fun EncodedFormat(
     from: EncodedFormat = EncodedFormat.Default,
-    builderAction: EncodedFormatBuilder.() -> Unit
+    builderAction: EncodedFormatBuilder.() -> Unit,
 ): EncodedFormat {
     val builder = EncodedFormatBuilder().apply {
         codec = from.configuration.codec
@@ -142,6 +134,6 @@ fun EncodedFormat(
             builder.codec,
             builder.transform,
             builder.binaryFormat,
-        )
+        ),
     )
 }

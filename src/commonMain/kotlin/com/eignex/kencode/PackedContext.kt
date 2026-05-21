@@ -40,21 +40,15 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
 
     val totalCount: Int get() = boolCount + nullCount
 
-    fun booleanPos(fieldIdx: Int): Int =
-        booleanLookup.getOrElse(fieldIdx) { -1 }
+    fun booleanPos(fieldIdx: Int): Int = booleanLookup.getOrElse(fieldIdx) { -1 }
 
-    fun nullablePos(fieldIdx: Int): Int =
-        nullableLookup.getOrElse(fieldIdx) { -1 }
+    fun nullablePos(fieldIdx: Int): Int = nullableLookup.getOrElse(fieldIdx) { -1 }
 
     /**
      * Packs boolean values followed by null values into a fixed-width byte array.
      * Used for inline (non-merged) bitmasks in polymorphic and other non-CLASS structures.
      */
-    fun writeInlineBitmask(
-        booleanValues: BooleanArray,
-        nullValues: BooleanArray,
-        out: ByteOutput
-    ) {
+    fun writeInlineBitmask(booleanValues: BooleanArray, nullValues: BooleanArray, out: ByteOutput) {
         val n = totalCount
         if (n == 0) return
         val bytes = ByteArray((n + 7) / 8)
@@ -86,11 +80,10 @@ internal fun shouldMergeChildCtx(
     parentIsCollection: Boolean,
     parentDescriptor: SerialDescriptor,
     fieldIndex: Int,
-    childDescriptor: SerialDescriptor
-): Boolean =
-    parentIsMergedKind && !parentIsCollection && fieldIndex >= 0 &&
-        !parentDescriptor.getElementDescriptor(fieldIndex).isNullable && !childDescriptor.isInline &&
-        (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
+    childDescriptor: SerialDescriptor,
+): Boolean = parentIsMergedKind && !parentIsCollection && fieldIndex >= 0 &&
+    !parentDescriptor.getElementDescriptor(fieldIndex).isNullable && !childDescriptor.isInline &&
+    (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
 
 /**
  * Accumulates bitmask bits across an entire nested-class hierarchy so that the
@@ -101,8 +94,7 @@ internal class HeaderContext {
     private var readCursor = 0
 
     /** Reserves slots and returns the start index for a later set call. */
-    fun reserve(count: Int): Int =
-        bits.size.also { repeat(count) { bits.add(false) } }
+    fun reserve(count: Int): Int = bits.size.also { repeat(count) { bits.add(false) } }
 
     /** Fills the slots starting at [start] with booleans immediately followed by nulls. */
     fun set(start: Int, booleans: BooleanArray, nulls: BooleanArray) {

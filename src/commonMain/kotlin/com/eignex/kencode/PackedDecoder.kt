@@ -22,7 +22,8 @@ class PackedDecoder internal constructor(
     private val config: PackedConfiguration,
     override val serializersModule: SerializersModule,
     headerCtx: HeaderContext?,
-) : Decoder, CompositeDecoder {
+) : Decoder,
+    CompositeDecoder {
 
     constructor(
         input: ByteArray,
@@ -176,27 +177,25 @@ class PackedDecoder internal constructor(
 
     override fun decodeShort(): Short = readShortPos()
 
-    override fun decodeInt(): Int =
-        if (inStructure && !isCollection) {
-            decodeIntElement(currentDescriptor, currentIndex)
-        } else {
-            when (config.defaultEncoding) {
-                IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
-                IntPacking.DEFAULT -> readVarInt()
-                IntPacking.FIXED -> readIntPos()
-            }
+    override fun decodeInt(): Int = if (inStructure && !isCollection) {
+        decodeIntElement(currentDescriptor, currentIndex)
+    } else {
+        when (config.defaultEncoding) {
+            IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
+            IntPacking.DEFAULT -> readVarInt()
+            IntPacking.FIXED -> readIntPos()
         }
+    }
 
-    override fun decodeLong(): Long =
-        if (inStructure && !isCollection) {
-            decodeLongElement(currentDescriptor, currentIndex)
-        } else {
-            when (config.defaultEncoding) {
-                IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
-                IntPacking.DEFAULT -> readVarLong()
-                IntPacking.FIXED -> readLongPos()
-            }
+    override fun decodeLong(): Long = if (inStructure && !isCollection) {
+        decodeLongElement(currentDescriptor, currentIndex)
+    } else {
+        when (config.defaultEncoding) {
+            IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
+            IntPacking.DEFAULT -> readVarLong()
+            IntPacking.FIXED -> readLongPos()
         }
+    }
 
     override fun decodeFloat(): Float = Float.fromBits(readIntPos())
 
@@ -213,8 +212,7 @@ class PackedDecoder internal constructor(
     }
 
     @ExperimentalSerializationApi
-    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int =
-        readVarInt()
+    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = readVarInt()
 
     @ExperimentalSerializationApi
     override fun decodeNull(): Nothing? = null
@@ -248,85 +246,51 @@ class PackedDecoder internal constructor(
         currentIndex = -1
     }
 
-    override fun decodeBooleanElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Boolean {
+    override fun decodeBooleanElement(descriptor: SerialDescriptor, index: Int): Boolean {
         val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         return booleanValues[pos]
     }
 
-    override fun decodeByteElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Byte {
+    override fun decodeByteElement(descriptor: SerialDescriptor, index: Int): Byte {
         require(position < input.size)
         return input[position++]
     }
 
-    override fun decodeShortElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Short = readShortPos()
+    override fun decodeShortElement(descriptor: SerialDescriptor, index: Int): Short = readShortPos()
 
-    override fun decodeIntElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Int =
-        when (
-            resolveIntEncoding(
-                descriptor.getElementAnnotations(index),
-                config
-            )
-        ) {
-            IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
-            IntPacking.DEFAULT -> readVarInt()
-            IntPacking.FIXED -> readIntPos()
-        }
+    override fun decodeIntElement(descriptor: SerialDescriptor, index: Int): Int = when (
+        resolveIntEncoding(
+            descriptor.getElementAnnotations(index),
+            config,
+        )
+    ) {
+        IntPacking.SIGNED -> zigZagDecodeInt(readVarInt())
+        IntPacking.DEFAULT -> readVarInt()
+        IntPacking.FIXED -> readIntPos()
+    }
 
-    override fun decodeLongElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Long =
-        when (
-            resolveIntEncoding(
-                descriptor.getElementAnnotations(index),
-                config
-            )
-        ) {
-            IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
-            IntPacking.DEFAULT -> readVarLong()
-            IntPacking.FIXED -> readLongPos()
-        }
+    override fun decodeLongElement(descriptor: SerialDescriptor, index: Int): Long = when (
+        resolveIntEncoding(
+            descriptor.getElementAnnotations(index),
+            config,
+        )
+    ) {
+        IntPacking.SIGNED -> zigZagDecodeLong(readVarLong())
+        IntPacking.DEFAULT -> readVarLong()
+        IntPacking.FIXED -> readLongPos()
+    }
 
-    override fun decodeFloatElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Float =
-        Float.fromBits(readIntPos())
+    override fun decodeFloatElement(descriptor: SerialDescriptor, index: Int): Float = Float.fromBits(readIntPos())
 
-    override fun decodeDoubleElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Double =
-        Double.fromBits(readLongPos())
+    override fun decodeDoubleElement(descriptor: SerialDescriptor, index: Int): Double = Double.fromBits(readLongPos())
 
-    override fun decodeCharElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Char = readUtf8Char()
+    override fun decodeCharElement(descriptor: SerialDescriptor, index: Int): Char = readUtf8Char()
 
-    override fun decodeStringElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): String = readStringInline()
+    override fun decodeStringElement(descriptor: SerialDescriptor, index: Int): String = readStringInline()
 
     @ExperimentalSerializationApi
-    override fun decodeInlineElement(
-        descriptor: SerialDescriptor,
-        index: Int
-    ): Decoder {
+    override fun decodeInlineElement(descriptor: SerialDescriptor, index: Int): Decoder {
         currentIndex = index
         return this
     }
@@ -335,7 +299,7 @@ class PackedDecoder internal constructor(
         descriptor: SerialDescriptor,
         index: Int,
         deserializer: DeserializationStrategy<T>,
-        previousValue: T?
+        previousValue: T?,
     ): T {
         currentIndex = index
 
@@ -367,13 +331,13 @@ class PackedDecoder internal constructor(
                 isCollection,
                 descriptor,
                 index,
-                deserializer.descriptor
+                deserializer.descriptor,
             )
             val subDecoder = PackedDecoder(
                 input,
                 config,
                 serializersModule,
-                if (shouldShareCtx) ctx else null
+                if (shouldShareCtx) ctx else null,
             )
             subDecoder.position = this.position
             val value = deserializer.deserialize(subDecoder)
@@ -392,7 +356,7 @@ class PackedDecoder internal constructor(
         descriptor: SerialDescriptor,
         index: Int,
         deserializer: DeserializationStrategy<T?>,
-        previousValue: T?
+        previousValue: T?,
     ): T? {
         require(!isCollection) {
             "decodeNullableSerializableElement should not be called for collections."
@@ -409,7 +373,7 @@ class PackedDecoder internal constructor(
             descriptor,
             index,
             deserializer as DeserializationStrategy<T>,
-            previousValue
+            previousValue,
         )
     }
 
@@ -440,20 +404,18 @@ class PackedDecoder internal constructor(
         }
     }
 
-    private fun readShortPos(): Short =
-        readShort(input, position).also { position += 2 }
+    private fun readShortPos(): Short = readShort(input, position).also { position += 2 }
 
-    private fun readIntPos(): Int =
-        readInt(input, position).also { position += 4 }
+    private fun readIntPos(): Int = readInt(input, position).also { position += 4 }
 
-    private fun readLongPos(): Long =
-        readLong(input, position).also { position += 8 }
+    private fun readLongPos(): Long = readLong(input, position).also { position += 8 }
 
     private fun readUtf8Char(): Char {
         require(position < input.size) { "Unexpected EOF while decoding UTF-8 char" }
         val b0 = input[position].toInt() and 0xFF
         val (len, cp) = when {
             (b0 and 0b1000_0000) == 0 -> 1 to b0
+
             (b0 and 0b1110_0000) == 0b1100_0000 -> {
                 require(position + 2 <= input.size)
                 val b1 = input[position + 1].toInt() and 0xFF
@@ -471,7 +433,8 @@ class PackedDecoder internal constructor(
             }
 
             else -> throw IllegalArgumentException(
-                "Code points above U+FFFF (4-byte UTF-8 sequences) are not supported in Char fields; use String instead"
+                "Code points above U+FFFF (4-byte UTF-8 sequences) are not supported in Char fields; " +
+                    "use String instead",
             )
         }
         position += len

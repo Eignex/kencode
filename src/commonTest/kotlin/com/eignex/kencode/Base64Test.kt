@@ -5,11 +5,7 @@ import kotlin.test.*
 
 class Base64Test {
 
-    private fun assertRoundtrip(
-        codec: Base64,
-        bytes: ByteArray,
-        message: String? = null
-    ) {
+    private fun assertRoundtrip(codec: Base64, bytes: ByteArray, message: String? = null) {
         val encoded = codec.encode(bytes)
         val decoded = codec.decode(encoded)
 
@@ -51,14 +47,14 @@ class Base64Test {
             byteArrayOf(-1),
             byteArrayOf(0, 1, 2, 3, 4),
             byteArrayOf(-1, -2, -3, -4),
-            byteArrayOf(127, -128, 0, 42)
+            byteArrayOf(127, -128, 0, 42),
         )
 
         for (bytes in patterns) {
             assertRoundtrip(
                 Base64,
                 bytes,
-                "Failed for pattern=${bytes.toList()}"
+                "Failed for pattern=${bytes.toList()}",
             )
         }
     }
@@ -72,14 +68,14 @@ class Base64Test {
             byteArrayOf(-1),
             byteArrayOf(0, 1, 2, 3, 4),
             byteArrayOf(-1, -2, -3, -4),
-            byteArrayOf(127, -128, 0, 42)
+            byteArrayOf(127, -128, 0, 42),
         )
 
         for (bytes in patterns) {
             assertRoundtrip(
                 Base64Url,
                 bytes,
-                "Failed for pattern=${bytes.toList()}"
+                "Failed for pattern=${bytes.toList()}",
             )
         }
     }
@@ -147,7 +143,7 @@ class Base64Test {
             "foo" to "Zm9v",
             "foob" to "Zm9vYg==",
             "fooba" to "Zm9vYmE=",
-            "foobar" to "Zm9vYmFy"
+            "foobar" to "Zm9vYmFy",
         )
 
         for ((plain, expectedEncoded) in vectors) {
@@ -156,14 +152,14 @@ class Base64Test {
             assertEquals(
                 expectedEncoded,
                 encoded,
-                "Encoding mismatch for '$plain'"
+                "Encoding mismatch for '$plain'",
             )
 
             val decoded = Base64.decode(expectedEncoded)
             assertContentEquals(
                 bytes,
                 decoded,
-                "Decoding mismatch for '$plain'"
+                "Decoding mismatch for '$plain'",
             )
         }
     }

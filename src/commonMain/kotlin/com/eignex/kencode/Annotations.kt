@@ -20,7 +20,7 @@ enum class IntPacking {
     SIGNED,
 
     /** Fixed-width. 4 bytes for `Int`, 8 bytes for `Long`. */
-    FIXED
+    FIXED,
 }
 
 /**
@@ -32,7 +32,7 @@ enum class IntPacking {
 @Retention(AnnotationRetention.SOURCE)
 annotation class PackedType(
     /** The integer encoding strategy to use for the annotated field. */
-    val type: IntPacking
+    val type: IntPacking,
 )
 
 private fun KxProtoIntegerType.toIntPacking(): IntPacking = when (this) {
@@ -41,10 +41,7 @@ private fun KxProtoIntegerType.toIntPacking(): IntPacking = when (this) {
     KxProtoIntegerType.FIXED -> IntPacking.FIXED
 }
 
-internal fun resolveIntEncoding(
-    anns: List<Annotation>,
-    config: PackedConfiguration
-): IntPacking {
+internal fun resolveIntEncoding(anns: List<Annotation>, config: PackedConfiguration): IntPacking {
     anns.filterIsInstance<PackedType>().firstOrNull()?.let { return it.type }
     try {
         anns.filterIsInstance<KxProtoType>().firstOrNull()
