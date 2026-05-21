@@ -6,6 +6,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.protobuf.ProtoIntegerType
 import kotlinx.serialization.protobuf.ProtoType
 import kotlin.test.Test
@@ -758,7 +759,7 @@ class PackedFormatTest {
         assertEquals(0, classDecoder.decodeElementIndex(classDescriptor))
         assertEquals(1, classDecoder.decodeElementIndex(classDescriptor))
         assertEquals(
-            kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
+            CompositeDecoder.DECODE_DONE,
             classDecoder.decodeElementIndex(classDescriptor),
         )
 
@@ -775,7 +776,7 @@ class PackedFormatTest {
         assertEquals(0, listDecoder.decodeElementIndex(listDescriptor))
         assertEquals(1, listDecoder.decodeElementIndex(listDescriptor))
         assertEquals(
-            kotlinx.serialization.encoding.CompositeDecoder.DECODE_DONE,
+            CompositeDecoder.DECODE_DONE,
             listDecoder.decodeElementIndex(listDescriptor),
         )
     }

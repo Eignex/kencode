@@ -277,7 +277,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
             val pad = blockSize - actualBytes.size
             require(pad >= 0) { "Decoded block exceeds expected block size." }
 
-            for (i in 0 until pad) output[outPos++] = 0
+            repeat(pad) { output[outPos++] = 0 }
             actualBytes.copyInto(output, outPos)
             outPos += actualBytes.size
 
