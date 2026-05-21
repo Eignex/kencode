@@ -36,7 +36,7 @@ For the design rationale and a walkthrough of the bit-packing layout, see the
 
 ```kotlin
 dependencies {
-    implementation("com.eignex:kencode:1.2.3")
+    implementation("com.eignex:kencode:1.3.0")
 }
 ```
 
