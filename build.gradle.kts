@@ -36,3 +36,15 @@ kotlin {
         }
     }
 }
+
+dokka {
+    dokkaSourceSets.configureEach {
+        sourceLink {
+            localDirectory.set(projectDir.resolve("src"))
+            val sub = projectDir.relativeTo(rootDir).invariantSeparatorsPath
+            val prefix = if (sub.isEmpty()) "src" else "$sub/src"
+            remoteUrl("https://github.com/Eignex/${rootProject.name}/blob/main/$prefix")
+            remoteLineSuffix.set("#L")
+        }
+    }
+}
