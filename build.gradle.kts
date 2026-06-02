@@ -39,6 +39,7 @@ kotlin {
 
 dokka {
     dokkaSourceSets.configureEach {
+        includes.from("package.md")
         sourceLink {
             localDirectory.set(projectDir.resolve("src"))
             val sub = projectDir.relativeTo(rootDir).invariantSeparatorsPath
