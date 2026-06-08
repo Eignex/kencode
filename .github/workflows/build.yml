@@ -7,6 +7,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# A newer push supersedes any in-flight run for the same ref.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Run tests and collect coverage
@@ -23,7 +28,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-          cache: gradle
+
+      # Persists the Gradle home incl. the build and configuration caches across runs.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Cache Kotlin/Native toolchain
         uses: actions/cache@v4
