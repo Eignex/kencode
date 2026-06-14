@@ -50,7 +50,7 @@ jobs:
         run: ./gradlew lintDocs
 
       - name: Run tests with coverage
-        run: ./gradlew allTests koverXmlReport
+        run: ./gradlew check koverXmlReport
 
       - name: Upload test reports
         if: always()
