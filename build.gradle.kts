@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("com.eignex.kmp") version "1.2.7"
-    kotlin("plugin.serialization") version "2.3.20"
+    kotlin("plugin.serialization") version "2.4.10"
 }
 
 eignexPublish {
@@ -13,7 +13,7 @@ eignexPublish {
 @OptIn(ExperimentalWasmDsl::class)
 kotlin {
     jvm()
-    js(IR) { browser(); nodejs() }
+    js { browser(); nodejs() }
     wasmJs { browser(); nodejs() }
     wasmWasi { nodejs() }
     linuxX64(); linuxArm64()
@@ -32,7 +32,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("org.bouncycastle:bcprov-jdk18on:1.83")
-            implementation("com.google.zxing:core:3.5.3")
+            implementation("com.google.zxing:core:3.5.4")
         }
     }
 }
