@@ -16,6 +16,7 @@ jobs:
   test:
     name: Run tests and collect coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
