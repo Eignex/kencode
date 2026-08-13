@@ -35,7 +35,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
-          cache: gradle
+
+      # Reads the build and configuration caches build.yml writes, read-only so release runs
+      # never seed them.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Cache Kotlin/Native toolchain
         uses: actions/cache@v5
@@ -75,7 +82,7 @@ jobs:
 
       - name: Build and Test
         if: env.IS_SNAPSHOT == 'false'
-        run: ./gradlew --no-daemon build -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew build -PciVersion=${{ env.RELEASE_VERSION }}
 
       - name: Upload test reports
         if: always() && env.IS_SNAPSHOT == 'false'
@@ -94,7 +101,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew --no-daemon publishToMavenCentral -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew publishToMavenCentral -PciVersion=${{ env.RELEASE_VERSION }}
 
       - name: Publish to Sonatype Snapshots
         if: env.IS_SNAPSHOT == 'true'
@@ -103,7 +110,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew --no-daemon publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion=${{ env.RELEASE_VERSION }}
 
       - name: Detect pre-release
         if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false'
