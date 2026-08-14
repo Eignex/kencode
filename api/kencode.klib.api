@@ -1,0 +1,322 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs, wasmWasi]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <com.eignex:kencode>
+open annotation class com.eignex.kencode/PackedType : kotlin/Annotation { // com.eignex.kencode/PackedType|null[0]
+    constructor <init>(com.eignex.kencode/IntPacking) // com.eignex.kencode/PackedType.<init>|<init>(com.eignex.kencode.IntPacking){}[0]
+
+    final val type // com.eignex.kencode/PackedType.type|{}type[0]
+        final fun <get-type>(): com.eignex.kencode/IntPacking // com.eignex.kencode/PackedType.type.<get-type>|<get-type>(){}[0]
+}
+
+final enum class com.eignex.kencode/IntPacking : kotlin/Enum<com.eignex.kencode/IntPacking> { // com.eignex.kencode/IntPacking|null[0]
+    enum entry DEFAULT // com.eignex.kencode/IntPacking.DEFAULT|null[0]
+    enum entry FIXED // com.eignex.kencode/IntPacking.FIXED|null[0]
+    enum entry SIGNED // com.eignex.kencode/IntPacking.SIGNED|null[0]
+
+    final val entries // com.eignex.kencode/IntPacking.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.kencode/IntPacking> // com.eignex.kencode/IntPacking.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.kencode/IntPacking // com.eignex.kencode/IntPacking.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.kencode/IntPacking> // com.eignex.kencode/IntPacking.values|values#static(){}[0]
+}
+
+abstract interface com.eignex.kencode/Alphabet { // com.eignex.kencode/Alphabet|null[0]
+    abstract val size // com.eignex.kencode/Alphabet.size|{}size[0]
+        abstract fun <get-size>(): kotlin/Int // com.eignex.kencode/Alphabet.size.<get-size>|<get-size>(){}[0]
+
+    abstract fun get(kotlin/Int): kotlin/Char // com.eignex.kencode/Alphabet.get|get(kotlin.Int){}[0]
+    abstract fun indexOf(kotlin/Char): kotlin/Int // com.eignex.kencode/Alphabet.indexOf|indexOf(kotlin.Char){}[0]
+}
+
+abstract interface com.eignex.kencode/ByteEncoding { // com.eignex.kencode/ByteEncoding|null[0]
+    abstract fun decode(kotlin/CharSequence): kotlin/ByteArray // com.eignex.kencode/ByteEncoding.decode|decode(kotlin.CharSequence){}[0]
+    abstract fun encode(kotlin/ByteArray, kotlin/Int = ..., kotlin/Int = ...): kotlin/String // com.eignex.kencode/ByteEncoding.encode|encode(kotlin.ByteArray;kotlin.Int;kotlin.Int){}[0]
+}
+
+abstract interface com.eignex.kencode/Checksum { // com.eignex.kencode/Checksum|null[0]
+    abstract val size // com.eignex.kencode/Checksum.size|{}size[0]
+        abstract fun <get-size>(): kotlin/Int // com.eignex.kencode/Checksum.size.<get-size>|<get-size>(){}[0]
+
+    abstract fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Checksum.digest|digest(kotlin.ByteArray){}[0]
+}
+
+abstract interface com.eignex.kencode/PayloadTransform { // com.eignex.kencode/PayloadTransform|null[0]
+    abstract fun decode(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/PayloadTransform.decode|decode(kotlin.ByteArray){}[0]
+    abstract fun encode(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/PayloadTransform.encode|encode(kotlin.ByteArray){}[0]
+}
+
+final class com.eignex.kencode/CharAlphabet : com.eignex.kencode/Alphabet { // com.eignex.kencode/CharAlphabet|null[0]
+    constructor <init>(kotlin/String) // com.eignex.kencode/CharAlphabet.<init>|<init>(kotlin.String){}[0]
+
+    final val size // com.eignex.kencode/CharAlphabet.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.kencode/CharAlphabet.size.<get-size>|<get-size>(){}[0]
+
+    final fun get(kotlin/Int): kotlin/Char // com.eignex.kencode/CharAlphabet.get|get(kotlin.Int){}[0]
+    final fun indexOf(kotlin/Char): kotlin/Int // com.eignex.kencode/CharAlphabet.indexOf|indexOf(kotlin.Char){}[0]
+}
+
+final class com.eignex.kencode/EncodedConfiguration { // com.eignex.kencode/EncodedConfiguration|null[0]
+    constructor <init>(com.eignex.kencode/ByteEncoding = ..., com.eignex.kencode/PayloadTransform? = ..., kotlinx.serialization/BinaryFormat = ...) // com.eignex.kencode/EncodedConfiguration.<init>|<init>(com.eignex.kencode.ByteEncoding;com.eignex.kencode.PayloadTransform?;kotlinx.serialization.BinaryFormat){}[0]
+
+    final val binaryFormat // com.eignex.kencode/EncodedConfiguration.binaryFormat|{}binaryFormat[0]
+        final fun <get-binaryFormat>(): kotlinx.serialization/BinaryFormat // com.eignex.kencode/EncodedConfiguration.binaryFormat.<get-binaryFormat>|<get-binaryFormat>(){}[0]
+    final val codec // com.eignex.kencode/EncodedConfiguration.codec|{}codec[0]
+        final fun <get-codec>(): com.eignex.kencode/ByteEncoding // com.eignex.kencode/EncodedConfiguration.codec.<get-codec>|<get-codec>(){}[0]
+    final val transform // com.eignex.kencode/EncodedConfiguration.transform|{}transform[0]
+        final fun <get-transform>(): com.eignex.kencode/PayloadTransform? // com.eignex.kencode/EncodedConfiguration.transform.<get-transform>|<get-transform>(){}[0]
+
+    final fun component1(): com.eignex.kencode/ByteEncoding // com.eignex.kencode/EncodedConfiguration.component1|component1(){}[0]
+    final fun component2(): com.eignex.kencode/PayloadTransform? // com.eignex.kencode/EncodedConfiguration.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization/BinaryFormat // com.eignex.kencode/EncodedConfiguration.component3|component3(){}[0]
+    final fun copy(com.eignex.kencode/ByteEncoding = ..., com.eignex.kencode/PayloadTransform? = ..., kotlinx.serialization/BinaryFormat = ...): com.eignex.kencode/EncodedConfiguration // com.eignex.kencode/EncodedConfiguration.copy|copy(com.eignex.kencode.ByteEncoding;com.eignex.kencode.PayloadTransform?;kotlinx.serialization.BinaryFormat){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.kencode/EncodedConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.kencode/EncodedConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.kencode/EncodedConfiguration.toString|toString(){}[0]
+}
+
+final class com.eignex.kencode/EncodedFormatBuilder { // com.eignex.kencode/EncodedFormatBuilder|null[0]
+    constructor <init>() // com.eignex.kencode/EncodedFormatBuilder.<init>|<init>(){}[0]
+
+    final var binaryFormat // com.eignex.kencode/EncodedFormatBuilder.binaryFormat|{}binaryFormat[0]
+        final fun <get-binaryFormat>(): kotlinx.serialization/BinaryFormat // com.eignex.kencode/EncodedFormatBuilder.binaryFormat.<get-binaryFormat>|<get-binaryFormat>(){}[0]
+        final fun <set-binaryFormat>(kotlinx.serialization/BinaryFormat) // com.eignex.kencode/EncodedFormatBuilder.binaryFormat.<set-binaryFormat>|<set-binaryFormat>(kotlinx.serialization.BinaryFormat){}[0]
+    final var checksum // com.eignex.kencode/EncodedFormatBuilder.checksum|{}checksum[0]
+        final fun <get-checksum>(): com.eignex.kencode/Checksum? // com.eignex.kencode/EncodedFormatBuilder.checksum.<get-checksum>|<get-checksum>(){}[0]
+        final fun <set-checksum>(com.eignex.kencode/Checksum?) // com.eignex.kencode/EncodedFormatBuilder.checksum.<set-checksum>|<set-checksum>(com.eignex.kencode.Checksum?){}[0]
+    final var codec // com.eignex.kencode/EncodedFormatBuilder.codec|{}codec[0]
+        final fun <get-codec>(): com.eignex.kencode/ByteEncoding // com.eignex.kencode/EncodedFormatBuilder.codec.<get-codec>|<get-codec>(){}[0]
+        final fun <set-codec>(com.eignex.kencode/ByteEncoding) // com.eignex.kencode/EncodedFormatBuilder.codec.<set-codec>|<set-codec>(com.eignex.kencode.ByteEncoding){}[0]
+    final var transform // com.eignex.kencode/EncodedFormatBuilder.transform|{}transform[0]
+        final fun <get-transform>(): com.eignex.kencode/PayloadTransform? // com.eignex.kencode/EncodedFormatBuilder.transform.<get-transform>|<get-transform>(){}[0]
+        final fun <set-transform>(com.eignex.kencode/PayloadTransform?) // com.eignex.kencode/EncodedFormatBuilder.transform.<set-transform>|<set-transform>(com.eignex.kencode.PayloadTransform?){}[0]
+}
+
+final class com.eignex.kencode/PackedConfiguration { // com.eignex.kencode/PackedConfiguration|null[0]
+    constructor <init>(com.eignex.kencode/IntPacking = ...) // com.eignex.kencode/PackedConfiguration.<init>|<init>(com.eignex.kencode.IntPacking){}[0]
+
+    final val defaultEncoding // com.eignex.kencode/PackedConfiguration.defaultEncoding|{}defaultEncoding[0]
+        final fun <get-defaultEncoding>(): com.eignex.kencode/IntPacking // com.eignex.kencode/PackedConfiguration.defaultEncoding.<get-defaultEncoding>|<get-defaultEncoding>(){}[0]
+
+    final fun component1(): com.eignex.kencode/IntPacking // com.eignex.kencode/PackedConfiguration.component1|component1(){}[0]
+    final fun copy(com.eignex.kencode/IntPacking = ...): com.eignex.kencode/PackedConfiguration // com.eignex.kencode/PackedConfiguration.copy|copy(com.eignex.kencode.IntPacking){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.kencode/PackedConfiguration.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.kencode/PackedConfiguration.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.kencode/PackedConfiguration.toString|toString(){}[0]
+}
+
+final class com.eignex.kencode/PackedDecoder : kotlinx.serialization.encoding/CompositeDecoder, kotlinx.serialization.encoding/Decoder { // com.eignex.kencode/PackedDecoder|null[0]
+    constructor <init>(kotlin/ByteArray, com.eignex.kencode/PackedConfiguration = ..., kotlinx.serialization.modules/SerializersModule = ...) // com.eignex.kencode/PackedDecoder.<init>|<init>(kotlin.ByteArray;com.eignex.kencode.PackedConfiguration;kotlinx.serialization.modules.SerializersModule){}[0]
+
+    final val serializersModule // com.eignex.kencode/PackedDecoder.serializersModule|{}serializersModule[0]
+        final fun <get-serializersModule>(): kotlinx.serialization.modules/SerializersModule // com.eignex.kencode/PackedDecoder.serializersModule.<get-serializersModule>|<get-serializersModule>(){}[0]
+
+    final fun <#A1: kotlin/Any> decodeNullableSerializableElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlinx.serialization/DeserializationStrategy<#A1?>, #A1?): #A1? // com.eignex.kencode/PackedDecoder.decodeNullableSerializableElement|decodeNullableSerializableElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlinx.serialization.DeserializationStrategy<0:0?>;0:0?){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any?> decodeSerializableElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlinx.serialization/DeserializationStrategy<#A1>, #A1?): #A1 // com.eignex.kencode/PackedDecoder.decodeSerializableElement|decodeSerializableElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlinx.serialization.DeserializationStrategy<0:0>;0:0?){0§<kotlin.Any?>}[0]
+    final fun beginStructure(kotlinx.serialization.descriptors/SerialDescriptor): kotlinx.serialization.encoding/CompositeDecoder // com.eignex.kencode/PackedDecoder.beginStructure|beginStructure(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun decodeBoolean(): kotlin/Boolean // com.eignex.kencode/PackedDecoder.decodeBoolean|decodeBoolean(){}[0]
+    final fun decodeBooleanElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Boolean // com.eignex.kencode/PackedDecoder.decodeBooleanElement|decodeBooleanElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeByte(): kotlin/Byte // com.eignex.kencode/PackedDecoder.decodeByte|decodeByte(){}[0]
+    final fun decodeByteElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Byte // com.eignex.kencode/PackedDecoder.decodeByteElement|decodeByteElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeChar(): kotlin/Char // com.eignex.kencode/PackedDecoder.decodeChar|decodeChar(){}[0]
+    final fun decodeCharElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Char // com.eignex.kencode/PackedDecoder.decodeCharElement|decodeCharElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeCollectionSize(kotlinx.serialization.descriptors/SerialDescriptor): kotlin/Int // com.eignex.kencode/PackedDecoder.decodeCollectionSize|decodeCollectionSize(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun decodeDouble(): kotlin/Double // com.eignex.kencode/PackedDecoder.decodeDouble|decodeDouble(){}[0]
+    final fun decodeDoubleElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Double // com.eignex.kencode/PackedDecoder.decodeDoubleElement|decodeDoubleElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeElementIndex(kotlinx.serialization.descriptors/SerialDescriptor): kotlin/Int // com.eignex.kencode/PackedDecoder.decodeElementIndex|decodeElementIndex(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun decodeEnum(kotlinx.serialization.descriptors/SerialDescriptor): kotlin/Int // com.eignex.kencode/PackedDecoder.decodeEnum|decodeEnum(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun decodeFloat(): kotlin/Float // com.eignex.kencode/PackedDecoder.decodeFloat|decodeFloat(){}[0]
+    final fun decodeFloatElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Float // com.eignex.kencode/PackedDecoder.decodeFloatElement|decodeFloatElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeInline(kotlinx.serialization.descriptors/SerialDescriptor): kotlinx.serialization.encoding/Decoder // com.eignex.kencode/PackedDecoder.decodeInline|decodeInline(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun decodeInlineElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlinx.serialization.encoding/Decoder // com.eignex.kencode/PackedDecoder.decodeInlineElement|decodeInlineElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeInt(): kotlin/Int // com.eignex.kencode/PackedDecoder.decodeInt|decodeInt(){}[0]
+    final fun decodeIntElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Int // com.eignex.kencode/PackedDecoder.decodeIntElement|decodeIntElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeLong(): kotlin/Long // com.eignex.kencode/PackedDecoder.decodeLong|decodeLong(){}[0]
+    final fun decodeLongElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Long // com.eignex.kencode/PackedDecoder.decodeLongElement|decodeLongElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeNotNullMark(): kotlin/Boolean // com.eignex.kencode/PackedDecoder.decodeNotNullMark|decodeNotNullMark(){}[0]
+    final fun decodeNull(): kotlin/Nothing? // com.eignex.kencode/PackedDecoder.decodeNull|decodeNull(){}[0]
+    final fun decodeSequentially(): kotlin/Boolean // com.eignex.kencode/PackedDecoder.decodeSequentially|decodeSequentially(){}[0]
+    final fun decodeShort(): kotlin/Short // com.eignex.kencode/PackedDecoder.decodeShort|decodeShort(){}[0]
+    final fun decodeShortElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/Short // com.eignex.kencode/PackedDecoder.decodeShortElement|decodeShortElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun decodeString(): kotlin/String // com.eignex.kencode/PackedDecoder.decodeString|decodeString(){}[0]
+    final fun decodeStringElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlin/String // com.eignex.kencode/PackedDecoder.decodeStringElement|decodeStringElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun endStructure(kotlinx.serialization.descriptors/SerialDescriptor) // com.eignex.kencode/PackedDecoder.endStructure|endStructure(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+}
+
+final class com.eignex.kencode/PackedEncoder : kotlinx.serialization.encoding/CompositeEncoder, kotlinx.serialization.encoding/Encoder { // com.eignex.kencode/PackedEncoder|null[0]
+    final val serializersModule // com.eignex.kencode/PackedEncoder.serializersModule|{}serializersModule[0]
+        final fun <get-serializersModule>(): kotlinx.serialization.modules/SerializersModule // com.eignex.kencode/PackedEncoder.serializersModule.<get-serializersModule>|<get-serializersModule>(){}[0]
+
+    final fun <#A1: kotlin/Any> encodeNullableSerializableElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlinx.serialization/SerializationStrategy<#A1>, #A1?) // com.eignex.kencode/PackedEncoder.encodeNullableSerializableElement|encodeNullableSerializableElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlinx.serialization.SerializationStrategy<0:0>;0:0?){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any?> encodeSerializableElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlinx.serialization/SerializationStrategy<#A1>, #A1) // com.eignex.kencode/PackedEncoder.encodeSerializableElement|encodeSerializableElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlinx.serialization.SerializationStrategy<0:0>;0:0){0§<kotlin.Any?>}[0]
+    final fun beginCollection(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlinx.serialization.encoding/CompositeEncoder // com.eignex.kencode/PackedEncoder.beginCollection|beginCollection(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun beginStructure(kotlinx.serialization.descriptors/SerialDescriptor): kotlinx.serialization.encoding/CompositeEncoder // com.eignex.kencode/PackedEncoder.beginStructure|beginStructure(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun encodeBoolean(kotlin/Boolean) // com.eignex.kencode/PackedEncoder.encodeBoolean|encodeBoolean(kotlin.Boolean){}[0]
+    final fun encodeBooleanElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Boolean) // com.eignex.kencode/PackedEncoder.encodeBooleanElement|encodeBooleanElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Boolean){}[0]
+    final fun encodeByte(kotlin/Byte) // com.eignex.kencode/PackedEncoder.encodeByte|encodeByte(kotlin.Byte){}[0]
+    final fun encodeByteElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Byte) // com.eignex.kencode/PackedEncoder.encodeByteElement|encodeByteElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Byte){}[0]
+    final fun encodeChar(kotlin/Char) // com.eignex.kencode/PackedEncoder.encodeChar|encodeChar(kotlin.Char){}[0]
+    final fun encodeCharElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Char) // com.eignex.kencode/PackedEncoder.encodeCharElement|encodeCharElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Char){}[0]
+    final fun encodeDouble(kotlin/Double) // com.eignex.kencode/PackedEncoder.encodeDouble|encodeDouble(kotlin.Double){}[0]
+    final fun encodeDoubleElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Double) // com.eignex.kencode/PackedEncoder.encodeDoubleElement|encodeDoubleElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Double){}[0]
+    final fun encodeEnum(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int) // com.eignex.kencode/PackedEncoder.encodeEnum|encodeEnum(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun encodeFloat(kotlin/Float) // com.eignex.kencode/PackedEncoder.encodeFloat|encodeFloat(kotlin.Float){}[0]
+    final fun encodeFloatElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Float) // com.eignex.kencode/PackedEncoder.encodeFloatElement|encodeFloatElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Float){}[0]
+    final fun encodeInline(kotlinx.serialization.descriptors/SerialDescriptor): kotlinx.serialization.encoding/Encoder // com.eignex.kencode/PackedEncoder.encodeInline|encodeInline(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+    final fun encodeInlineElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int): kotlinx.serialization.encoding/Encoder // com.eignex.kencode/PackedEncoder.encodeInlineElement|encodeInlineElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int){}[0]
+    final fun encodeInt(kotlin/Int) // com.eignex.kencode/PackedEncoder.encodeInt|encodeInt(kotlin.Int){}[0]
+    final fun encodeIntElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Int) // com.eignex.kencode/PackedEncoder.encodeIntElement|encodeIntElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Int){}[0]
+    final fun encodeLong(kotlin/Long) // com.eignex.kencode/PackedEncoder.encodeLong|encodeLong(kotlin.Long){}[0]
+    final fun encodeLongElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Long) // com.eignex.kencode/PackedEncoder.encodeLongElement|encodeLongElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Long){}[0]
+    final fun encodeNotNullMark() // com.eignex.kencode/PackedEncoder.encodeNotNullMark|encodeNotNullMark(){}[0]
+    final fun encodeNull() // com.eignex.kencode/PackedEncoder.encodeNull|encodeNull(){}[0]
+    final fun encodeShort(kotlin/Short) // com.eignex.kencode/PackedEncoder.encodeShort|encodeShort(kotlin.Short){}[0]
+    final fun encodeShortElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/Short) // com.eignex.kencode/PackedEncoder.encodeShortElement|encodeShortElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.Short){}[0]
+    final fun encodeString(kotlin/String) // com.eignex.kencode/PackedEncoder.encodeString|encodeString(kotlin.String){}[0]
+    final fun encodeStringElement(kotlinx.serialization.descriptors/SerialDescriptor, kotlin/Int, kotlin/String) // com.eignex.kencode/PackedEncoder.encodeStringElement|encodeStringElement(kotlinx.serialization.descriptors.SerialDescriptor;kotlin.Int;kotlin.String){}[0]
+    final fun endStructure(kotlinx.serialization.descriptors/SerialDescriptor) // com.eignex.kencode/PackedEncoder.endStructure|endStructure(kotlinx.serialization.descriptors.SerialDescriptor){}[0]
+}
+
+final class com.eignex.kencode/PackedFormatBuilder { // com.eignex.kencode/PackedFormatBuilder|null[0]
+    constructor <init>() // com.eignex.kencode/PackedFormatBuilder.<init>|<init>(){}[0]
+
+    final var defaultEncoding // com.eignex.kencode/PackedFormatBuilder.defaultEncoding|{}defaultEncoding[0]
+        final fun <get-defaultEncoding>(): com.eignex.kencode/IntPacking // com.eignex.kencode/PackedFormatBuilder.defaultEncoding.<get-defaultEncoding>|<get-defaultEncoding>(){}[0]
+        final fun <set-defaultEncoding>(com.eignex.kencode/IntPacking) // com.eignex.kencode/PackedFormatBuilder.defaultEncoding.<set-defaultEncoding>|<set-defaultEncoding>(com.eignex.kencode.IntPacking){}[0]
+    final var serializersModule // com.eignex.kencode/PackedFormatBuilder.serializersModule|{}serializersModule[0]
+        final fun <get-serializersModule>(): kotlinx.serialization.modules/SerializersModule // com.eignex.kencode/PackedFormatBuilder.serializersModule.<get-serializersModule>|<get-serializersModule>(){}[0]
+        final fun <set-serializersModule>(kotlinx.serialization.modules/SerializersModule) // com.eignex.kencode/PackedFormatBuilder.serializersModule.<set-serializersModule>|<set-serializersModule>(kotlinx.serialization.modules.SerializersModule){}[0]
+}
+
+final class com.eignex.kencode/UnicodeRangeAlphabet : com.eignex.kencode/Alphabet { // com.eignex.kencode/UnicodeRangeAlphabet|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ...) // com.eignex.kencode/UnicodeRangeAlphabet.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val size // com.eignex.kencode/UnicodeRangeAlphabet.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.kencode/UnicodeRangeAlphabet.size.<get-size>|<get-size>(){}[0]
+
+    final fun get(kotlin/Int): kotlin/Char // com.eignex.kencode/UnicodeRangeAlphabet.get|get(kotlin.Int){}[0]
+    final fun indexOf(kotlin/Char): kotlin/Int // com.eignex.kencode/UnicodeRangeAlphabet.indexOf|indexOf(kotlin.Char){}[0]
+}
+
+open class com.eignex.kencode/Base64 : com.eignex.kencode/ByteEncoding { // com.eignex.kencode/Base64|null[0]
+    constructor <init>(kotlin/CharArray) // com.eignex.kencode/Base64.<init>|<init>(kotlin.CharArray){}[0]
+
+    final val alphabet // com.eignex.kencode/Base64.alphabet|{}alphabet[0]
+        final fun <get-alphabet>(): kotlin/CharArray // com.eignex.kencode/Base64.alphabet.<get-alphabet>|<get-alphabet>(){}[0]
+
+    open fun decode(kotlin/CharSequence): kotlin/ByteArray // com.eignex.kencode/Base64.decode|decode(kotlin.CharSequence){}[0]
+    open fun encode(kotlin/ByteArray, kotlin/Int, kotlin/Int): kotlin/String // com.eignex.kencode/Base64.encode|encode(kotlin.ByteArray;kotlin.Int;kotlin.Int){}[0]
+
+    final object Default : com.eignex.kencode/Base64 // com.eignex.kencode/Base64.Default|null[0]
+}
+
+open class com.eignex.kencode/Base85 : com.eignex.kencode/ByteEncoding { // com.eignex.kencode/Base85|null[0]
+    constructor <init>(kotlin/CharArray) // com.eignex.kencode/Base85.<init>|<init>(kotlin.CharArray){}[0]
+
+    open fun decode(kotlin/CharSequence): kotlin/ByteArray // com.eignex.kencode/Base85.decode|decode(kotlin.CharSequence){}[0]
+    open fun encode(kotlin/ByteArray, kotlin/Int, kotlin/Int): kotlin/String // com.eignex.kencode/Base85.encode|encode(kotlin.ByteArray;kotlin.Int;kotlin.Int){}[0]
+
+    final object Default : com.eignex.kencode/Base85 // com.eignex.kencode/Base85.Default|null[0]
+}
+
+open class com.eignex.kencode/BaseRadix : com.eignex.kencode/ByteEncoding { // com.eignex.kencode/BaseRadix|null[0]
+    constructor <init>(com.eignex.kencode/Alphabet, kotlin/Int = ...) // com.eignex.kencode/BaseRadix.<init>|<init>(com.eignex.kencode.Alphabet;kotlin.Int){}[0]
+    constructor <init>(kotlin/String, kotlin/Int = ...) // com.eignex.kencode/BaseRadix.<init>|<init>(kotlin.String;kotlin.Int){}[0]
+
+    final val blockSize // com.eignex.kencode/BaseRadix.blockSize|{}blockSize[0]
+        final fun <get-blockSize>(): kotlin/Int // com.eignex.kencode/BaseRadix.blockSize.<get-blockSize>|<get-blockSize>(){}[0]
+
+    open fun decode(kotlin/CharSequence): kotlin/ByteArray // com.eignex.kencode/BaseRadix.decode|decode(kotlin.CharSequence){}[0]
+    open fun encode(kotlin/ByteArray, kotlin/Int, kotlin/Int): kotlin/String // com.eignex.kencode/BaseRadix.encode|encode(kotlin.ByteArray;kotlin.Int;kotlin.Int){}[0]
+}
+
+open class com.eignex.kencode/Crc16 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc16|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc16.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
+
+    open val size // com.eignex.kencode/Crc16.size|{}size[0]
+        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc16.size.<get-size>|<get-size>(){}[0]
+
+    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc16.digest|digest(kotlin.ByteArray){}[0]
+
+    final object Default : com.eignex.kencode/Crc16 // com.eignex.kencode/Crc16.Default|null[0]
+}
+
+open class com.eignex.kencode/Crc32 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc32|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc32.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
+
+    open val size // com.eignex.kencode/Crc32.size|{}size[0]
+        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc32.size.<get-size>|<get-size>(){}[0]
+
+    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc32.digest|digest(kotlin.ByteArray){}[0]
+
+    final object Default : com.eignex.kencode/Crc32 // com.eignex.kencode/Crc32.Default|null[0]
+}
+
+open class com.eignex.kencode/Crc8 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc8|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc8.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
+
+    open val size // com.eignex.kencode/Crc8.size|{}size[0]
+        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc8.size.<get-size>|<get-size>(){}[0]
+
+    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc8.digest|digest(kotlin.ByteArray){}[0]
+
+    final object Default : com.eignex.kencode/Crc8 // com.eignex.kencode/Crc8.Default|null[0]
+}
+
+open class com.eignex.kencode/EncodedFormat : kotlinx.serialization/StringFormat { // com.eignex.kencode/EncodedFormat|null[0]
+    constructor <init>(com.eignex.kencode/ByteEncoding = ..., com.eignex.kencode/PayloadTransform? = ..., kotlinx.serialization/BinaryFormat = ...) // com.eignex.kencode/EncodedFormat.<init>|<init>(com.eignex.kencode.ByteEncoding;com.eignex.kencode.PayloadTransform?;kotlinx.serialization.BinaryFormat){}[0]
+    constructor <init>(com.eignex.kencode/EncodedConfiguration) // com.eignex.kencode/EncodedFormat.<init>|<init>(com.eignex.kencode.EncodedConfiguration){}[0]
+
+    final val configuration // com.eignex.kencode/EncodedFormat.configuration|{}configuration[0]
+        final fun <get-configuration>(): com.eignex.kencode/EncodedConfiguration // com.eignex.kencode/EncodedFormat.configuration.<get-configuration>|<get-configuration>(){}[0]
+    open val serializersModule // com.eignex.kencode/EncodedFormat.serializersModule|{}serializersModule[0]
+        open fun <get-serializersModule>(): kotlinx.serialization.modules/SerializersModule // com.eignex.kencode/EncodedFormat.serializersModule.<get-serializersModule>|<get-serializersModule>(){}[0]
+
+    open fun <#A1: kotlin/Any?> decodeFromString(kotlinx.serialization/DeserializationStrategy<#A1>, kotlin/String): #A1 // com.eignex.kencode/EncodedFormat.decodeFromString|decodeFromString(kotlinx.serialization.DeserializationStrategy<0:0>;kotlin.String){0§<kotlin.Any?>}[0]
+    open fun <#A1: kotlin/Any?> encodeToString(kotlinx.serialization/SerializationStrategy<#A1>, #A1): kotlin/String // com.eignex.kencode/EncodedFormat.encodeToString|encodeToString(kotlinx.serialization.SerializationStrategy<0:0>;0:0){0§<kotlin.Any?>}[0]
+
+    final object Default : com.eignex.kencode/EncodedFormat // com.eignex.kencode/EncodedFormat.Default|null[0]
+}
+
+open class com.eignex.kencode/PackedFormat : kotlinx.serialization/BinaryFormat { // com.eignex.kencode/PackedFormat|null[0]
+    constructor <init>(com.eignex.kencode/PackedConfiguration = ..., kotlinx.serialization.modules/SerializersModule = ...) // com.eignex.kencode/PackedFormat.<init>|<init>(com.eignex.kencode.PackedConfiguration;kotlinx.serialization.modules.SerializersModule){}[0]
+
+    final val configuration // com.eignex.kencode/PackedFormat.configuration|{}configuration[0]
+        final fun <get-configuration>(): com.eignex.kencode/PackedConfiguration // com.eignex.kencode/PackedFormat.configuration.<get-configuration>|<get-configuration>(){}[0]
+    open val serializersModule // com.eignex.kencode/PackedFormat.serializersModule|{}serializersModule[0]
+        open fun <get-serializersModule>(): kotlinx.serialization.modules/SerializersModule // com.eignex.kencode/PackedFormat.serializersModule.<get-serializersModule>|<get-serializersModule>(){}[0]
+
+    open fun <#A1: kotlin/Any?> decodeFromByteArray(kotlinx.serialization/DeserializationStrategy<#A1>, kotlin/ByteArray): #A1 // com.eignex.kencode/PackedFormat.decodeFromByteArray|decodeFromByteArray(kotlinx.serialization.DeserializationStrategy<0:0>;kotlin.ByteArray){0§<kotlin.Any?>}[0]
+    open fun <#A1: kotlin/Any?> encodeToByteArray(kotlinx.serialization/SerializationStrategy<#A1>, #A1): kotlin/ByteArray // com.eignex.kencode/PackedFormat.encodeToByteArray|encodeToByteArray(kotlinx.serialization.SerializationStrategy<0:0>;0:0){0§<kotlin.Any?>}[0]
+
+    final object Default : com.eignex.kencode/PackedFormat // com.eignex.kencode/PackedFormat.Default|null[0]
+}
+
+final object com.eignex.kencode/Base36 : com.eignex.kencode/BaseRadix // com.eignex.kencode/Base36|null[0]
+
+final object com.eignex.kencode/Base62 : com.eignex.kencode/BaseRadix // com.eignex.kencode/Base62|null[0]
+
+final object com.eignex.kencode/Base64Url : com.eignex.kencode/Base64 // com.eignex.kencode/Base64Url|null[0]
+
+final object com.eignex.kencode/CompactZeros : com.eignex.kencode/PayloadTransform { // com.eignex.kencode/CompactZeros|null[0]
+    final fun decode(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/CompactZeros.decode|decode(kotlin.ByteArray){}[0]
+    final fun encode(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/CompactZeros.encode|encode(kotlin.ByteArray){}[0]
+}
+
+final const val com.eignex.kencode/ASCII85 // com.eignex.kencode/ASCII85|{}ASCII85[0]
+    final fun <get-ASCII85>(): kotlin/String // com.eignex.kencode/ASCII85.<get-ASCII85>|<get-ASCII85>(){}[0]
+final const val com.eignex.kencode/BASE_62 // com.eignex.kencode/BASE_62|{}BASE_62[0]
+    final fun <get-BASE_62>(): kotlin/String // com.eignex.kencode/BASE_62.<get-BASE_62>|<get-BASE_62>(){}[0]
+final const val com.eignex.kencode/BASE_64 // com.eignex.kencode/BASE_64|{}BASE_64[0]
+    final fun <get-BASE_64>(): kotlin/String // com.eignex.kencode/BASE_64.<get-BASE_64>|<get-BASE_64>(){}[0]
+final const val com.eignex.kencode/BASE_64_URL // com.eignex.kencode/BASE_64_URL|{}BASE_64_URL[0]
+    final fun <get-BASE_64_URL>(): kotlin/String // com.eignex.kencode/BASE_64_URL.<get-BASE_64_URL>|<get-BASE_64_URL>(){}[0]
+
+final fun (com.eignex.kencode/Checksum).com.eignex.kencode/asTransform(): com.eignex.kencode/PayloadTransform // com.eignex.kencode/asTransform|asTransform@com.eignex.kencode.Checksum(){}[0]
+final fun (com.eignex.kencode/PayloadTransform).com.eignex.kencode/then(com.eignex.kencode/PayloadTransform): com.eignex.kencode/PayloadTransform // com.eignex.kencode/then|then@com.eignex.kencode.PayloadTransform(com.eignex.kencode.PayloadTransform){}[0]
+final fun com.eignex.kencode/EncodedFormat(com.eignex.kencode/EncodedFormat = ..., kotlin/Function1<com.eignex.kencode/EncodedFormatBuilder, kotlin/Unit>): com.eignex.kencode/EncodedFormat // com.eignex.kencode/EncodedFormat|EncodedFormat(com.eignex.kencode.EncodedFormat;kotlin.Function1<com.eignex.kencode.EncodedFormatBuilder,kotlin.Unit>){}[0]
+final fun com.eignex.kencode/PackedFormat(com.eignex.kencode/PackedFormat = ..., kotlin/Function1<com.eignex.kencode/PackedFormatBuilder, kotlin/Unit>): com.eignex.kencode/PackedFormat // com.eignex.kencode/PackedFormat|PackedFormat(com.eignex.kencode.PackedFormat;kotlin.Function1<com.eignex.kencode.PackedFormatBuilder,kotlin.Unit>){}[0]
