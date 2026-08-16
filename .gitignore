@@ -14,3 +14,18 @@ build/
 out/
 .fleet/
 .kotlin/
+
+### Agent harnesses ###
+# Local state only: transcripts, caches, per-user settings, and the scratch git
+# worktrees agents create inside the repo. Force-add if a config here is meant to be shared.
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.continue/
+.gemini/
+.opencode/
+.serena/
+.specstory/
+.aider*
+*.local.md
