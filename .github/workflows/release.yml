@@ -1,11 +1,12 @@
 name: release
 
 on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+    branches: [main]
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       dryRun:
@@ -14,86 +15,137 @@ on:
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
-# Superseded snapshot runs are pointless, but a tag publish must never be cancelled.
+# New snapshots supersede older runs; a tag publication must never be cancelled.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
+  prepare:
+    name: Resolve publication version and revision
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_snapshot: ${{ steps.version.outputs.is_snapshot }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      dry_run: ${{ steps.version.outputs.dry_run }}
+      revision: ${{ steps.version.outputs.revision }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Resolve publication version
+        id: version
+        env:
+          DRY_RUN: ${{ inputs.dryRun || false }}
+        run: |
+          next_patch() {
+            local tag major minor patch
+            while IFS= read -r tag; do
+              if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                major=${BASH_REMATCH[1]}
+                minor=${BASH_REMATCH[2]}
+                patch=${BASH_REMATCH[3]}
+                printf '%s.%s.%s\n' "$major" "$minor" "$((10#$patch + 1))"
+                return
+              fi
+            done < <(git tag --list 'v*' --sort=-v:refname)
+            echo '0.0.1'
+          }
+          if [[ "$DRY_RUN" == true ]]; then
+            version=$(next_patch)
+          elif [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version=${GITHUB_REF_NAME#v}
+          else
+            version="$(next_patch)-SNAPSHOT"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::invalid publication version: $version" >&2
+            exit 1
+          fi
+          is_snapshot=false
+          [[ "$version" != *-SNAPSHOT ]] || is_snapshot=true
+          is_prerelease=false
+          [[ "$version" != *-* ]] || is_prerelease=true
+          {
+            echo "version=$version"
+            echo "is_snapshot=$is_snapshot"
+            echo "is_prerelease=$is_prerelease"
+            echo "dry_run=$DRY_RUN"
+            echo "revision=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+  # Tags and manual runs use the same gate as pull requests. Automatic snapshots have already passed it.
+  validate:
+    if: github.event_name != 'workflow_run'
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.prepare.outputs.revision }}
+    secrets:
+      GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
   publish:
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' &&
+      (needs.validate.result == 'success' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'))
+    needs: [prepare, validate]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      IS_SNAPSHOT: ${{ needs.prepare.outputs.is_snapshot }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
-          # Tags are needed to derive the next snapshot version on a main push.
-          fetch-depth: 0
-
-      - uses: actions/setup-java@v5
+          ref: ${{ needs.prepare.outputs.revision }}
+          persist-credentials: false
+      - name: Set up JDK
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 25
-
-      # Reads the build and configuration caches build.yml writes, read-only so release runs
-      # never seed them.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-
-      - name: Cache Kotlin/Native toolchain
-        uses: actions/cache@v5
+      - name: Restore Kotlin/Native toolchain
+        uses: actions/cache/restore@v6
         with:
           path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
-          restore-keys: ${{ runner.os }}-konan-
-
-      # A tag publishes that exact version as a release. Any other ref publishes a snapshot of the
-      # next patch, so main always has a consumable build. A dry run takes the release path as far
-      # as the tests and stops, so the tag path can be exercised on demand.
-      - name: Resolve Version
-        run: |
-          next_patch() {
-            # Release tags only; a prerelease tag must not advance the line.
-            local last base major minor patch
-            last=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
-            base="${last:-v0.0.0}"
-            base="${base#v}"
-            IFS=. read -r major minor patch <<<"$base"
-            echo "${major:-0}.${minor:-0}.$(( ${patch:-0} + 1 ))"
-          }
-          if [[ "${{ inputs.dryRun }}" == "true" ]]; then
-            version="$(next_patch)"
-            echo "DRY_RUN=true" >> "$GITHUB_ENV"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="$(next_patch)-SNAPSHOT"
-          fi
-          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
-          if [[ "$version" == *-SNAPSHOT ]]; then
-            echo "IS_SNAPSHOT=true" >> "$GITHUB_ENV"
-          else
-            echo "IS_SNAPSHOT=false" >> "$GITHUB_ENV"
-          fi
+          key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('**/*.gradle.kts', '**/gradle.properties', '**/gradle-wrapper.properties', '**/*.versions.toml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
 
       - name: Build and Test
         if: env.IS_SNAPSHOT == 'false'
-        run: ./gradlew build -PciVersion=${{ env.RELEASE_VERSION }}
-
+        run: ./gradlew build -PciVersion="$RELEASE_VERSION"
       - name: Upload test reports
         if: always() && env.IS_SNAPSHOT == 'false'
         uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
-            build/reports/tests/
-            build/test-results/
+            **/build/reports/tests/
+            **/build/test-results/
           if-no-files-found: ignore
-
       - name: Publish to Maven Central (Portal)
         if: env.IS_SNAPSHOT == 'false' && env.DRY_RUN != 'true'
         env:
@@ -101,29 +153,18 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishToMavenCentral -PciVersion=${{ env.RELEASE_VERSION }}
-
+        run: ./gradlew publishToMavenCentral -PciVersion="$RELEASE_VERSION"
       - name: Publish to Sonatype Snapshots
-        if: env.IS_SNAPSHOT == 'true'
+        if: env.IS_SNAPSHOT == 'true' && env.DRY_RUN != 'true'
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion=${{ env.RELEASE_VERSION }}
-
-      - name: Detect pre-release
-        if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false'
-        run: |
-          if [[ "$RELEASE_VERSION" == *"-"* ]]; then
-            echo "IS_PRERELEASE=true" >> "$GITHUB_ENV"
-          else
-            echo "IS_PRERELEASE=false" >> "$GITHUB_ENV"
-          fi
-
-      - name: Create GitHub Release
-        if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false'
-        uses: softprops/action-gh-release@v2
+        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion="$RELEASE_VERSION"
+      - name: Create GitHub release
+        if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false' && env.DRY_RUN != 'true'
+        uses: softprops/action-gh-release@v3
         with:
-          prerelease: ${{ env.IS_PRERELEASE }}
+          prerelease: ${{ needs.prepare.outputs.is_prerelease }}
           generate_release_notes: true
