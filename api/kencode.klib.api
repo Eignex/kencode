@@ -50,6 +50,13 @@ abstract interface com.eignex.kencode/PayloadTransform { // com.eignex.kencode/P
     abstract fun encode(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/PayloadTransform.encode|encode(kotlin.ByteArray){}[0]
 }
 
+abstract class com.eignex.kencode/Crc : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc|null[0]
+    open val size // com.eignex.kencode/Crc.size|{}size[0]
+        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc.size.<get-size>|<get-size>(){}[0]
+
+    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc.digest|digest(kotlin.ByteArray){}[0]
+}
+
 final class com.eignex.kencode/CharAlphabet : com.eignex.kencode/Alphabet { // com.eignex.kencode/CharAlphabet|null[0]
     constructor <init>(kotlin/String) // com.eignex.kencode/CharAlphabet.<init>|<init>(kotlin.String){}[0]
 
@@ -236,35 +243,20 @@ open class com.eignex.kencode/BaseRadix : com.eignex.kencode/ByteEncoding { // c
     open fun encode(kotlin/ByteArray, kotlin/Int, kotlin/Int): kotlin/String // com.eignex.kencode/BaseRadix.encode|encode(kotlin.ByteArray;kotlin.Int;kotlin.Int){}[0]
 }
 
-open class com.eignex.kencode/Crc16 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc16|null[0]
+open class com.eignex.kencode/Crc16 : com.eignex.kencode/Crc { // com.eignex.kencode/Crc16|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc16.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
-
-    open val size // com.eignex.kencode/Crc16.size|{}size[0]
-        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc16.size.<get-size>|<get-size>(){}[0]
-
-    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc16.digest|digest(kotlin.ByteArray){}[0]
 
     final object Default : com.eignex.kencode/Crc16 // com.eignex.kencode/Crc16.Default|null[0]
 }
 
-open class com.eignex.kencode/Crc32 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc32|null[0]
+open class com.eignex.kencode/Crc32 : com.eignex.kencode/Crc { // com.eignex.kencode/Crc32|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc32.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
-
-    open val size // com.eignex.kencode/Crc32.size|{}size[0]
-        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc32.size.<get-size>|<get-size>(){}[0]
-
-    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc32.digest|digest(kotlin.ByteArray){}[0]
 
     final object Default : com.eignex.kencode/Crc32 // com.eignex.kencode/Crc32.Default|null[0]
 }
 
-open class com.eignex.kencode/Crc8 : com.eignex.kencode/Checksum { // com.eignex.kencode/Crc8|null[0]
+open class com.eignex.kencode/Crc8 : com.eignex.kencode/Crc { // com.eignex.kencode/Crc8|null[0]
     constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ...) // com.eignex.kencode/Crc8.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Int){}[0]
-
-    open val size // com.eignex.kencode/Crc8.size|{}size[0]
-        open fun <get-size>(): kotlin/Int // com.eignex.kencode/Crc8.size.<get-size>|<get-size>(){}[0]
-
-    open fun digest(kotlin/ByteArray): kotlin/ByteArray // com.eignex.kencode/Crc8.digest|digest(kotlin.ByteArray){}[0]
 
     final object Default : com.eignex.kencode/Crc8 // com.eignex.kencode/Crc8.Default|null[0]
 }

@@ -2,10 +2,7 @@ package com.eignex.kencode
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -28,10 +25,7 @@ class PackedEncoder internal constructor(
     private val isRoot: Boolean = headerCtx == null
 
     private var inStructure: Boolean = false
-    private var isCollection: Boolean = false
-
-    // True when the current structure uses the shared merged-header path (CLASS/OBJECT only).
-    private var isMergedKind: Boolean = false
+    private var layout: StructureLayout = StructureLayout.NONE
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
@@ -47,91 +41,64 @@ class PackedEncoder internal constructor(
     private var headerStart: Int = -1
 
     // Null bitmap followed by packed boolean/enum values for LIST elements.
-    private var isNullableCollection: Boolean = false
-    private var isPackedCollection: Boolean = false
-    private val collectionBitmapValues: MutableList<Boolean> = mutableListOf()
+    private lateinit var collectionNullBits: BitOutput
     private lateinit var collectionValueBits: BitOutput
 
     // Buffer for field data.
     private val dataBuffer = ByteOutput()
 
+    private fun child(headerCtx: HeaderContext? = null) =
+        PackedEncoder(getBuffer(), config, serializersModule, headerCtx)
+
     override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder {
         if (inStructure) {
-            val childCtx = if (shouldMergeChildCtx(
-                    isMergedKind,
-                    isCollection,
-                    currentDescriptor,
-                    currentIndex,
-                    descriptor,
-                )
-            ) {
-                ctx
-            } else {
-                null
-            }
-            val childEncoder =
-                PackedEncoder(dataBuffer, config, serializersModule, childCtx)
-            childEncoder.initializeStructure(descriptor)
-            return childEncoder
+            val shareCtx = shouldMergeChildCtx(
+                layout.isMergedKind,
+                layout.isCollection,
+                currentDescriptor,
+                currentIndex,
+                descriptor,
+            )
+            return child(if (shareCtx) ctx else null).also { it.initializeStructure(descriptor) }
         }
         initializeStructure(descriptor)
         return this
     }
 
     override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
-        val target = if (inStructure) dataBuffer else output
-        writeVarInt(collectionSize, target)
-        val childEncoder = PackedEncoder(target, config, serializersModule)
-        childEncoder.initializeStructure(descriptor)
-        return childEncoder
+        writeVarInt(collectionSize, getBuffer())
+        return child().also { it.initializeStructure(descriptor) }
     }
 
     private fun initializeStructure(descriptor: SerialDescriptor) {
         inStructure = true
         currentDescriptor = descriptor
+        layout = StructureLayout.of(descriptor)
 
-        val kind = descriptor.kind
-        isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
-
-        if (!isCollection) {
+        if (!layout.isCollection) {
             bitmask = ClassBitmask(descriptor)
             booleanValues = BooleanArray(bitmask.boolCount)
             nullValues = BooleanArray(bitmask.nullCount)
             enumValues = BooleanArray(bitmask.enumBitCount)
-
-            isNullableCollection = false
-            isPackedCollection = false
-
-            isMergedKind =
-                kind is StructureKind.CLASS || kind is StructureKind.OBJECT
-            if (isMergedKind) {
+            if (layout.isMergedKind) {
                 headerStart = ctx.reserve(bitmask.totalCount)
             }
         } else {
-            val isList = kind is StructureKind.LIST
-            val elemDesc = descriptor.getElementDescriptor(0)
-            isNullableCollection = isList && elemDesc.isNullable
-            isPackedCollection =
-                isList && (elemDesc.kind == PrimitiveKind.BOOLEAN || elemDesc.kind == SerialKind.ENUM)
+            collectionNullBits = BitOutput()
+            collectionValueBits = BitOutput()
         }
 
-        collectionBitmapValues.clear()
-        if (isPackedCollection) collectionValueBits = BitOutput()
         dataBuffer.reset()
     }
 
     private fun getBuffer(): ByteOutput = if (inStructure) dataBuffer else output
 
+    private val inClass: Boolean get() = inStructure && !layout.isCollection
+
     override fun encodeBoolean(value: Boolean) {
         when {
-            inStructure && !isCollection -> encodeBooleanElement(
-                currentDescriptor,
-                currentIndex,
-                value,
-            )
-
-            inStructure && isPackedCollection -> collectionValueBits.write(if (value) 1 else 0, 1)
-
+            inClass -> encodeBooleanElement(currentDescriptor, currentIndex, value)
+            inStructure && layout.isPackedCollection -> collectionValueBits.writeBit(value)
             else -> getBuffer().write(if (value) 1 else 0)
         }
     }
@@ -145,46 +112,18 @@ class PackedEncoder internal constructor(
     }
 
     override fun encodeInt(value: Int) {
-        if (inStructure && !isCollection) {
+        if (inClass) {
             encodeIntElement(currentDescriptor, currentIndex, value)
         } else {
-            when (config.defaultEncoding) {
-                IntPacking.SIGNED -> writeVarInt(
-                    zigZagEncodeInt(
-                        value,
-                    ),
-                    getBuffer(),
-                )
-
-                IntPacking.DEFAULT -> writeVarInt(
-                    value,
-                    getBuffer(),
-                )
-
-                IntPacking.FIXED -> writeInt(value, getBuffer())
-            }
+            writePackedInt(value, config.defaultEncoding, getBuffer())
         }
     }
 
     override fun encodeLong(value: Long) {
-        if (inStructure && !isCollection) {
+        if (inClass) {
             encodeLongElement(currentDescriptor, currentIndex, value)
         } else {
-            when (config.defaultEncoding) {
-                IntPacking.SIGNED -> writeVarLong(
-                    zigZagEncodeLong(
-                        value,
-                    ),
-                    getBuffer(),
-                )
-
-                IntPacking.DEFAULT -> writeVarLong(
-                    value,
-                    getBuffer(),
-                )
-
-                IntPacking.FIXED -> writeLong(value, getBuffer())
-            }
+            writePackedLong(value, config.defaultEncoding, getBuffer())
         }
     }
 
@@ -213,95 +152,63 @@ class PackedEncoder internal constructor(
             index in 0 until enumDescriptor.elementsCount,
         ) { "Invalid enum ordinal $index for ${enumDescriptor.serialName}" }
         val width = enumBitWidth(enumDescriptor)
-        val pos = if (inStructure && !isCollection) bitmask.enumPos(currentIndex) else -1
+        val pos = if (inClass) bitmask.enumPos(currentIndex) else -1
         when {
             pos != -1 -> repeat(width) { bit -> enumValues[pos + bit] = (index and (1 shl bit)) != 0 }
-            inStructure && isPackedCollection -> collectionValueBits.write(index, width)
+            inStructure && layout.isPackedCollection -> collectionValueBits.write(index, width)
             else -> for (shift in 0 until width step 8) getBuffer().write(index ushr shift)
         }
     }
 
     @ExperimentalSerializationApi
-    override fun encodeNull() {
-        if (inStructure && isCollection) {
-            if (isNullableCollection) {
-                collectionBitmapValues.add(true)
-            } else {
-                writeVarLong(1L, dataBuffer)
-            }
-        } else if (inStructure) {
+    override fun encodeNull() = encodeNullMark(isNull = true)
+
+    @ExperimentalSerializationApi
+    override fun encodeNotNullMark() = encodeNullMark(isNull = false)
+
+    private fun encodeNullMark(isNull: Boolean) {
+        when {
+            inStructure && layout.isNullableCollection -> collectionNullBits.writeBit(isNull)
+
             // Reached through a nullable serializer passed to encodeSerializableElement,
             // e.g. a generic `T` bound to a nullable type, or Pair/Triple components.
-            val pos = bitmask.nullablePos(currentIndex)
-            if (pos == -1) error("Element $currentIndex is not declared nullable")
-            nullValues[pos] = true
-        } else {
-            writeVarLong(1L, output)
+            inClass -> markNull(currentIndex, isNull)
+
+            else -> writeVarLong(if (isNull) 1L else 0L, getBuffer())
         }
     }
 
-    @ExperimentalSerializationApi
-    override fun encodeNotNullMark() {
-        if (inStructure && isCollection) {
-            if (isNullableCollection) {
-                collectionBitmapValues.add(false)
-            } else {
-                writeVarLong(0L, dataBuffer)
-            }
-        } else if (inStructure) {
-            val pos = bitmask.nullablePos(currentIndex)
-            if (pos != -1) nullValues[pos] = false
-        } else {
-            writeVarLong(0L, output)
+    private fun markNull(index: Int, isNull: Boolean) {
+        val pos = bitmask.nullablePos(index)
+        if (pos != -1) {
+            nullValues[pos] = isNull
+        } else if (isNull) {
+            error("Element $index is not declared nullable")
         }
     }
 
     @ExperimentalSerializationApi
     override fun encodeInline(descriptor: SerialDescriptor): Encoder =
-        if (needsInlineBoundary(descriptor)) PackedEncoder(getBuffer(), config, serializersModule) else this
+        if (needsInlineBoundary(descriptor)) child() else this
 
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
         // ContextualSerializer resolves the real serializer through this call. Its payload
         // cannot contribute to a header derived from the parent's static descriptor.
-        val target = if (inStructure && currentIndex >= 0 &&
-            currentDescriptor.getElementDescriptor(currentIndex).kind == SerialKind.CONTEXTUAL
-        ) {
-            PackedEncoder(getBuffer(), config, serializersModule)
-        } else {
-            this
-        }
+        val target = if (inStructure && currentDescriptor.isContextualElement(currentIndex)) child() else this
         serializer.serialize(target, value)
     }
 
     override fun endStructure(descriptor: SerialDescriptor) {
         if (!inStructure) return
 
-        // Collections: optional null bitmap, packed boolean/enum values, then data.
-        if (isCollection) {
-            if (collectionBitmapValues.isNotEmpty()) {
-                val n = collectionBitmapValues.size
-                val bitmap = ByteArray((n + 7) / 8)
-                collectionBitmapValues.forEachIndexed { i, v ->
-                    if (v) {
-                        bitmap[i / 8] =
-                            (bitmap[i / 8].toInt() or (1 shl (i % 8))).toByte()
-                    }
-                }
-                output.write(bitmap)
-            }
-            if (isPackedCollection) collectionValueBits.writeTo(output)
-            dataBuffer.writeTo(output)
-            inStructure = false
-            return
-        }
-
-        if (isMergedKind) {
+        if (layout.isCollection) {
+            // Collections: optional null bitmap, packed boolean/enum values, then data.
+            collectionNullBits.writeTo(output)
+            collectionValueBits.writeTo(output)
+        } else if (layout.isMergedKind) {
             // CLASS/OBJECT: fill reserved bits; root writes the single merged header.
             ctx.set(headerStart, booleanValues, nullValues, enumValues)
-            if (isRoot) {
-                val headerBytes = ctx.toByteArray()
-                if (headerBytes.isNotEmpty()) output.write(headerBytes)
-            }
+            if (isRoot) output.write(ctx.toByteArray())
         } else {
             // Polymorphic/enum/other: write a local inline bitmask.
             bitmask.writeInlineBitmask(booleanValues, nullValues, output, enumValues)
@@ -309,11 +216,12 @@ class PackedEncoder internal constructor(
 
         dataBuffer.writeTo(output)
         inStructure = false
+        layout = StructureLayout.NONE
         currentIndex = -1
     }
 
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
-        if (isCollection) {
+        if (layout.isCollection) {
             encodeBoolean(value)
             return
         }
@@ -322,71 +230,23 @@ class PackedEncoder internal constructor(
         booleanValues[pos] = value
     }
 
-    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
-        when (
-            resolveIntEncoding(
-                descriptor.getElementAnnotations(index),
-                config,
-            )
-        ) {
-            IntPacking.SIGNED -> writeVarInt(
-                zigZagEncodeInt(
-                    value,
-                ),
-                dataBuffer,
-            )
+    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) =
+        writePackedInt(value, resolveIntEncoding(descriptor.getElementAnnotations(index), config), dataBuffer)
 
-            IntPacking.DEFAULT -> writeVarInt(value, dataBuffer)
+    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) =
+        writePackedLong(value, resolveIntEncoding(descriptor.getElementAnnotations(index), config), dataBuffer)
 
-            IntPacking.FIXED -> writeInt(value, dataBuffer)
-        }
-    }
+    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) = encodeByte(value)
 
-    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
-        when (
-            resolveIntEncoding(
-                descriptor.getElementAnnotations(index),
-                config,
-            )
-        ) {
-            IntPacking.SIGNED -> writeVarLong(
-                zigZagEncodeLong(
-                    value,
-                ),
-                dataBuffer,
-            )
+    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) = encodeShort(value)
 
-            IntPacking.DEFAULT -> writeVarLong(value, dataBuffer)
+    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) = encodeChar(value)
 
-            IntPacking.FIXED -> writeLong(value, dataBuffer)
-        }
-    }
+    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) = encodeFloat(value)
 
-    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) {
-        dataBuffer.write(value.toInt() and 0xFF)
-    }
+    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) = encodeDouble(value)
 
-    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) {
-        writeShort(value, dataBuffer)
-    }
-
-    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) {
-        writeUtf8Char(value, dataBuffer)
-    }
-
-    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
-        writeInt(value.toBits(), dataBuffer)
-    }
-
-    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
-        writeLong(value.toBits(), dataBuffer)
-    }
-
-    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
-        val bytes = value.encodeToByteArray()
-        writeVarInt(bytes.size, dataBuffer)
-        dataBuffer.write(bytes)
-    }
+    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) = encodeString(value)
 
     @ExperimentalSerializationApi
     override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
@@ -412,24 +272,12 @@ class PackedEncoder internal constructor(
         serializer: SerializationStrategy<T>,
         value: T?,
     ) {
-        if (isCollection) {
-            if (value == null) {
-                encodeNull()
-            } else {
-                encodeNotNullMark()
-                encodeSerializableElement(descriptor, index, serializer, value)
-            }
-            return
+        if (layout.isCollection) {
+            encodeNullMark(isNull = value == null)
+        } else {
+            markNull(index, isNull = value == null)
         }
-
-        val pos = bitmask.nullablePos(index)
-        if (value == null) {
-            if (pos == -1) error("Element $index is not declared nullable")
-            nullValues[pos] = true
-            return
-        }
-        if (pos != -1) nullValues[pos] = false
-        encodeSerializableElement(descriptor, index, serializer, value)
+        if (value != null) encodeSerializableElement(descriptor, index, serializer, value)
     }
 
     private fun writeUtf8Char(value: Char, out: ByteOutput) {

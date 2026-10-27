@@ -46,9 +46,9 @@ class MalformedInputTest {
                 bytes(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x03),
             )
         }
-        assertFailsWith<IllegalArgumentException> { decodeVarInt(bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x1F), 0) }
+        assertFailsWith<IllegalArgumentException> { readVarInt(bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x1F), PackedPosition()) }
         assertFailsWith<IllegalArgumentException> {
-            decodeVarLong(bytes(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02), 0)
+            readVarLong(bytes(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02), PackedPosition())
         }
     }
 
@@ -66,7 +66,7 @@ class MalformedInputTest {
                 bytes(0x80, 0x00),
             )
         }
-        assertFailsWith<IllegalArgumentException> { decodeVarInt(bytes(0x80, 0x80, 0x00), 0) }
+        assertFailsWith<IllegalArgumentException> { readVarInt(bytes(0x80, 0x80, 0x00), PackedPosition()) }
     }
 
     @Test

@@ -1,25 +1,25 @@
 package com.eignex.kencode
 
 /**
- * Shared CRC digest engine for widths up to 32 bits.
+ * Bitwise CRC digest for widths up to 32 bits, parameterized as in the Rocksoft model.
  */
-private class CrcEngine(
+abstract class Crc internal constructor(
     poly: Int,
     init: Int,
     private val refin: Boolean,
     private val refout: Boolean,
     xorOut: Int,
     private val width: Int,
-) {
+) : Checksum {
     private val mask: Long =
         if (width == 32) 0xFFFFFFFFL else (1L shl width) - 1L
     private val refPoly: Long = poly.reverseBits(width).toLong() and mask
     private val refInit: Long = init.reverseBits(width).toLong() and mask
     private val xorOutL: Long = xorOut.toLong() and mask
 
-    val size: Int = (width + 7) / 8
+    override val size: Int = (width + 7) / 8
 
-    fun digest(data: ByteArray): ByteArray {
+    override fun digest(data: ByteArray): ByteArray {
         var crc = refInit
         for (b in data) {
             val raw = b.toInt() and 0xFF
@@ -56,13 +56,9 @@ open class Crc8(
     refin: Boolean = false,
     refout: Boolean = false,
     xorOut: Int = 0x00,
-) : Checksum {
+) : Crc(poly, init, refin, refout, xorOut, width = 8) {
     /** Default CRC-8/SMBUS instance. */
     companion object Default : Crc8()
-
-    private val engine = CrcEngine(poly, init, refin, refout, xorOut, width = 8)
-    override val size: Int get() = engine.size
-    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
 }
 
 /**
@@ -74,14 +70,9 @@ open class Crc16(
     refin: Boolean = true,
     refout: Boolean = true,
     xorOut: Int = 0xFFFF,
-) : Checksum {
+) : Crc(poly, init, refin, refout, xorOut, width = 16) {
     /** Default CRC-16/X-25 instance. */
     companion object Default : Crc16()
-
-    private val engine =
-        CrcEngine(poly, init, refin, refout, xorOut, width = 16)
-    override val size: Int get() = engine.size
-    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
 }
 
 /**
@@ -93,14 +84,9 @@ open class Crc32(
     refin: Boolean = true,
     refout: Boolean = true,
     xorOut: Int = 0xFFFFFFFF.toInt(),
-) : Checksum {
+) : Crc(poly, init, refin, refout, xorOut, width = 32) {
     /** Default CRC-32/ISO-HDLC instance. */
     companion object Default : Crc32()
-
-    private val engine =
-        CrcEngine(poly, init, refin, refout, xorOut, width = 32)
-    override val size: Int get() = engine.size
-    override fun digest(data: ByteArray): ByteArray = engine.digest(data)
 }
 
 private fun Int.reverseBits(width: Int): Int {

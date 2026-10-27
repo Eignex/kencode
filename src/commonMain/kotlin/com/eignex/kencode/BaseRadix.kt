@@ -129,7 +129,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
     }
 
     override fun encode(input: ByteArray, offset: Int, length: Int): String {
-        require(offset >= 0 && length >= 0 && offset + length <= input.size)
+        requireRange(input, offset, length)
         if (length == 0) return ""
 
         val output = StringBuilder(length * 2)
@@ -207,13 +207,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         outPos: Int = 0,
         outLen: Int = invLengths[inLen - 1],
     ) {
-        var n = bigZero
-        for (i in inPos until (inPos + inLen)) {
-            val index = alphabet.indexOf(input[i])
-            require(index >= 0) { "Not an encoding char: '${input[i]}'" }
-            n = n * base + BigInteger.fromLong(index.toLong())
-        }
-
+        var n = parseDigits(input, inPos, inLen)
         for (i in outLen - 1 downTo 0) {
             output[outPos + i] = (n and bigFF).byteValue(exactRequired = false)
             n = n shr 8
@@ -254,6 +248,16 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         }
     }
 
+    private fun parseDigits(input: CharSequence, inPos: Int, inLen: Int): BigInteger {
+        var n = bigZero
+        for (i in inPos until (inPos + inLen)) {
+            val index = alphabet.indexOf(input[i])
+            require(index >= 0) { "Not an encoding char: '${input[i]}'" }
+            n = n * base + BigInteger.fromLong(index.toLong())
+        }
+        return n
+    }
+
     private fun bigIntOf(input: ByteArray, inPos: Int, inLen: Int): BigInteger = BigInteger.fromByteArray(
         if (inPos == 0 && inLen == input.size) input else input.sliceArray(inPos until inPos + inLen),
         Sign.POSITIVE,
@@ -271,13 +275,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         var inPos = 0
 
         repeat(fullBlocks) {
-            var n = bigZero
-            for (i in inPos until (inPos + massiveFullBlockLen)) {
-                val index = alphabet.indexOf(input[i])
-                require(index >= 0) { "Not an encoding char: '${input[i]}'" }
-                n = n * base + BigInteger.fromLong(index.toLong())
-            }
-
+            val n = parseDigits(input, inPos, massiveFullBlockLen)
             val actualBytes = stripSignByte(n.toByteArray())
 
             val pad = blockSize - actualBytes.size
@@ -291,13 +289,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         }
 
         if (lastBlockLen != 0) {
-            var n = bigZero
-            for (i in inPos until (inPos + lastBlockLen)) {
-                val index = alphabet.indexOf(input[i])
-                require(index >= 0) { "Not an encoding char: '${input[i]}'" }
-                n = n * base + BigInteger.fromLong(index.toLong())
-            }
-
+            val n = parseDigits(input, inPos, lastBlockLen)
             val framed = stripSignByte(n.toByteArray())
             require(framed.size in 2..blockSize && framed[0] == 1.toByte()) {
                 "Invalid partial encoding block."

@@ -72,29 +72,11 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
         out: ByteOutput,
         enumValues: BooleanArray = booleanArrayOf(),
     ) {
-        val n = totalCount
-        if (n == 0) return
-        val bytes = ByteArray((n + 7) / 8)
-        booleanValues.forEachIndexed { i, v ->
-            if (v) {
-                bytes[i / 8] =
-                    (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
-            }
-        }
-        nullValues.forEachIndexed { i, v ->
-            val bit = boolCount + i
-            if (v) {
-                bytes[bit / 8] =
-                    (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
-            }
-        }
-        enumValues.forEachIndexed { i, v ->
-            val bit = boolCount + nullCount + i
-            if (v) {
-                bytes[bit / 8] = (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
-            }
-        }
-        out.write(bytes)
+        val bits = BitOutput()
+        booleanValues.forEach(bits::writeBit)
+        nullValues.forEach(bits::writeBit)
+        enumValues.forEach(bits::writeBit)
+        bits.writeTo(out)
     }
 }
 
@@ -112,7 +94,7 @@ internal fun shouldMergeChildCtx(
     childDescriptor: SerialDescriptor,
 ): Boolean = parentIsMergedKind && !parentIsCollection && fieldIndex >= 0 &&
     !parentDescriptor.getElementDescriptor(fieldIndex).isNullable && !childDescriptor.isInline &&
-    (childDescriptor.kind is StructureKind.CLASS || childDescriptor.kind is StructureKind.OBJECT)
+    childDescriptor.isClassLike
 
 /**
  * Accumulates bitmask bits across an entire nested-class hierarchy so that the
@@ -135,24 +117,16 @@ internal class HeaderContext {
 
     /** Packs all reserved bits into a byte array. */
     fun toByteArray(): ByteArray {
-        if (bits.isEmpty()) return ByteArray(0)
-        val bytes = ByteArray((bits.size + 7) / 8)
-        bits.forEachIndexed { i, v ->
-            if (v) {
-                bytes[i / 8] =
-                    (bytes[i / 8].toInt() or (1 shl (i % 8))).toByte()
-            }
-        }
-        return bytes
+        val out = ByteOutput()
+        BitOutput().apply { bits.forEach(::writeBit) }.writeTo(out)
+        return out.toByteArray()
     }
 
     /** Reads [count] bits from [input] at [offset] and appends them to this context. */
     fun load(input: ByteArray, offset: Int, count: Int): Int {
-        if (count == 0) return 0
-        val numBytes = (count + 7) / 8
-        val flags = unpackFlags(input, offset, numBytes)
-        repeat(count) { bits.add(if (it < flags.size) flags[it] else false) }
-        return numBytes
+        val flags = BitInput(input, offset, count.toLong())
+        repeat(count) { bits.add(flags.readBit()) }
+        return flags.byteCount
     }
 
     /** Returns the next bit from the sequential read cursor. */
@@ -170,7 +144,7 @@ internal class HeaderContext {
  */
 @OptIn(ExperimentalSerializationApi::class)
 internal fun countAllBits(descriptor: SerialDescriptor): Int {
-    if (descriptor.kind is StructureKind.LIST || descriptor.kind is StructureKind.MAP) return 0
+    if (descriptor.isCollectionLike) return 0
     var count = 0
     for (i in 0 until descriptor.elementsCount) {
         val elem = descriptor.getElementDescriptor(i)
@@ -178,7 +152,7 @@ internal fun countAllBits(descriptor: SerialDescriptor): Int {
         if (elem.kind == SerialKind.ENUM) count += enumBitWidth(elem)
         if (elem.isNullable) {
             count++
-        } else if (!elem.isInline && (elem.kind is StructureKind.CLASS || elem.kind is StructureKind.OBJECT)) {
+        } else if (!elem.isInline && elem.isClassLike) {
             count += countAllBits(elem)
         }
     }
@@ -192,6 +166,54 @@ internal fun needsInlineBoundary(descriptor: SerialDescriptor): Boolean {
     while (payload.isInline) payload = payload.getElementDescriptor(0)
     return payload.isNullable || payload.kind == PrimitiveKind.BOOLEAN ||
         payload.kind is StructureKind || payload.kind is PolymorphicKind || payload.kind == SerialKind.CONTEXTUAL
+}
+
+/** CLASS and OBJECT structures, the kinds whose bits go into the shared merged header. */
+internal val SerialDescriptor.isClassLike: Boolean
+    get() = kind is StructureKind.CLASS || kind is StructureKind.OBJECT
+
+internal val SerialDescriptor.isCollectionLike: Boolean
+    get() = kind is StructureKind.LIST || kind is StructureKind.MAP
+
+/** True when element [index] resolves its serializer at runtime, so it cannot join the parent's header. */
+@OptIn(ExperimentalSerializationApi::class)
+internal fun SerialDescriptor.isContextualElement(index: Int): Boolean =
+    index >= 0 && getElementDescriptor(index).kind == SerialKind.CONTEXTUAL
+
+/** How a structure lays out its elements, derived from its descriptor. Shared by encoder and decoder. */
+@OptIn(ExperimentalSerializationApi::class)
+internal class StructureLayout private constructor(
+    val isCollection: Boolean,
+    // True when the structure uses the shared merged-header path (CLASS/OBJECT only).
+    val isMergedKind: Boolean,
+    // LIST elements are preceded by a null bitmap, then packed boolean/enum values.
+    val isNullableCollection: Boolean,
+    val isPackedCollection: Boolean,
+    val collectionValueWidth: Int,
+) {
+    companion object {
+        /** Layout outside any structure. */
+        val NONE = StructureLayout(false, false, false, false, 0)
+
+        fun of(descriptor: SerialDescriptor): StructureLayout {
+            if (!descriptor.isCollectionLike) {
+                return StructureLayout(false, descriptor.isClassLike, false, false, 0)
+            }
+            val isList = descriptor.kind is StructureKind.LIST
+            val elem = descriptor.getElementDescriptor(0)
+            return StructureLayout(
+                isCollection = true,
+                isMergedKind = false,
+                isNullableCollection = isList && elem.isNullable,
+                isPackedCollection = isList && (elem.kind == PrimitiveKind.BOOLEAN || elem.kind == SerialKind.ENUM),
+                collectionValueWidth = when (elem.kind) {
+                    PrimitiveKind.BOOLEAN -> 1
+                    SerialKind.ENUM -> enumBitWidth(elem)
+                    else -> 0
+                },
+            )
+        }
+    }
 }
 
 /** Shared by an inline decoder and its parent so primitive reads advance the same cursor. */

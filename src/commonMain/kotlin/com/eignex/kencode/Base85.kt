@@ -13,22 +13,10 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
     /** Default Base85 instance using the standard [ASCII85] alphabet. */
     companion object Default : Base85(ASCII85.toCharArray())
 
-    init {
-        require(alphabet.size == 85) { "Base85 requires an alphabet of length 85" }
-        require(alphabet.all { it.code < 256 }) { "Base85 alphabet characters must be below U+0100" }
-        require(alphabet.toSet().size == alphabet.size) { "Base85 alphabet must not contain duplicate characters" }
-    }
-
-    private val decodeTable: IntArray = IntArray(256) { -1 }.apply {
-        for (i in alphabet.indices) {
-            this[alphabet[i].code] = i
-        }
-    }
+    private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base85", 85)
 
     override fun encode(input: ByteArray, offset: Int, length: Int): String {
-        require(offset >= 0 && length >= 0 && offset + length <= input.size) {
-            "Invalid offset/length for input of size ${input.size}"
-        }
+        requireRange(input, offset, length)
         if (length == 0) return ""
 
         val end = offset + length
@@ -118,8 +106,7 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
     }
 
     private fun decodeChar(c: Char): Int {
-        val code = c.code
-        val value = if (code < decodeTable.size) decodeTable[code] else -1
+        val value = decodeTable.getOrElse(c.code) { -1 }
         require(value >= 0) { "Invalid Base85 character: '$c'" }
         return value
     }

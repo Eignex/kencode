@@ -31,6 +31,8 @@ internal class BitOutput {
         }
     }
 
+    fun writeBit(value: Boolean) = write(if (value) 1 else 0, 1)
+
     fun writeTo(output: ByteOutput) {
         bytes.writeTo(output)
         if (used != 0) output.write(pending)
@@ -63,4 +65,6 @@ internal class BitInput(private val input: ByteArray, private val offset: Int, p
         }
         return value
     }
+
+    fun readBit(): Boolean = read(1) != 0
 }

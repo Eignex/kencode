@@ -6,66 +6,6 @@ private fun requireAvailable(data: ByteArray, offset: Int, needed: Int, what: St
     }
 }
 
-internal fun packFlags(flags: BooleanArray): ByteArray {
-    var lastTrueIndex = -1
-    for (i in flags.indices) {
-        if (flags[i]) lastTrueIndex = i
-    }
-
-    if (lastTrueIndex == -1) {
-        return ByteArray(0) // All false -> 0 bytes
-    }
-
-    val numBytes = (lastTrueIndex / 8) + 1
-    val bytes = ByteArray(numBytes)
-
-    for (i in 0..lastTrueIndex) {
-        if (flags[i]) {
-            val byteIndex = i / 8
-            val bitIndex = i % 8
-            bytes[byteIndex] =
-                (bytes[byteIndex].toInt() or (1 shl bitIndex)).toByte()
-        }
-    }
-    return bytes
-}
-
-internal fun unpackFlags(input: ByteArray, offset: Int, length: Int): BooleanArray {
-    require(offset + length <= input.size) {
-        "Unexpected EOF reading flags: need $length bytes"
-    }
-
-    val totalBits = length * 8
-    val result = BooleanArray(totalBits)
-
-    for (i in 0 until totalBits) {
-        val byteIndex = i / 8
-        val bitIndex = i % 8
-        val byteVal = input[offset + byteIndex].toInt()
-
-        val isSet = (byteVal and (1 shl bitIndex)) != 0
-        result[i] = isSet
-    }
-
-    return result
-}
-
-internal fun packFlagsToLong(flags: BooleanArray): Long {
-    var result = 0L
-    for (i in flags.indices) {
-        if (flags[i]) result = result or (1L shl i)
-    }
-    return result
-}
-
-internal fun unpackFlagsFromLong(bits: Long, count: Int): BooleanArray {
-    val result = BooleanArray(count)
-    for (i in 0 until count) {
-        result[i] = (bits and (1L shl i)) != 0L
-    }
-    return result
-}
-
 internal fun zigZagEncodeInt(value: Int): Int = (value shl 1) xor (value shr 31)
 
 internal fun zigZagDecodeInt(value: Int): Int = (value ushr 1) xor -(value and 1)
@@ -73,6 +13,18 @@ internal fun zigZagDecodeInt(value: Int): Int = (value ushr 1) xor -(value and 1
 internal fun zigZagEncodeLong(value: Long): Long = (value shl 1) xor (value shr 63)
 
 internal fun zigZagDecodeLong(value: Long): Long = (value ushr 1) xor -(value and 1L)
+
+internal fun writePackedInt(value: Int, packing: IntPacking, out: ByteOutput) = when (packing) {
+    IntPacking.SIGNED -> writeVarInt(zigZagEncodeInt(value), out)
+    IntPacking.DEFAULT -> writeVarInt(value, out)
+    IntPacking.FIXED -> writeInt(value, out)
+}
+
+internal fun writePackedLong(value: Long, packing: IntPacking, out: ByteOutput) = when (packing) {
+    IntPacking.SIGNED -> writeVarLong(zigZagEncodeLong(value), out)
+    IntPacking.DEFAULT -> writeVarLong(value, out)
+    IntPacking.FIXED -> writeLong(value, out)
+}
 
 internal fun writeShort(value: Short, out: ByteOutput) {
     val v = value.toInt() and 0xFFFF
@@ -149,38 +101,28 @@ internal fun writeVarLong(value: Long, out: ByteOutput) {
     }
 }
 
-internal fun decodeVarInt(input: ByteArray, offset: Int): Pair<Int, Int> {
+internal fun readVarInt(input: ByteArray, cursor: PackedPosition): Int {
     var result = 0
     var shift = 0
-    var pos = offset
     while (true) {
-        require(pos < input.size) {
-            "Unexpected EOF while decoding VarInt"
-        }
-        val b = input[pos++].toInt() and 0xFF
+        require(cursor.value < input.size) { "Unexpected EOF while decoding VarInt" }
+        val b = input[cursor.value++].toInt() and 0xFF
         requireVarIntByte(b, shift)
         result = result or ((b and 0x7F) shl shift)
-        if (b and 0x80 == 0) {
-            return result to (pos - offset)
-        }
+        if (b and 0x80 == 0) return result
         shift += 7
     }
 }
 
-internal fun decodeVarLong(input: ByteArray, offset: Int): Pair<Long, Int> {
+internal fun readVarLong(input: ByteArray, cursor: PackedPosition): Long {
     var result = 0L
     var shift = 0
-    var pos = offset
     while (true) {
-        require(pos < input.size) {
-            "Unexpected EOF while decoding VarLong"
-        }
-        val b = input[pos++].toInt() and 0xFF
+        require(cursor.value < input.size) { "Unexpected EOF while decoding VarLong" }
+        val b = input[cursor.value++].toInt() and 0xFF
         requireVarLongByte(b, shift)
         result = result or ((b and 0x7F).toLong() shl shift)
-        if (b and 0x80 == 0) {
-            return result to (pos - offset)
-        }
+        if (b and 0x80 == 0) return result
         shift += 7
     }
 }
