@@ -5,6 +5,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
@@ -22,6 +23,7 @@ class PackedDecoder internal constructor(
     private val config: PackedConfiguration,
     override val serializersModule: SerializersModule,
     headerCtx: HeaderContext?,
+    private val cursor: PackedPosition = PackedPosition(),
 ) : Decoder,
     CompositeDecoder {
 
@@ -34,7 +36,11 @@ class PackedDecoder internal constructor(
     private val ctx: HeaderContext = headerCtx ?: HeaderContext()
     private val isRoot: Boolean = headerCtx == null
 
-    internal var position: Int = 0
+    internal var position: Int
+        get() = cursor.value
+        set(value) {
+            cursor.value = value
+        }
 
     private var inStructure: Boolean = false
     private var isCollection: Boolean = false
@@ -43,6 +49,7 @@ class PackedDecoder internal constructor(
     private var isMergedKind: Boolean = false
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
+    private var nextElementIndex: Int = 0
 
     // Schema metadata: non-null for all non-collection structures.
     private lateinit var bitmask: ClassBitmask
@@ -69,6 +76,7 @@ class PackedDecoder internal constructor(
     override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
         inStructure = true
         currentDescriptor = descriptor
+        nextElementIndex = 0
 
         val kind = descriptor.kind
         isCollection = kind is StructureKind.LIST || kind is StructureKind.MAP
@@ -145,10 +153,9 @@ class PackedDecoder internal constructor(
         if (isCollection) {
             return if (collectionIndex < collectionSize) collectionIndex++ else CompositeDecoder.DECODE_DONE
         }
-        val nextIndex = currentIndex + 1
-        return if (nextIndex < descriptor.elementsCount) {
-            currentIndex = nextIndex
-            nextIndex
+        return if (nextElementIndex < descriptor.elementsCount) {
+            currentIndex = nextElementIndex++
+            currentIndex
         } else {
             CompositeDecoder.DECODE_DONE
         }
@@ -236,7 +243,19 @@ class PackedDecoder internal constructor(
     }
 
     @ExperimentalSerializationApi
-    override fun decodeInline(descriptor: SerialDescriptor): Decoder = this
+    override fun decodeInline(descriptor: SerialDescriptor): Decoder =
+        if (needsInlineBoundary(descriptor)) PackedDecoder(input, config, serializersModule, null, cursor) else this
+
+    override fun <T> decodeSerializableValue(deserializer: DeserializationStrategy<T>): T {
+        val target = if (inStructure && currentIndex >= 0 &&
+            currentDescriptor.getElementDescriptor(currentIndex).kind == SerialKind.CONTEXTUAL
+        ) {
+            PackedDecoder(input, config, serializersModule, null, cursor)
+        } else {
+            this
+        }
+        return deserializer.deserialize(target)
+    }
 
     override fun endStructure(descriptor: SerialDescriptor) {
         inStructure = false
@@ -247,6 +266,7 @@ class PackedDecoder internal constructor(
     }
 
     override fun decodeBooleanElement(descriptor: SerialDescriptor, index: Int): Boolean {
+        if (isCollection) return decodeBoolean()
         val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         return booleanValues[pos]
@@ -292,7 +312,7 @@ class PackedDecoder internal constructor(
     @ExperimentalSerializationApi
     override fun decodeInlineElement(descriptor: SerialDescriptor, index: Int): Decoder {
         currentIndex = index
-        return this
+        return decodeInline(descriptor.getElementDescriptor(index))
     }
 
     override fun <T> decodeSerializableElement(

@@ -1,8 +1,10 @@
 package com.eignex.kencode
 
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 
 /**
@@ -153,3 +155,15 @@ internal fun countAllBits(descriptor: SerialDescriptor): Int {
     }
     return count
 }
+
+/** Inline values that need their own flag or structure state instead of their parent's. */
+@OptIn(ExperimentalSerializationApi::class)
+internal fun needsInlineBoundary(descriptor: SerialDescriptor): Boolean {
+    var payload = descriptor
+    while (payload.isInline) payload = payload.getElementDescriptor(0)
+    return payload.isNullable || payload.kind == PrimitiveKind.BOOLEAN ||
+        payload.kind is StructureKind || payload.kind is PolymorphicKind || payload.kind == SerialKind.CONTEXTUAL
+}
+
+/** Shared by an inline decoder and its parent so primitive reads advance the same cursor. */
+internal class PackedPosition(var value: Int = 0)
