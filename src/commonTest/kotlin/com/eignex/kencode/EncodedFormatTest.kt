@@ -191,4 +191,32 @@ class EncodedFormatTest {
         val decoded = format.decodeFromString(Payload.serializer(), encoded)
         assertEquals(value, decoded)
     }
+
+    @Serializable
+    object EmptyPayload
+
+    @Test
+    fun `CompactZeros roundtrips an empty byte array`() {
+        val empty = byteArrayOf()
+        assertContentEquals(empty, CompactZeros.decode(CompactZeros.encode(empty)))
+    }
+
+    @Test
+    fun `empty serialized payload roundtrips through CompactZeros and checksums`() {
+        for (transform in listOf(
+            CompactZeros,
+            CompactZeros.then(Crc16.asTransform()),
+            Crc16.asTransform().then(CompactZeros),
+        )) {
+            val format = EncodedFormat { this.transform = transform }
+            val token = format.encodeToString(EmptyPayload.serializer(), EmptyPayload)
+            assertEquals(EmptyPayload, format.decodeFromString(EmptyPayload.serializer(), token))
+        }
+    }
+
+    @Test
+    fun `CompactZeros still rejects a truncated sentinel prefix`() {
+        assertFailsWith<IllegalArgumentException> { CompactZeros.decode(byteArrayOf(0)) }
+        assertFailsWith<IllegalArgumentException> { CompactZeros.decode(byteArrayOf(0, 0x80.toByte())) }
+    }
 }
