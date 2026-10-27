@@ -15,6 +15,8 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
 
     init {
         require(alphabet.size == 85) { "Base85 requires an alphabet of length 85" }
+        require(alphabet.all { it.code < 256 }) { "Base85 alphabet characters must be below U+0100" }
+        require(alphabet.toSet().size == alphabet.size) { "Base85 alphabet must not contain duplicate characters" }
     }
 
     private val decodeTable: IntArray = IntArray(256) { -1 }.apply {
@@ -105,6 +107,11 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
                 value = value shr 8
             }
             tmp.copyInto(out, outPos, 0, rem - 1)
+
+            // Several final groups decode to the same bytes; accept only the one encode writes.
+            require(encode(out, outPos, rem - 1).contentEquals(input.subSequence(inPos, len))) {
+                "Non-canonical Base85 final group"
+            }
         }
 
         return out

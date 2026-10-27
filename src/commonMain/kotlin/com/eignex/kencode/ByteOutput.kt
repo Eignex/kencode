@@ -25,7 +25,7 @@ internal class ByteOutput(initialCapacity: Int = 64) {
 
     private fun ensureCapacity(needed: Int) {
         if (needed <= buf.size) return
-        var newSize = buf.size * 2
+        var newSize = maxOf(buf.size * 2, 1)
         while (newSize < needed) newSize *= 2
         buf = buf.copyOf(newSize)
     }

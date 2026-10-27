@@ -88,6 +88,10 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
 
     constructor(chars: String, blockSize: Int = 32) : this(CharAlphabet(chars), blockSize)
 
+    init {
+        require(blockSize > 0) { "Block size must be positive." }
+    }
+
     private val base: BigInteger = BigInteger.fromLong(alphabet.size.toLong())
     private val logBase: Double = log2(alphabet.size.toDouble())
 

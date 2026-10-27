@@ -23,6 +23,9 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
 
     init {
         require(alphabet.size == 64) { "Base64 requires a 64 length alphabet" }
+        require(alphabet.all { it.code < 256 }) { "Base64 alphabet characters must be below U+0100" }
+        require(alphabet.toSet().size == alphabet.size) { "Base64 alphabet must not contain duplicate characters" }
+        require('=' !in alphabet) { "Base64 alphabet must not contain the '=' padding character" }
     }
 
     private val decodeTable: IntArray = IntArray(256) { -1 }.apply {
@@ -91,6 +94,12 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
             val c1 = decodeChar(input[i + 1])
             val c2 = decodeChar(input[i + 2])
             val c3 = decodeChar(input[i + 3])
+
+            // Bits below the final byte must be zero, so each byte sequence has one encoding.
+            if (i == len - 4) {
+                require(pad != 1 || (c2 and 0x03) == 0) { "Base64 final group has non-zero padding bits" }
+                require(pad != 2 || (c1 and 0x0F) == 0) { "Base64 final group has non-zero padding bits" }
+            }
 
             val b0 = (c0 shl 2) or (c1 ushr 4)
             val b1 = ((c1 and 0x0F) shl 4) or (c2 ushr 2)
