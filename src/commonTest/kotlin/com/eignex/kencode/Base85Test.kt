@@ -104,4 +104,20 @@ class Base85Test {
             Base85(CharArray(86))
         }
     }
+
+    @Test
+    fun `full and partial groups outside unsigned 32 bit range are rejected`() {
+        for (input in listOf("uuuuu", "s8W-\"", "uu", "uuu", "uuuu", "!!!!!uuuuu")) {
+            assertFailsWith<IllegalArgumentException>(input) { Base85.decode(input) }
+        }
+    }
+
+    @Test
+    fun `maximum unsigned values roundtrip for full and partial groups`() {
+        assertContentEquals(ByteArray(4) { -1 }, Base85.decode("s8W-!"))
+        for (size in 1..8) {
+            val bytes = ByteArray(size) { -1 }
+            assertContentEquals(bytes, Base85.decode(Base85.encode(bytes)))
+        }
+    }
 }

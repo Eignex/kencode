@@ -80,6 +80,8 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
                 value = value * 85L + decodeChar(input[inPos++])
             }
 
+            require(value <= 0xFFFFFFFFL) { "Base85 group exceeds the unsigned 32-bit range" }
+
             for (i in 3 downTo 0) {
                 out[outPos + i] = (value and 0xFFL).toByte()
                 value = value shr 8
@@ -94,6 +96,8 @@ open class Base85(private val alphabet: CharArray) : ByteEncoding {
                 val c = if (i < rem) input[inPos + i] else padChar
                 value = value * 85L + decodeChar(c)
             }
+
+            require(value <= 0xFFFFFFFFL) { "Base85 group exceeds the unsigned 32-bit range" }
 
             val tmp = ByteArray(4)
             for (i in 3 downTo 0) {

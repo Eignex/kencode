@@ -173,4 +173,23 @@ class Base64Test {
             Base64(CharArray(65))
         }
     }
+
+    @Test
+    fun `misplaced padding is rejected by both base64 variants`() {
+        for (codec in listOf(Base64, Base64Url)) {
+            for (input in listOf("====", "=AAA", "A=AA", "AA=A", "A===", "AA==AAAA", "AAA=AAAA", "AAAA====")) {
+                assertFailsWith<IllegalArgumentException>(input) { codec.decode(input) }
+            }
+        }
+    }
+
+    @Test
+    fun `final padding roundtrips after preceding complete groups`() {
+        for (codec in listOf(Base64, Base64Url)) {
+            for (length in 1..12) {
+                val bytes = ByteArray(length) { (it * 31).toByte() }
+                assertContentEquals(bytes, codec.decode(codec.encode(bytes)))
+            }
+        }
+    }
 }
