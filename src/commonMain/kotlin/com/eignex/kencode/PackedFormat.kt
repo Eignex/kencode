@@ -19,13 +19,15 @@ data class PackedConfiguration(val defaultEncoding: IntPacking = IntPacking.DEFA
  * Compact `BinaryFormat` optimized for small, flat Kotlin data classes.
  *
  * Features:
- * - Booleans and nullability encoded as compact bitmasks in a class header.
+ * - Booleans, nullability, and enum ordinals packed into a shared class header.
+ * - Boolean and enum lists use packed values, including nullable elements.
  * - Optional varint / zig-zag encoding via `@PackedType` annotations, or globally via [PackedConfiguration].
  * - Fixed, deterministic field order based on declaration.
  *
  * Limitations:
- * - Nested objects and collections are supported, but do not share bitmasks across structural boundaries.
+ * - Non-nullable nested classes share a header; nullable objects and collection elements have local headers.
  * - Polymorphism support is limited/unoptimized compared to full-featured formats.
+ * - The wire layout depends on the schema, including enum entry count and declaration order.
  *
  * Use the [PackedFormat] builder function to create a customized instance.
  *

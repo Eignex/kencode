@@ -41,14 +41,16 @@ class PackedEncoder internal constructor(
     // Live bitmask values accumulated during encoding; written in endStructure.
     private lateinit var booleanValues: BooleanArray
     private lateinit var nullValues: BooleanArray
+    private lateinit var enumValues: BooleanArray
 
     // Start index in the shared HeaderContext for this class's reserved bits.
     private var headerStart: Int = -1
 
-    // Bitmap state for nullable/boolean LIST elements.
+    // Null bitmap followed by packed boolean/enum values for LIST elements.
     private var isNullableCollection: Boolean = false
-    private var isBooleanCollection: Boolean = false
+    private var isPackedCollection: Boolean = false
     private val collectionBitmapValues: MutableList<Boolean> = mutableListOf()
+    private lateinit var collectionValueBits: BitOutput
 
     // Buffer for field data.
     private val dataBuffer = ByteOutput()
@@ -95,9 +97,10 @@ class PackedEncoder internal constructor(
             bitmask = ClassBitmask(descriptor)
             booleanValues = BooleanArray(bitmask.boolCount)
             nullValues = BooleanArray(bitmask.nullCount)
+            enumValues = BooleanArray(bitmask.enumBitCount)
 
             isNullableCollection = false
-            isBooleanCollection = false
+            isPackedCollection = false
 
             isMergedKind =
                 kind is StructureKind.CLASS || kind is StructureKind.OBJECT
@@ -108,11 +111,12 @@ class PackedEncoder internal constructor(
             val isList = kind is StructureKind.LIST
             val elemDesc = descriptor.getElementDescriptor(0)
             isNullableCollection = isList && elemDesc.isNullable
-            isBooleanCollection =
-                isList && !isNullableCollection && elemDesc.kind == PrimitiveKind.BOOLEAN
+            isPackedCollection =
+                isList && (elemDesc.kind == PrimitiveKind.BOOLEAN || elemDesc.kind == SerialKind.ENUM)
         }
 
         collectionBitmapValues.clear()
+        if (isPackedCollection) collectionValueBits = BitOutput()
         dataBuffer.reset()
     }
 
@@ -126,9 +130,7 @@ class PackedEncoder internal constructor(
                 value,
             )
 
-            inStructure && isBooleanCollection -> collectionBitmapValues.add(
-                value,
-            )
+            inStructure && isPackedCollection -> collectionValueBits.write(if (value) 1 else 0, 1)
 
             else -> getBuffer().write(if (value) 1 else 0)
         }
@@ -207,7 +209,16 @@ class PackedEncoder internal constructor(
 
     @ExperimentalSerializationApi
     override fun encodeEnum(enumDescriptor: SerialDescriptor, index: Int) {
-        writeVarInt(index, getBuffer())
+        require(
+            index in 0 until enumDescriptor.elementsCount,
+        ) { "Invalid enum ordinal $index for ${enumDescriptor.serialName}" }
+        val width = enumBitWidth(enumDescriptor)
+        val pos = if (inStructure && !isCollection) bitmask.enumPos(currentIndex) else -1
+        when {
+            pos != -1 -> repeat(width) { bit -> enumValues[pos + bit] = (index and (1 shl bit)) != 0 }
+            inStructure && isPackedCollection -> collectionValueBits.write(index, width)
+            else -> for (shift in 0 until width step 8) getBuffer().write(index ushr shift)
+        }
     }
 
     @ExperimentalSerializationApi
@@ -258,7 +269,7 @@ class PackedEncoder internal constructor(
     override fun endStructure(descriptor: SerialDescriptor) {
         if (!inStructure) return
 
-        // Collections: optional bitmap header then data.
+        // Collections: optional null bitmap, packed boolean/enum values, then data.
         if (isCollection) {
             if (collectionBitmapValues.isNotEmpty()) {
                 val n = collectionBitmapValues.size
@@ -271,6 +282,7 @@ class PackedEncoder internal constructor(
                 }
                 output.write(bitmap)
             }
+            if (isPackedCollection) collectionValueBits.writeTo(output)
             dataBuffer.writeTo(output)
             inStructure = false
             return
@@ -278,14 +290,14 @@ class PackedEncoder internal constructor(
 
         if (isMergedKind) {
             // CLASS/OBJECT: fill reserved bits; root writes the single merged header.
-            ctx.set(headerStart, booleanValues, nullValues)
+            ctx.set(headerStart, booleanValues, nullValues, enumValues)
             if (isRoot) {
                 val headerBytes = ctx.toByteArray()
                 if (headerBytes.isNotEmpty()) output.write(headerBytes)
             }
         } else {
             // Polymorphic/enum/other: write a local inline bitmask.
-            bitmask.writeInlineBitmask(booleanValues, nullValues, output)
+            bitmask.writeInlineBitmask(booleanValues, nullValues, output, enumValues)
         }
 
         dataBuffer.writeTo(output)
