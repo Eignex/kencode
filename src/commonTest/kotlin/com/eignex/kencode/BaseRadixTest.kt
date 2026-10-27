@@ -237,15 +237,13 @@ class BaseRadixTest {
     }
 
     @Test
-    fun `massive bases dynamically preserve leading zeros correctly`() {
+    fun `massive bases preserve partial block byte length including leading zeros`() {
         val codec = BaseRadix(UnicodeRangeAlphabet())
-        val zeroChar = UnicodeRangeAlphabet()[0]
         val input = byteArrayOf(0, 0, 1)
 
         val encoded = codec.encode(input)
 
-        assertTrue(encoded.startsWith("$zeroChar$zeroChar"))
-        assertFalse(encoded.startsWith("$zeroChar$zeroChar$zeroChar"))
+        assertTrue(encoded.length < input.size)
         assertContentEquals(input, codec.decode(encoded))
     }
 
@@ -285,5 +283,38 @@ class BaseRadixTest {
 
         val overBlock = byteArrayOf(0xFF.toByte(), 0xEE.toByte(), 0xDD.toByte(), 0xCC.toByte(), 0xBB.toByte())
         assertRoundtrip(codec, overBlock, "Over block boundary failed")
+    }
+
+    @Test
+    fun `massive bases preserve every leading zero count across block boundaries`() {
+        for (alphabet in listOf(UnicodeRangeAlphabet(), UnicodeRangeAlphabet(0x20, 512))) {
+            for (blockSize in listOf(1, 4, 9, 10, 32)) {
+                val codec = BaseRadix(alphabet, blockSize)
+                for (prefixBlocks in 0..2) {
+                    val tailSizes = listOf(0, 1, blockSize / 2, blockSize - 1).filter { it < blockSize }.distinct()
+                    for (tailSize in tailSizes) {
+                        for (leadingZeros in 0..tailSize) {
+                            val bytes = ByteArray(prefixBlocks * blockSize + tailSize) { 0xFF.toByte() }
+                            bytes.fill(0, prefixBlocks * blockSize, prefixBlocks * blockSize + leadingZeros)
+                            assertRoundtrip(
+                                codec,
+                                bytes,
+                                "blockSize=$blockSize prefix=$prefixBlocks tail=$tailSize zeros=$leadingZeros",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `UnicodeRangeAlphabet rejects code points that cannot fit in Char`() {
+        for ((start, size) in listOf(0x10000 to 512, 0xFFFE to 3, Int.MAX_VALUE to 512, 0xE000 to Int.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException> { UnicodeRangeAlphabet(start, size) }
+        }
+        val upperBmp = UnicodeRangeAlphabet(0xE000, 0x2000)
+        assertEquals('\uFFFF', upperBmp[upperBmp.size - 1])
+        assertEquals(upperBmp.size - 1, upperBmp.indexOf('\uFFFF'))
     }
 }
