@@ -96,13 +96,16 @@ class EncodedFormatBuilder {
     var binaryFormat: BinaryFormat = PackedFormat.Default
 
     /**
-     * Convenience setter that wraps a [Checksum] as a [PayloadTransform] and assigns
-     * it to [transform]. Always reads back as `null`.
+     * Convenience setter that wraps a [Checksum] as a [PayloadTransform] and appends it
+     * after the current [transform], so `transform = CompactZeros; checksum = Crc16`
+     * keeps both. Assigning `null` leaves [transform] unchanged. Always reads back as `null`.
      */
     var checksum: Checksum?
         get() = null
         set(value) {
-            transform = value?.asTransform()
+            if (value == null) return
+            val checksumTransform = value.asTransform()
+            transform = transform?.then(checksumTransform) ?: checksumTransform
         }
 }
 

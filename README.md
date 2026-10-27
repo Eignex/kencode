@@ -106,7 +106,7 @@ Base85 are also available.
 ```kotlin
 val customFormat = EncodedFormat {
     codec = Base36                  // Use Base36 instead of Base62 (for lowercase)
-    checksum = Crc16                // Convenience shorthand for transform = Crc16.asTransform()
+    checksum = Crc16                // Appends Crc16.asTransform() after any transform already set
     binaryFormat = ProtoBuf         // Use ProtoBuf instead of PackedFormat
 }
 
