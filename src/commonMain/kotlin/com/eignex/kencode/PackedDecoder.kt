@@ -55,6 +55,7 @@ class PackedDecoder internal constructor(
     private lateinit var enumValues: BooleanArray
 
     private var collectionSize = -1
+    private var collectionElementCount = 0L
     private var collectionIndex = 0
 
     // Null bitmap followed by packed boolean/enum values for LIST elements.
@@ -75,7 +76,10 @@ class PackedDecoder internal constructor(
         currentDescriptor = descriptor
         nextElementIndex = 0
         layout = StructureLayout.of(descriptor)
-        if (layout.isCollection) return this
+        if (layout.isCollection) {
+            readCollectionHeader(elementsPerEntry = if (descriptor.kind is StructureKind.MAP) 2 else 1)
+            return this
+        }
 
         bitmask = ClassBitmask(descriptor)
 
@@ -99,10 +103,13 @@ class PackedDecoder internal constructor(
         enumValues = BooleanArray(bitmask.enumBitCount) { next() }
     }
 
-    override fun decodeCollectionSize(descriptor: SerialDescriptor): Int {
+    // The size is read with the structure so decodeSequentially can see it before any allocation.
+    private fun readCollectionHeader(elementsPerEntry: Int) {
         val size = readVarInt()
         require(size >= 0) { "Negative collection size" }
         collectionSize = size
+        collectionElementCount = size.toLong() * elementsPerEntry
+        require(collectionElementCount <= Int.MAX_VALUE) { "Map size $size exceeds the element index range" }
         collectionIndex = 0
         nullBitmapIndex = 0
         var valueCount = size
@@ -116,12 +123,15 @@ class PackedDecoder internal constructor(
             collectionValueBits = BitInput(input, position, valueCount.toLong() * layout.collectionValueWidth)
             position += collectionValueBits.byteCount
         }
-        return size
     }
+
+    // -1 (unknown) keeps kotlinx from preallocating a size that is not backed by input bytes.
+    override fun decodeCollectionSize(descriptor: SerialDescriptor): Int =
+        if (decodeSequentially()) collectionSize else -1
 
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
         if (layout.isCollection) {
-            return if (collectionIndex < collectionSize) collectionIndex++ else CompositeDecoder.DECODE_DONE
+            return if (collectionIndex < collectionElementCount) collectionIndex++ else CompositeDecoder.DECODE_DONE
         }
         return if (nextElementIndex < descriptor.elementsCount) {
             currentIndex = nextElementIndex++
@@ -131,7 +141,10 @@ class PackedDecoder internal constructor(
         }
     }
 
-    override fun decodeSequentially(): Boolean = true
+    // A collection claiming more elements than there are bytes left is read element by element
+    // without preallocation, so a bogus size fails at EOF instead of exhausting memory. Lists of
+    // zero-byte elements (Unit, packed booleans) still decode this way.
+    override fun decodeSequentially(): Boolean = !layout.isCollection || collectionElementCount <= input.size - position
 
     private val inClass: Boolean get() = inStructure && !layout.isCollection
 
