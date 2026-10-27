@@ -248,8 +248,11 @@ class PackedDecoder internal constructor(
 
     @ExperimentalSerializationApi
     override fun decodeNotNullMark(): Boolean {
-        require(!inStructure || isCollection) {
-            "decodeNotNullMark cannot be called inside classes. Use decodeNullableSerializableElement instead."
+        if (inStructure && !isCollection) {
+            // Reached through a nullable serializer passed to decodeSerializableElement.
+            val pos = bitmask.nullablePos(currentIndex)
+            require(pos != -1) { "Element $currentIndex is not declared as nullable in the descriptor." }
+            return !nullValues[pos]
         }
         if (isNullableCollection) {
             val isNull =
@@ -349,7 +352,10 @@ class PackedDecoder internal constructor(
         val isInline = deserializer.descriptor.isInline
         val isStructural = kind is StructureKind || kind is PolymorphicKind
 
-        if (isNullableCollection && deserializer.descriptor.isNullable && !isInline && isStructural) {
+        // Nullable structural values in a nullable list or a class read their null marker from
+        // the parent's bitmap, so the sub-decoder must not read another one.
+        val parentTracksNull = isNullableCollection || !isCollection
+        if (parentTracksNull && deserializer.descriptor.isNullable && !isInline && isStructural) {
             val isNotNull = decodeNotNullMark()
             if (!isNotNull) {
                 currentIndex = -1
