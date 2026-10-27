@@ -96,7 +96,7 @@ class PackedCanonicalTest {
 
     @Test
     fun `strings with unpaired surrogates are rejected when encoding`() {
-        // Built from codes because Kotlin/JS does not keep unpaired surrogates in string literals.
+        // Kotlin/JS drops unpaired surrogates from string literals.
         fun text(vararg codes: Int) = codes.map { Char(it) }.joinToString("")
         for (value in listOf(text(0xD800), text(0x61, 0xDC00, 0x62), text(0xDE00, 0xD83D))) {
             assertFailsWith<IllegalArgumentException> { PackedFormat.encodeToByteArray(Text.serializer(), Text(value)) }

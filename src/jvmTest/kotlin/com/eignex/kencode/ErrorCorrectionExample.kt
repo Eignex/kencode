@@ -41,7 +41,7 @@ class ErrorCorrectionExample {
         val token = robustFormat.encodeToString(RobustPayload.serializer(), payload)
         println(token)
 
-        // Simulate up to 4 corrupted bytes in the raw binary
+        // Corrupt up to 4 bytes.
         val bytes = Base62.decode(token)
         bytes[0] = (bytes[0].toInt() xor 0xFF).toByte()
         bytes[2] = (bytes[2].toInt() xor 0xAB).toByte()

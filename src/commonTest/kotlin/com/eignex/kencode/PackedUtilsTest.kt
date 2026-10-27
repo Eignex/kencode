@@ -190,8 +190,6 @@ class PackedUtilsTest {
         }
     }
 
-    // --- ByteOutput ---
-
     @Test
     fun `ByteOutput reset clears written bytes`() {
         val out = ByteOutput()
@@ -261,7 +259,6 @@ class PackedUtilsTest {
             val out = ByteOutput()
             writer(out)
             val full = out.toByteArray()
-            // Truncate by 1 byte to trigger requireAvailable
             val truncated = full.copyOfRange(0, full.size - 1)
 
             assertFailsWith<IllegalArgumentException>("Should fail $name truncation") {

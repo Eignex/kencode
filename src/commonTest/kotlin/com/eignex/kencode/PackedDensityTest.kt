@@ -273,7 +273,6 @@ class PackedDensityTest {
 
     @Test
     fun `truncated packed lists and class enum headers fail`() {
-        // Each case checks both the null and value bitmap.
         for (cut in 0..2) {
             assertFailsWith<IllegalArgumentException> {
                 PackedFormat.decodeFromByteArray(

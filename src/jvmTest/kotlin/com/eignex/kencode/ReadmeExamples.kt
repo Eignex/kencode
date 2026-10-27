@@ -14,24 +14,18 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 class ReadmeExamples {
 
-    // Example from readme
-
     @Serializable
     data class Payload(
 
-        // only uses as many bytes as needed
         @PackedType(IntPacking.DEFAULT)
         val id: ULong,
 
-        // zig-zag encodes small negatives efficiently
         @PackedType(IntPacking.SIGNED)
         val delta: Int,
 
-        // these are packed into a bitset along with nullability flags
         val urgent: Boolean,
         val handledAt: Instant?,
 
-        // two bits in the shared header for this three-entry enum
         val type: PayloadType,
     )
 

@@ -4,13 +4,9 @@ import kotlinx.serialization.*
 import kotlinx.serialization.modules.SerializersModule
 
 /**
- * Holds the configuration for an [EncodedFormat] instance.
- *
- * @property codec The ASCII-safe byte codec used to turn raw bytes into text (e.g., Base62, Base64).
- * @property transform An optional [PayloadTransform] applied after serialization and before encoding.
- *   Common uses: [CompactZeros] to strip leading zeros, integrity checks via [Checksum.asTransform],
- *   encryption, or error-correcting codes. Use [PayloadTransform.then] to chain multiple transforms.
- * @property binaryFormat The underlying binary serialization format used before encoding to text.
+ * @property codec Text codec for the serialized bytes.
+ * @property transform Optional transform between [binaryFormat] and [codec].
+ * @property binaryFormat Format that serializes values to bytes.
  */
 data class EncodedConfiguration(
     val codec: ByteEncoding = Base62,
@@ -19,46 +15,22 @@ data class EncodedConfiguration(
 )
 
 /**
- * Text `StringFormat` that produces short, predictable string tokens by composing:
- *
- * 1. A binary format (e.g. [PackedFormat], `ProtoBuf`).
- * 2. An optional [PayloadTransform] ([CompactZeros], checksum, encryption, ECC, …).
- * 3. An ASCII-safe byte encoding (e.g. [Base62], [Base64], [Base36], [Base85]).
- *
- * Typical use:
- * - `encodeToString`: serialize -> transform.encode -> encode bytes to text.
- * - `decodeFromString`: decode text to bytes -> transform.decode -> deserialize.
- *
- * Use the [EncodedFormat] builder function to create a customized instance.
- *
- * @property configuration The active configuration dictating the codec, transform, and binary format.
+ * [StringFormat] that serializes with a [BinaryFormat], applies an optional [PayloadTransform],
+ * and encodes the bytes with a [ByteEncoding]. Defaults to [PackedFormat] and [Base62].
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat {
 
-    /**
-     * Secondary constructor for direct instantiation without the builder.
-     */
     constructor(
         codec: ByteEncoding = Base62,
         transform: PayloadTransform? = null,
         binaryFormat: BinaryFormat = PackedFormat,
     ) : this(EncodedConfiguration(codec, transform, binaryFormat))
 
-    /**
-     * Delegates to the underlying [BinaryFormat]'s serializers module.
-     */
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
-    /**
-     * Default format: `PackedFormat` + `Base62`, no transform.
-     */
     companion object Default : EncodedFormat()
 
-    /**
-     * Serializes [value] with the configured binary format, applies the transform,
-     * and encodes the resulting byte array using the text codec.
-     */
     override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
         val bytes =
             configuration.binaryFormat.encodeToByteArray(serializer, value)
@@ -66,12 +38,7 @@ open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat
         return configuration.codec.encode(payload)
     }
 
-    /**
-     * Decodes [string] using the text codec, applies the inverse transform,
-     * then deserializes with the configured binary format.
-     *
-     * @throws IllegalArgumentException if the transform's decode step fails (e.g. checksum mismatch).
-     */
+    /** @throws IllegalArgumentException if any layer rejects the input, e.g. a checksum mismatch. */
     override fun <T> decodeFromString(deserializer: DeserializationStrategy<T>, string: String): T {
         val input = configuration.codec.decode(string)
         val bytes = configuration.transform?.decode(input) ?: input
@@ -82,23 +49,20 @@ open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat
     }
 }
 
-/**
- * Builder for configuring [EncodedFormat] instances.
- */
+/** Builder for [EncodedFormat]. */
 class EncodedFormatBuilder {
-    /** The ASCII-safe byte codec used to turn raw bytes into text. */
+    /** Text codec for the serialized bytes. */
     var codec: ByteEncoding = Base62
 
-    /** Optional payload transform applied after serialization and before encoding. */
+    /** Optional transform between [binaryFormat] and [codec]. */
     var transform: PayloadTransform? = null
 
-    /** The underlying binary serialization format used before encoding to text. */
+    /** Format that serializes values to bytes. */
     var binaryFormat: BinaryFormat = PackedFormat.Default
 
     /**
-     * Convenience setter that wraps a [Checksum] as a [PayloadTransform] and appends it
-     * after the current [transform], so `transform = CompactZeros; checksum = Crc16`
-     * keeps both. Assigning `null` leaves [transform] unchanged. Always reads back as `null`.
+     * Appends the checksum after the current [transform]. Setting `null` does nothing;
+     * reads always return `null`.
      */
     var checksum: Checksum?
         get() = null
@@ -110,7 +74,7 @@ class EncodedFormatBuilder {
 }
 
 /**
- * Creates a customized [EncodedFormat] instance.
+ * Creates an [EncodedFormat]:
  *
  * ```
  * val format = EncodedFormat {
@@ -119,8 +83,7 @@ class EncodedFormatBuilder {
  * }
  * ```
  *
- * @param from An existing [EncodedFormat] instance to copy defaults from.
- * @param builderAction The configuration block.
+ * @param from Instance to copy settings from.
  */
 fun EncodedFormat(
     from: EncodedFormat = EncodedFormat.Default,

@@ -1,18 +1,12 @@
 package com.eignex.kencode
 
-/**
- * Abstraction for bidirectional byte–text encodings (e.g., Base62, Base64).
- */
+/** Bidirectional byte–text codec such as [Base62] or [Base64]. */
 interface ByteEncoding {
 
-    /**
-     * Encode the given byte range into a text representation.
-     */
+    /** Encodes [length] bytes of [input] starting at [offset]. */
     fun encode(input: ByteArray, offset: Int = 0, length: Int = input.size - offset): String
 
-    /**
-     * Decode an encoded string back into the original bytes.
-     */
+    /** Decodes [input] back into bytes. */
     fun decode(input: CharSequence): ByteArray
 }
 
@@ -22,10 +16,7 @@ internal fun requireRange(input: ByteArray, offset: Int, length: Int) {
     }
 }
 
-/**
- * Validates a fixed-size, byte-range alphabet for codec [name] and returns its decode table,
- * mapping each char code below 256 to its digit, or -1 when absent.
- */
+/** Validates a byte-range alphabet and returns its decode table: char code to digit, or -1. */
 internal fun byteAlphabetTable(alphabet: CharArray, name: String, size: Int): IntArray {
     require(alphabet.size == size) { "$name requires an alphabet of length $size" }
     require(alphabet.all { it.code < 256 }) { "$name alphabet characters must be below U+0100" }

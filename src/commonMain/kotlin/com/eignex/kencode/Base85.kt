@@ -1,16 +1,12 @@
 package com.eignex.kencode
 
-/** Standard ASCII85 alphabet (printable ASCII `!` through `u`). */
+/** ASCII85 alphabet, `!` through `u`. */
 const val ASCII85 =
     "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstu"
 
-/**
- * Generic Base85 encoder/decoder supporting both ASCII85 and ZeroMQ Z85.
- * 4 input bytes -> 5 output chars. Allows final partial group (1–3 bytes -> 2–4 chars).
- */
+/** Base85 codec: 4 bytes to 5 characters, and a final 1–3 bytes to 2–4 characters. */
 open class Base85(private val alphabet: CharArray) : ByteEncoding {
 
-    /** Default Base85 instance using the standard [ASCII85] alphabet. */
     companion object Default : Base85(ASCII85.toCharArray())
 
     private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base85", 85)

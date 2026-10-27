@@ -170,7 +170,7 @@ class EncodedFormatTest {
 
     @Test
     fun `CompactZeros handles large leading-zero count requiring multi-byte varint`() {
-        // k=128 forces a 2-byte LEB128 varint in the sentinel prefix
+        // 128 zeros need a two-byte count.
         val zeros = 128
         val data =
             ByteArray(zeros + 50) { i -> if (i < zeros) 0 else (i - zeros + 1).toByte() }

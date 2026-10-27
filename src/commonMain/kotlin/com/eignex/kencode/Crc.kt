@@ -1,8 +1,6 @@
 package com.eignex.kencode
 
-/**
- * Bitwise CRC digest for widths up to 32 bits, parameterized as in the Rocksoft model.
- */
+/** Bitwise CRC up to 32 bits, parameterized per the Rocksoft model. */
 abstract class Crc internal constructor(
     poly: Int,
     init: Int,
@@ -47,9 +45,7 @@ abstract class Crc internal constructor(
     }
 }
 
-/**
- * CRC-8/SMBUS implementation.
- */
+/** 8-bit CRC; CRC-8/SMBUS by default. */
 open class Crc8(
     poly: Int = 0x07,
     init: Int = 0x00,
@@ -57,13 +53,10 @@ open class Crc8(
     refout: Boolean = false,
     xorOut: Int = 0x00,
 ) : Crc(poly, init, refin, refout, xorOut, width = 8) {
-    /** Default CRC-8/SMBUS instance. */
     companion object Default : Crc8()
 }
 
-/**
- * CRC-16/X-25 implementation.
- */
+/** 16-bit CRC; CRC-16/X-25 by default. */
 open class Crc16(
     poly: Int = 0x1021,
     init: Int = 0xFFFF,
@@ -71,13 +64,10 @@ open class Crc16(
     refout: Boolean = true,
     xorOut: Int = 0xFFFF,
 ) : Crc(poly, init, refin, refout, xorOut, width = 16) {
-    /** Default CRC-16/X-25 instance. */
     companion object Default : Crc16()
 }
 
-/**
- * CRC-32/ISO-HDLC implementation.
- */
+/** 32-bit CRC; CRC-32/ISO-HDLC by default. */
 open class Crc32(
     poly: Int = 0x04C11DB7,
     init: Int = 0xFFFFFFFF.toInt(),
@@ -85,7 +75,6 @@ open class Crc32(
     refout: Boolean = true,
     xorOut: Int = 0xFFFFFFFF.toInt(),
 ) : Crc(poly, init, refin, refout, xorOut, width = 32) {
-    /** Default CRC-32/ISO-HDLC instance. */
     companion object Default : Crc32()
 }
 
