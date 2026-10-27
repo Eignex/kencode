@@ -20,13 +20,12 @@ class EncryptionExample {
         Security.addProvider(BouncyCastleProvider())
         val random = SecureRandom()
 
-        // This key is stored permanently so we can read payloads after jvm restart
+        // Persist the key to decode payloads across restarts.
         val keyBytes = ByteArray(16)
         random.nextBytes(keyBytes)
         val key = SecretKeySpec(keyBytes, "XTEA")
 
-        // Wrap XTEA/CTR as a PayloadTransform.
-        // Each encode prepends a fresh 8-byte IV; decode reads it back.
+        // Each encode prepends a fresh 8-byte IV.
         val encryptCipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
         val decryptCipher = Cipher.getInstance("XTEA/CTR/NoPadding", "BC")
         val xteaTransform = object : PayloadTransform {

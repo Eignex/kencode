@@ -122,7 +122,6 @@ class BaseRadixTest {
 
     @Test
     fun `char with code beyond alphabet range should throw`() {
-        // Base62 max char is 'Z' (code=90); '{' (code=123) exceeds the inverseAlphabet table
         val encoded = Base62.encode(byteArrayOf(1, 2, 3))
         val withHighChar = encoded.dropLast(1) + "{"
         assertFailsWith<IllegalArgumentException> {
@@ -132,9 +131,7 @@ class BaseRadixTest {
 
     @Test
     fun `known encoding output is deterministic`() {
-        // Base16 (hex) has deterministic, human-verifiable output
         val hex = BaseRadix("0123456789abcdef")
-        // 0x00 → "00", 0xFF → "ff", 0xAB → "ab"
         assertEquals("00", hex.encode(byteArrayOf(0x00)))
         assertEquals("ff", hex.encode(byteArrayOf(0xFF.toByte())))
         assertEquals("0102", hex.encode(byteArrayOf(0x01, 0x02)))
@@ -153,7 +150,6 @@ class BaseRadixTest {
 
     @Test
     fun `multi-block input roundtrips correctly`() {
-        // Explicitly test an input that spans more than one block (blockSize + 1 bytes)
         for (codec in listOf(Base62, Base36)) {
             val bytes = ByteArray(codec.blockSize + 1) { it.toByte() }
             assertRoundtrip(
@@ -197,7 +193,6 @@ class BaseRadixTest {
 
     @Test
     fun `UnicodeRangeAlphabet custom range roundtrips`() {
-        // Narrow range: Greek letters U+0391–U+03C9 (57 chars)
         val greek = BaseRadix(UnicodeRangeAlphabet(start = 0x0391, size = 57))
         val rng = Random(2222L)
         for (len in 0..greek.blockSize) {
@@ -262,8 +257,7 @@ class BaseRadixTest {
 
     @Test
     fun `power-of-two massive base roundtrips at partial block boundary`() {
-        // base=512, blockSize=9: 8*blockSize is a multiple of log2(base), making an
-        // 8-byte partial block tie the encoded length of a 9-byte full block.
+        // 8-byte partial blocks would tie 9-byte full blocks in length without the extra digit.
         val codec = BaseRadix(UnicodeRangeAlphabet(start = 0x0020, size = 512), blockSize = 9)
         val rng = Random(9999L)
         for (len in 1..(codec.blockSize * 3)) {

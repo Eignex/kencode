@@ -1,24 +1,24 @@
 package com.eignex.kencode
 
-/** Standard RFC 4648 Base64 alphabet (uses `+` and `/`). */
+/** RFC 4648 Base64 alphabet. */
 const val BASE_64 =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-/** URL- and filename-safe Base64 alphabet from RFC 4648 §5 (uses `-` and `_`). */
+/** RFC 4648 §5 URL-safe Base64 alphabet. */
 const val BASE_64_URL =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
-/** URL- and filename-safe variant of [Base64] using the [BASE_64_URL] alphabet. */
+/** [Base64] with the [BASE_64_URL] alphabet. */
 object Base64Url : Base64(BASE_64_URL.toCharArray())
 
 /**
- * RFC 4648–compatible Base64 encoder/decoder.
+ * Padded RFC 4648 Base64 codec.
  *
- * @property alphabet The 64-character alphabet used to map 6-bit groups to characters.
+ * @property alphabet The 64 digit characters.
  */
 open class Base64(val alphabet: CharArray) : ByteEncoding {
 
-    /** Default Base64 instance using the standard [BASE_64] alphabet. */
+    /** Codec with the [BASE_64] alphabet. */
     companion object Default : Base64(BASE_64.toCharArray())
 
     private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base64", 64).apply {
@@ -67,7 +67,6 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
         if (input[len - 1] == '=') pad++
         if (input[len - 2] == '=') pad++
 
-        // Padding is only permitted in the final one or two character positions.
         for (i in 0 until len - pad) {
             require(input[i] != '=') { "Base64 padding is only allowed at the end of the final group" }
         }
@@ -83,7 +82,7 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
             val c2 = decodeChar(input[i + 2])
             val c3 = decodeChar(input[i + 3])
 
-            // Bits below the final byte must be zero, so each byte sequence has one encoding.
+            // Non-zero padding bits would give a byte sequence several encodings.
             if (i == len - 4) {
                 require(pad != 1 || (c2 and 0x03) == 0) { "Base64 final group has non-zero padding bits" }
                 require(pad != 2 || (c1 and 0x0F) == 0) { "Base64 final group has non-zero padding bits" }

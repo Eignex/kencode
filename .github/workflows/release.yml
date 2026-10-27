@@ -86,7 +86,7 @@ jobs:
             echo "revision=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
-  # Tags and manual runs use the same gate as pull requests. Automatic snapshots have already passed it.
+  # Automatic snapshots already passed this gate.
   validate:
     if: github.event_name != 'workflow_run'
     needs: prepare

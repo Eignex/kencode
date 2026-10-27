@@ -3,12 +3,12 @@ package com.eignex.kencode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.SerialDescriptor
 
-/** Number of bits needed for an enum ordinal; a single-entry enum needs no bits. */
+/** Bits needed for an enum ordinal; zero for a single-entry enum. */
 @OptIn(ExperimentalSerializationApi::class)
 internal fun enumBitWidth(descriptor: SerialDescriptor): Int =
     Int.SIZE_BITS - (descriptor.elementsCount - 1).coerceAtLeast(0).countLeadingZeroBits()
 
-/** Appends fixed-width values least-significant bit first, padding only the final byte. */
+/** Writes values LSB first, padding only the final byte. */
 internal class BitOutput {
     private val bytes = ByteOutput()
     private var pending = 0
@@ -39,7 +39,7 @@ internal class BitOutput {
     }
 }
 
-/** A bounded view of a packed bit sequence, without expanding it to a boolean array. */
+/** Reads packed bits from a bounded byte range. */
 internal class BitInput(private val input: ByteArray, private val offset: Int, private val bitCount: Long) {
     val byteCount: Int
     private var cursor = 0L
@@ -49,7 +49,7 @@ internal class BitInput(private val input: ByteArray, private val offset: Int, p
         val needed = bitCount / 8 + if (bitCount % 8 == 0L) 0 else 1
         require(needed <= input.size - offset) { "Unexpected EOF reading packed values: need $needed bytes" }
         byteCount = needed.toInt()
-        // Bits after bitCount in the final byte are padding, which the encoder leaves clear.
+        // The encoder leaves padding bits clear.
         val usedBits = (bitCount % 8).toInt()
         if (usedBits != 0) {
             val last = input[offset + byteCount - 1].toInt() and 0xFF

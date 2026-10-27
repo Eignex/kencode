@@ -127,10 +127,7 @@ internal fun readVarLong(input: ByteArray, cursor: PackedPosition): Long {
     }
 }
 
-/**
- * Rejects varint bytes the encoder never writes: a zero final byte after the first, or a
- * final group whose bits do not fit the target width. Each value then has a single encoding.
- */
+/** Rejects varint bytes the encoder never writes, so each value has one encoding. */
 internal fun requireVarIntByte(b: Int, shift: Int) {
     require(shift == 0 || b != 0) { "Non-canonical VarInt" }
     require(shift < 28 || (b and 0xF0) == 0) { "VarInt too long" }

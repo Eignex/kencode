@@ -8,6 +8,6 @@ pluginManagement {
 }
 
 plugins {
-    // Provisions the JDK the conventions ask for, so a machine without it does not need one installed.
+    // Downloads the required JDK if missing.
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }

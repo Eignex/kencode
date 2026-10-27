@@ -79,7 +79,6 @@ class Base85Test {
 
     @Test
     fun `invalid length remainder 1 should throw`() {
-        // Length 1 → rem = 1 → should be rejected by decodeAscii85
         assertFailsWith<IllegalArgumentException> {
             Base85.decode("!")
         }
@@ -88,7 +87,7 @@ class Base85Test {
     @Test
     fun `invalid Base85 character should throw for`() {
         val encoded = Base85.encode(byteArrayOf(1, 2, 3, 4))
-        val corrupted = "~" + encoded.drop(1) // '~' not in ASCII85 alphabet
+        val corrupted = "~" + encoded.drop(1)
 
         assertFailsWith<IllegalArgumentException> {
             Base85.decode(corrupted)

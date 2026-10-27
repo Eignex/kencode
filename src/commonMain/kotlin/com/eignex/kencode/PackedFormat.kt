@@ -7,32 +7,20 @@ import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
-/**
- * Holds the configuration for a [PackedFormat] instance.
- *
- * @property defaultEncoding The encoding applied to all `Int` and `Long` fields that carry no
- *   [PackedType] annotation. Defaults to [IntPacking.DEFAULT] varint encoding.
- */
+/** @property defaultEncoding Encoding for `Int` and `Long` fields without a [PackedType]. */
 data class PackedConfiguration(val defaultEncoding: IntPacking = IntPacking.DEFAULT)
 
 /**
- * Compact `BinaryFormat` optimized for small, flat Kotlin data classes.
+ * Compact [BinaryFormat] for Kotlin classes.
  *
- * Features:
- * - Booleans, nullability, and enum ordinals packed into a shared class header.
- * - Boolean and enum lists use packed values, including nullable elements.
- * - Optional varint / zig-zag encoding via `@PackedType` annotations, or globally via [PackedConfiguration].
- * - Fixed, deterministic field order based on declaration.
+ * Booleans, null markers, and enum ordinals share one bit header per class, merged with those of
+ * non-nullable nested classes. Boolean and enum lists are bit-packed. Integers use varint unless
+ * set otherwise with [PackedType] or [PackedConfiguration]. Fields are written in declaration
+ * order, so the wire layout depends on the schema, including enum entry counts. Polymorphism
+ * works but is not optimized.
  *
- * Limitations:
- * - Non-nullable nested classes share a header; nullable objects and collection elements have local headers.
- * - Polymorphism support is limited/unoptimized compared to full-featured formats.
- * - The wire layout depends on the schema, including enum entry count and declaration order.
- *
- * Use the [PackedFormat] builder function to create a customized instance.
- *
- * @property configuration The active configuration for default varint/zigzag behaviors.
- * @property serializersModule The module used to resolve contextual and polymorphic serializers.
+ * @property configuration Integer encoding defaults.
+ * @property serializersModule Module for contextual and polymorphic serializers.
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class PackedFormat(
@@ -40,14 +28,9 @@ open class PackedFormat(
     override val serializersModule: SerializersModule = EmptySerializersModule(),
 ) : BinaryFormat {
 
-    /**
-     * Default instance using [IntPacking.DEFAULT] (unsigned varint) for all unannotated `Int`/`Long` fields.
-     */
+    /** Instance with varint integers and no serializers module. */
     companion object Default : PackedFormat()
 
-    /**
-     * Encodes [value] into a compact binary representation.
-     */
     override fun <T> encodeToByteArray(serializer: SerializationStrategy<T>, value: T): ByteArray {
         val out = ByteOutput()
         val encoder = PackedEncoder(out, configuration, serializersModule)
@@ -55,11 +38,7 @@ open class PackedFormat(
         return out.toByteArray()
     }
 
-    /**
-     * Decodes [bytes] produced by [PackedFormat] back into an object of type [T].
-     *
-     * @throws IllegalArgumentException if [bytes] is malformed or has data after the value.
-     */
+    /** @throws IllegalArgumentException if [bytes] is malformed or has trailing data. */
     override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T {
         val decoder = PackedDecoder(bytes, configuration, serializersModule)
         val value = decoder.decodeSerializableValue(deserializer)
@@ -70,24 +49,17 @@ open class PackedFormat(
     }
 }
 
-/**
- * Builder for configuring [PackedFormat] instances.
- */
+/** Builder for [PackedFormat]. */
 class PackedFormatBuilder {
-    /**
-     * The module containing contextual and polymorphic serializers.
-     */
+    /** Module for contextual and polymorphic serializers. */
     var serializersModule: SerializersModule = EmptySerializersModule()
 
-    /**
-     * The encoding applied to all `Int` and `Long` fields that carry no [PackedType] annotation.
-     * Defaults to [IntPacking.DEFAULT].
-     */
+    /** Encoding for `Int` and `Long` fields without a [PackedType]. */
     var defaultEncoding: IntPacking = IntPacking.DEFAULT
 }
 
 /**
- * Creates a customized [PackedFormat] instance.
+ * Creates a [PackedFormat].
  *
  * ```
  * val format = PackedFormat {
@@ -96,8 +68,8 @@ class PackedFormatBuilder {
  * }
  * ```
  *
- * @param from An existing [PackedFormat] instance to copy defaults from.
- * @param builderAction The configuration block.
+ * @param from Instance to copy settings from.
+ * @param builderAction Configuration block.
  */
 fun PackedFormat(
     from: PackedFormat = PackedFormat.Default,

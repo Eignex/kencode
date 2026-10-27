@@ -7,31 +7,27 @@ import kotlinx.serialization.SerialInfo
 import kotlinx.serialization.protobuf.ProtoIntegerType as KxProtoIntegerType
 import kotlinx.serialization.protobuf.ProtoType as KxProtoType
 
-/**
- * Integer encoding strategy for `Int` and `Long` fields in [PackedFormat].
- *
- * Compatible with [kotlinx.serialization.protobuf.ProtoIntegerType] as a fallback (see [PackedType]).
- */
+/** Integer encoding for `Int` and `Long` fields in [PackedFormat]. */
 enum class IntPacking {
-    /** Unsigned variable-length (LEB128). Compact for small non-negative values. */
+    /** Unsigned LEB128 varint. */
     DEFAULT,
 
-    /** ZigZag variable-length. Compact for small signed values. */
+    /** ZigZag varint, for small signed values. */
     SIGNED,
 
-    /** Fixed-width. 4 bytes for `Int`, 8 bytes for `Long`. */
+    /** 4 bytes for `Int`, 8 for `Long`. */
     FIXED,
 }
 
 /**
- * Overrides the integer encoding strategy for an `Int` or `Long` field in [PackedFormat].
- * Falls back to [kotlinx.serialization.protobuf.ProtoType] if present, then [PackedConfiguration.defaultEncoding].
+ * Sets the [IntPacking] of an `Int` or `Long` field. Without it, [kotlinx.serialization.protobuf.ProtoType]
+ * applies if present, then [PackedConfiguration.defaultEncoding].
  */
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
 annotation class PackedType(
-    /** The integer encoding strategy to use for the annotated field. */
+    /** Encoding for the annotated field. */
     val type: IntPacking,
 )
 

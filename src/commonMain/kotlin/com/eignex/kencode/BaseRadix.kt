@@ -8,34 +8,25 @@ import kotlin.math.*
 const val BASE_62: String =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-/**
- * Base62 encoder/decoder using digits, lowercase, then uppercase characters.
- */
+/** Base62 codec over [BASE_62]. */
 object Base62 : BaseRadix(BASE_62)
 
-/**
- * Base36 encoder/decoder using digits and lowercase characters.
- */
+/** Base36 codec: digits and lowercase letters. */
 object Base36 : BaseRadix(BASE_62.take(36))
 
-/**
- * Maps indices to characters (encoding) and characters back to indices (decoding).
- * [indexOf] returns -1 for characters not in the alphabet.
- */
+/** Maps digit values to characters and back. */
 interface Alphabet {
-    /** Number of characters in the alphabet. */
+    /** Number of digits. */
     val size: Int
 
-    /** Returns the character at [index] in the alphabet. */
+    /** Character for digit [index]. */
     operator fun get(index: Int): Char
 
-    /** Returns the index of [c] in the alphabet, or `-1` if [c] is not present. */
+    /** Index of [c], or `-1` if absent. */
     fun indexOf(c: Char): Int
 }
 
-/**
- * Alphabet backed by an explicit string of characters.
- */
+/** Alphabet of the characters in [chars]. */
 class CharAlphabet(private val chars: String) : Alphabet {
     init {
         require(chars.length > 1) { "Alphabet must contain at least 2 characters." }
@@ -53,9 +44,8 @@ class CharAlphabet(private val chars: String) : Alphabet {
 }
 
 /**
- * Alphabet backed by a contiguous Unicode range starting at [start].
- * Defaults to U+0020 – U+D7FF (55,264 characters), the largest BMP range
- * that avoids surrogate code points. Only BMP ranges are supported because each digit is a [Char].
+ * [size] consecutive BMP characters from [start]. Defaults to U+0020–U+D7FF, the largest
+ * range below the surrogate block.
  */
 class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: Int = 0xD800 - 0x0020) : Alphabet {
     init {
@@ -75,14 +65,11 @@ class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: I
 }
 
 /**
- * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
+ * Base-N codec over any [Alphabet], converting [blockSize] bytes at a time. With more than 256
+ * characters, partial blocks get a sentinel byte that preserves their length and leading zeros.
  *
- * For alphabets larger than 256 characters, partial blocks carry a leading sentinel byte
- * before conversion to digits. This preserves their byte length, including leading zeros.
- *
- * @param alphabet The alphabet used to map digit values to characters.
- * @property blockSize Number of input bytes processed per block; larger blocks pack more
- *   tightly but cost more BigInteger arithmetic.
+ * @param alphabet Digit characters.
+ * @property blockSize Bytes per block; larger blocks pack tighter but cost more arithmetic.
  */
 open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : ByteEncoding {
 
@@ -101,7 +88,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
 
     private val isMassiveBase = alphabet.size > 256
 
-    // Full block length must exceed any partial block's so the decoder can split unambiguously.
+    // Longer than any partial block so the decoder can tell them apart.
     private val massiveFullBlockLen: Int = maxOf(
         ceil((blockSize * 8) / logBase).toInt(),
         ceil(((blockSize - 1) * 8 + 1) / logBase).toInt() + 1,
@@ -221,8 +208,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
             return
         }
 
-        // A high sentinel bit records the byte count without one digit per zero byte.
-        // Its maximum digit count is included in massiveFullBlockLen above.
+        // The sentinel keeps leading zeros; massiveFullBlockLen accounts for its digits.
         val framed = ByteArray(inLen + 1)
         framed[0] = 1
         input.copyInto(framed, destinationOffset = 1, startIndex = inPos, endIndex = inPos + inLen)
@@ -289,7 +275,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         }
 
         if (lastBlockLen != 0) {
-            // Partial blocks are written without leading zero digits; the sentinel keeps the first one non-zero.
+            // The sentinel makes a partial block's first digit non-zero.
             require(alphabet.indexOf(input[inPos]) != 0) { "Non-canonical partial encoding block." }
             val n = parseDigits(input, inPos, lastBlockLen)
             val framed = stripSignByte(n.toByteArray())

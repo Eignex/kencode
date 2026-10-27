@@ -11,10 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
-/**
- * Nullable values reached through `encodeSerializableElement` with a nullable serializer,
- * as generated for generic properties and used by Pair and Triple.
- */
 class PackedNullableElementTest {
     @Serializable
     data class Box<T>(val before: Boolean, val value: T, val tail: Int)

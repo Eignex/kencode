@@ -10,10 +10,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
-/**
- * Binary decoder for the [PackedFormat] wire format. Reads merged class bitmask headers
- * and per-field data produced by [PackedEncoder].
- */
+/** [PackedFormat] decoder. */
 @Suppress("UNCHECKED_CAST")
 @OptIn(ExperimentalSerializationApi::class)
 class PackedDecoder internal constructor(
@@ -46,10 +43,10 @@ class PackedDecoder internal constructor(
     private var currentIndex: Int = -1
     private var nextElementIndex: Int = 0
 
-    // Schema metadata: non-null for all non-collection structures.
+    // Set for non-collection structures.
     private lateinit var bitmask: ClassBitmask
 
-    // Bitmask state for CLASSES only
+    // Header values.
     private lateinit var booleanValues: BooleanArray
     private lateinit var nullValues: BooleanArray
     private lateinit var enumValues: BooleanArray
@@ -63,11 +60,10 @@ class PackedDecoder internal constructor(
     private lateinit var collectionValueBits: BitInput
     private var nullBitmapIndex: Int = 0
 
-    // When a nullable-collection parent intercepts the null check for a complex element it
-    // primes the sub-decoder so that NullableSerializer's own decodeNotNullMark call is a no-op.
+    // Set when the parent already read this value's null marker.
     internal var skipNextNullMark: Boolean = false
 
-    /** A decoder for a value with its own structure state, reading from the same cursor. */
+    /** Decoder with its own structure state on the same cursor. */
     private fun child(headerCtx: HeaderContext? = null) =
         PackedDecoder(input, config, serializersModule, headerCtx, cursor)
 
@@ -83,8 +79,6 @@ class PackedDecoder internal constructor(
 
         bitmask = ClassBitmask(descriptor)
 
-        // Only CLASS and OBJECT use the shared merged-header context.
-        // Polymorphic, enum, and other kinds read their own inline bitmask as before.
         if (layout.isMergedKind) {
             if (isRoot) position += ctx.load(input, position, countAllBits(descriptor))
             readBitmask(ctx::read)
@@ -104,7 +98,7 @@ class PackedDecoder internal constructor(
         bitmask.requireNullElementsClear(currentDescriptor, booleanValues, nullValues, enumValues)
     }
 
-    // The size is read with the structure so decodeSequentially can see it before any allocation.
+    // Read early so decodeSequentially sees the size before any allocation.
     private fun readCollectionHeader(elementsPerEntry: Int) {
         val size = readVarInt()
         require(size >= 0) { "Negative collection size" }
@@ -126,7 +120,7 @@ class PackedDecoder internal constructor(
         }
     }
 
-    // -1 (unknown) keeps kotlinx from preallocating a size that is not backed by input bytes.
+    // -1 stops kotlinx from preallocating a size the input may not back.
     override fun decodeCollectionSize(descriptor: SerialDescriptor): Int =
         if (decodeSequentially()) collectionSize else -1
 
@@ -142,9 +136,8 @@ class PackedDecoder internal constructor(
         }
     }
 
-    // A collection claiming more elements than there are bytes left is read element by element
-    // without preallocation, so a bogus size fails at EOF instead of exhausting memory. Lists of
-    // zero-byte elements (Unit, packed booleans) still decode this way.
+    // A size larger than the remaining bytes decodes element by element, so a bogus size hits
+    // EOF instead of exhausting memory. Zero-byte elements (Unit, packed booleans) take this path too.
     override fun decodeSequentially(): Boolean = !layout.isCollection || collectionElementCount <= input.size - position
 
     private val inClass: Boolean get() = inStructure && !layout.isCollection
@@ -218,7 +211,7 @@ class PackedDecoder internal constructor(
     @ExperimentalSerializationApi
     override fun decodeNotNullMark(): Boolean {
         if (inClass) {
-            // Reached through a nullable serializer passed to decodeSerializableElement.
+            // Nullable element serializer, e.g. a generic `T` bound to a nullable type.
             return !nullValues[requireNullablePos(currentIndex)]
         }
         if (layout.isNullableCollection) {
@@ -299,8 +292,7 @@ class PackedDecoder internal constructor(
         val isStructural = !childDescriptor.isInline &&
             (childDescriptor.kind is StructureKind || childDescriptor.kind is PolymorphicKind)
 
-        // Nullable structural values in a nullable list or a class read their null marker from
-        // the parent's bitmap, so the sub-decoder must not read another one.
+        // The parent holds the null marker, so the sub-decoder must not read another.
         val parentTracksNull = layout.isNullableCollection || !layout.isCollection
 
         val value = when {
@@ -313,8 +305,6 @@ class PackedDecoder internal constructor(
                     decodeNull() as T
                 }
 
-            // Share the HeaderContext only when the current decoder is in merged mode
-            // and the child is a non-nullable, non-inline CLASS/OBJECT in a non-collection context.
             else -> {
                 val shareCtx = shouldMergeChildCtx(
                     layout.isMergedKind,

@@ -9,10 +9,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
-/**
- * Binary encoder for the [PackedFormat] wire format. Accumulates merged class bitmask
- * headers and per-field data, producing output consumable by [PackedDecoder].
- */
+/** [PackedFormat] encoder. */
 @OptIn(ExperimentalSerializationApi::class)
 class PackedEncoder internal constructor(
     private val output: ByteOutput,
@@ -30,25 +27,24 @@ class PackedEncoder internal constructor(
     private lateinit var currentDescriptor: SerialDescriptor
     private var currentIndex: Int = -1
 
-    // Schema metadata: non-null for all non-collection structures.
+    // Set for non-collection structures.
     private lateinit var bitmask: ClassBitmask
 
-    // Live bitmask values accumulated during encoding; written in endStructure.
+    // Header values, written in endStructure.
     private lateinit var booleanValues: BooleanArray
     private lateinit var nullValues: BooleanArray
     private lateinit var enumValues: BooleanArray
 
-    // Elements written so far. The decoder reads every element in order, so none may be skipped.
+    // The decoder reads every element in order, so none may be skipped.
     private lateinit var encodedElements: BooleanArray
 
-    // Start index in the shared HeaderContext for this class's reserved bits.
+    // This class's first bit in the shared HeaderContext.
     private var headerStart: Int = -1
 
     // Null bitmap followed by packed boolean/enum values for LIST elements.
     private lateinit var collectionNullBits: BitOutput
     private lateinit var collectionValueBits: BitOutput
 
-    // Buffer for field data.
     private val dataBuffer = ByteOutput()
 
     private fun child(headerCtx: HeaderContext? = null) =
@@ -144,7 +140,7 @@ class PackedEncoder internal constructor(
         writeUtf8Char(value, getBuffer())
     }
 
-    // Unpaired surrogates have no UTF-8 form; encoding them would silently replace them with '?'.
+    // Unpaired surrogates have no UTF-8 form and would silently become '?'.
     override fun encodeString(value: String) {
         val bytes = try {
             value.encodeToByteArray(0, value.length, throwOnInvalidSequence = true)
@@ -180,8 +176,7 @@ class PackedEncoder internal constructor(
         when {
             inStructure && layout.isNullableCollection -> collectionNullBits.writeBit(isNull)
 
-            // Reached through a nullable serializer passed to encodeSerializableElement,
-            // e.g. a generic `T` bound to a nullable type, or Pair/Triple components.
+            // Nullable element serializer, e.g. a generic `T` bound to a nullable type.
             inClass -> markNull(currentIndex, isNull)
 
             else -> writeVarLong(if (isNull) 1L else 0L, getBuffer())
@@ -202,8 +197,7 @@ class PackedEncoder internal constructor(
         if (needsInlineBoundary(descriptor)) child() else this
 
     override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
-        // ContextualSerializer resolves the real serializer through this call. Its payload
-        // cannot contribute to a header derived from the parent's static descriptor.
+        // A contextual payload cannot join a header built from the parent's static descriptor.
         val target = if (inStructure && currentDescriptor.isContextualElement(currentIndex)) child() else this
         serializer.serialize(target, value)
     }
@@ -212,17 +206,16 @@ class PackedEncoder internal constructor(
         if (!inStructure) return
 
         if (layout.isCollection) {
-            // Collections: optional null bitmap, packed boolean/enum values, then data.
             collectionNullBits.writeTo(output)
             collectionValueBits.writeTo(output)
         } else if (layout.isMergedKind) {
             requireAllElementsEncoded(descriptor)
-            // CLASS/OBJECT: fill reserved bits; root writes the single merged header.
+            // The root writes the merged header.
             ctx.set(headerStart, booleanValues, nullValues, enumValues)
             if (isRoot) output.write(ctx.toByteArray())
         } else {
             requireAllElementsEncoded(descriptor)
-            // Polymorphic/enum/other: write a local inline bitmask.
+            // Other structures write their own header.
             bitmask.writeInlineBitmask(booleanValues, nullValues, output, enumValues)
         }
 
@@ -232,7 +225,7 @@ class PackedEncoder internal constructor(
         currentIndex = -1
     }
 
-    // @EncodeDefault(NEVER) makes the plugin skip an element; the layout has no way to mark that.
+    // The layout cannot represent elements skipped by @EncodeDefault(NEVER).
     private fun requireAllElementsEncoded(descriptor: SerialDescriptor) {
         val skipped = encodedElements.indexOfFirst { !it }
         if (skipped != -1) {
