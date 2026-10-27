@@ -1,6 +1,9 @@
 package com.eignex.kencode
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.IntArraySerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -90,5 +93,61 @@ class MalformedInputTest {
         assertFailsWith<IllegalArgumentException> {
             EncodedFormat.decodeFromString(Payload.serializer(), Base62.encode(encoded + bytes(9, 9, 9)))
         }
+    }
+
+    @Test
+    fun `collection sizes beyond the input are rejected without preallocating`() {
+        val huge = bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x07)
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(ListSerializer(Int.serializer()), huge)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(IntArraySerializer(), bytes(0xFF, 0xFF, 0xFF, 0x3F))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(ListSerializer(String.serializer()), bytes(0x80, 0x80, 0x80, 0x80, 0x04))
+        }
+    }
+
+    @Test
+    fun `map sizes whose element count overflows are rejected`() {
+        val serializer = MapSerializer(Int.serializer(), Int.serializer())
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(serializer, bytes(0x80, 0x80, 0x80, 0x80, 0x04))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(serializer, bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x07))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(serializer, bytes(0x05, 0x01, 0x02))
+        }
+    }
+
+    @Test
+    fun `collections larger than the remaining bytes still roundtrip`() {
+        val units = List(1_000_000) { }
+        val unitSerializer = ListSerializer(Unit.serializer())
+        assertEquals(
+            units,
+            PackedFormat.decodeFromByteArray(unitSerializer, PackedFormat.encodeToByteArray(unitSerializer, units)),
+        )
+
+        val flags = List(1_000) { it % 3 == 0 }
+        val nested = listOf(flags, emptyList(), flags.reversed())
+        val nestedSerializer = ListSerializer(ListSerializer(Boolean.serializer()))
+        assertEquals(
+            nested,
+            PackedFormat.decodeFromByteArray(
+                nestedSerializer,
+                PackedFormat.encodeToByteArray(nestedSerializer, nested),
+            ),
+        )
+
+        val map = mapOf(Unit to List(50) { true })
+        val mapSerializer = MapSerializer(Unit.serializer(), ListSerializer(Boolean.serializer()))
+        assertEquals(
+            map,
+            PackedFormat.decodeFromByteArray(mapSerializer, PackedFormat.encodeToByteArray(mapSerializer, map)),
+        )
     }
 }
