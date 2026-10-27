@@ -15,13 +15,14 @@
 [![codecov](https://codecov.io/gh/eignex/kencode/branch/main/graph/badge.svg)](https://codecov.io/gh/eignex/kencode)
 [![License](https://img.shields.io/github/license/eignex/kencode)](https://github.com/eignex/kencode/blob/main/LICENSE)
 
-Short, predictable text payloads for places with strict character or length
-limits: URLs, file names, Kubernetes labels, log keys.
+KEncode turns your data into short strings. It's useful when you need to fit
+data into a URL, a file name, a Kubernetes label, or anywhere else with a tight
+length limit.
 
-ByteEncoding encodes raw bytes as text. PackedFormat is a compact
-kotlinx.serialization BinaryFormat. EncodedFormat combines the two into short
-strings. See the [technical deep dive](https://eignex.com/posts/kencode-packing-data-for-strict-limits/)
-for the design.
+There are three parts. ByteEncoding turns bytes into text. PackedFormat turns
+your Kotlin classes into as few bytes as possible. EncodedFormat does both, so
+you go straight from an object to a short string. If you want to know how it
+works, read the [technical deep dive](https://eignex.com/posts/kencode-packing-data-for-strict-limits/).
 
 ## Installation
 
@@ -31,7 +32,7 @@ dependencies {
 }
 ```
 
-The formats also need the kotlinx.serialization plugin.
+You also need the kotlinx.serialization plugin to use the formats.
 
 ## Example
 
@@ -54,8 +55,9 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 
 ## PackedFormat
 
-Booleans, null markers, and enum ordinals are packed into a bit header. Int and
-Long fields default to varint; PackedType selects zigzag or fixed width.
+PackedFormat stores booleans, nulls, and enums in just a few bits each.
+Numbers are stored in as few bytes as they need. Add PackedType to a field if
+it is often negative (SIGNED) or if you want a fixed size (FIXED).
 
 ```kotlin
 val format = PackedFormat {
@@ -65,12 +67,14 @@ val format = PackedFormat {
 val bytes = format.encodeToByteArray(payload)
 ```
 
-Fields are untagged and written in declaration order.
+Fields are written in the order you declare them, with no names or tags. So if
+you change a class, old strings may no longer decode.
 
 ## EncodedFormat
 
-A binary format, optional PayloadTransforms, and a text codec. Built-in
-transforms are CompactZeros and the Crc8, Crc16, and Crc32 checksums.
+EncodedFormat serializes your object, optionally transforms the bytes, and
+then turns them into text. You can swap each step. For example, you can use
+ProtoBuf instead of PackedFormat, add a checksum, or pick a different codec.
 
 ```kotlin
 val format = EncodedFormat {
@@ -84,12 +88,14 @@ val compacted = EncodedFormat {
 }
 ```
 
-Custom transforms: [encryption](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt),
-[error correction](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt).
+You can also write your own transforms, like these examples for
+[encryption](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
+and [error correction](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt).
 
 ## Codecs
 
-All codecs accept custom alphabets. Encoding the 13 bytes of "any byte data":
+Every codec can be used on its own, and you can give it your own alphabet.
+Here is what the text "any byte data" (13 bytes) looks like in each:
 
 | Codec  | Output                  | Length | Alphabet         |
 |--------|-------------------------|--------|------------------|
@@ -98,5 +104,6 @@ All codecs accept custom alphabets. Encoding the 13 bytes of "any byte data":
 | Base64 | `YW55IGJ5dGUgZGF0YQ==`  | 20     | `[0-9A-Za-z+/=]` |
 | Base85 | `@;^?5@X3',+Cno&@/`     | 17     | ASCII 33–117     |
 
-BaseRadix also accepts a UnicodeRangeAlphabet. Tokens from alphabets over 256
-characters encoded with 1.3.0 must be regenerated.
+For even shorter strings, BaseRadix can use a large range of Unicode
+characters. If you used an alphabet with more than 256 characters in 1.3.0,
+you'll need to encode those strings again, since the format has changed.
