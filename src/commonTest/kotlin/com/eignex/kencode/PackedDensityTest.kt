@@ -222,21 +222,27 @@ class PackedDensityTest {
     }
 
     @Test
-    fun `null bitmap padding does not affect present value count`() {
+    fun `null bitmap padding is rejected rather than counted`() {
         assertEquals(
             listOf(true, null, null),
             PackedFormat.decodeFromByteArray(
                 ListSerializer(Boolean.serializer().nullable),
-                byteArrayOf(3, 0xFE.toByte(), 1),
+                byteArrayOf(3, 0x06, 1),
             ),
         )
         assertEquals(
             listOf(Status.DONE, null, null),
             PackedFormat.decodeFromByteArray(
                 ListSerializer(Status.serializer().nullable),
-                byteArrayOf(3, 0xFE.toByte(), 2),
+                byteArrayOf(3, 0x06, 2),
             ),
         )
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(
+                ListSerializer(Boolean.serializer().nullable),
+                byteArrayOf(3, 0xFE.toByte(), 1),
+            )
+        }
     }
 
     @Test

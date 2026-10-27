@@ -56,6 +56,26 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
 
     val totalCount: Int get() = boolCount + nullCount + enumBitCount
 
+    /** Rejects boolean or enum bits set for an element whose null bit is set; encode leaves them clear. */
+    fun requireNullElementsClear(
+        descriptor: SerialDescriptor,
+        booleanValues: BooleanArray,
+        nullValues: BooleanArray,
+        enumValues: BooleanArray,
+    ) {
+        for (i in 0 until descriptor.elementsCount) {
+            val nullPos = nullablePos(i)
+            if (nullPos == -1 || !nullValues[nullPos]) continue
+            val boolPos = booleanPos(i)
+            require(boolPos == -1 || !booleanValues[boolPos]) { "Null element $i has its boolean bit set" }
+            val enumStart = enumPos(i)
+            if (enumStart == -1) continue
+            for (bit in 0 until enumBitWidth(descriptor.getElementDescriptor(i))) {
+                require(!enumValues[enumStart + bit]) { "Null element $i has enum bits set" }
+            }
+        }
+    }
+
     fun booleanPos(fieldIdx: Int): Int = booleanLookup.getOrElse(fieldIdx) { -1 }
 
     fun nullablePos(fieldIdx: Int): Int = nullableLookup.getOrElse(fieldIdx) { -1 }
