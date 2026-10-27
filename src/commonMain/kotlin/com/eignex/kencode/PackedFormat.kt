@@ -18,6 +18,9 @@ data class PackedConfiguration(val defaultEncoding: IntPacking = IntPacking.DEFA
  * set otherwise with [PackedType] or [PackedConfiguration]. Fields are written in declaration
  * order, so the wire layout depends on the schema, including enum entry counts. Polymorphism
  * works but is not optimized.
+ *
+ * @property configuration Integer encoding defaults.
+ * @property serializersModule Module for contextual and polymorphic serializers.
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class PackedFormat(
@@ -25,6 +28,7 @@ open class PackedFormat(
     override val serializersModule: SerializersModule = EmptySerializersModule(),
 ) : BinaryFormat {
 
+    /** Instance with varint integers and no serializers module. */
     companion object Default : PackedFormat()
 
     override fun <T> encodeToByteArray(serializer: SerializationStrategy<T>, value: T): ByteArray {
@@ -55,7 +59,7 @@ class PackedFormatBuilder {
 }
 
 /**
- * Creates a [PackedFormat]:
+ * Creates a [PackedFormat].
  *
  * ```
  * val format = PackedFormat {
@@ -65,6 +69,7 @@ class PackedFormatBuilder {
  * ```
  *
  * @param from Instance to copy settings from.
+ * @param builderAction Configuration block.
  */
 fun PackedFormat(
     from: PackedFormat = PackedFormat.Default,

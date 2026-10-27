@@ -53,6 +53,7 @@ open class Crc8(
     refout: Boolean = false,
     xorOut: Int = 0x00,
 ) : Crc(poly, init, refin, refout, xorOut, width = 8) {
+    /** CRC-8/SMBUS. */
     companion object Default : Crc8()
 }
 
@@ -64,6 +65,7 @@ open class Crc16(
     refout: Boolean = true,
     xorOut: Int = 0xFFFF,
 ) : Crc(poly, init, refin, refout, xorOut, width = 16) {
+    /** CRC-16/X-25. */
     companion object Default : Crc16()
 }
 
@@ -75,6 +77,7 @@ open class Crc32(
     refout: Boolean = true,
     xorOut: Int = 0xFFFFFFFF.toInt(),
 ) : Crc(poly, init, refin, refout, xorOut, width = 32) {
+    /** CRC-32/ISO-HDLC. */
     companion object Default : Crc32()
 }
 

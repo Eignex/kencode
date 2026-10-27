@@ -18,10 +18,10 @@
 Short, predictable text payloads for places with strict character or length
 limits: URLs, file names, Kubernetes labels, log keys.
 
-- **ByteEncoding**: text codecs for raw bytes (Base62, Base36, Base64, Base85).
-- **PackedFormat**: a kotlinx.serialization `BinaryFormat` with compact output.
-- **EncodedFormat**: PackedFormat plus optional transforms and a text codec,
-  producing short, deterministic strings.
+ByteEncoding is a set of text codecs for raw bytes: Base62, Base36, Base64,
+and Base85. PackedFormat is a kotlinx.serialization BinaryFormat with compact
+output. EncodedFormat combines PackedFormat, optional transforms, and a text
+codec into short, deterministic strings.
 
 The [technical deep dive](https://eignex.com/posts/kencode-packing-data-for-strict-limits/)
 covers the design and bit-packing layout.
@@ -60,8 +60,8 @@ val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 
 Booleans, null markers, and enum ordinals share one bit header, so each costs
 a bit or two. Nested objects, lists, maps, and polymorphism are supported.
-`Int` and `Long` fields default to varint; `@PackedType` (or `@ProtoType` as a
-fallback) selects varint, zigzag, or fixed width per field.
+Int and Long fields default to varint; PackedType (or ProtoType as a fallback)
+selects varint, zigzag, or fixed width per field.
 
 ```kotlin
 val format = PackedFormat {
@@ -72,15 +72,15 @@ val bytes = format.encodeToByteArray(payload)
 ```
 
 The layout has no field tags: every element is written in declaration order,
-so encoding fails when `@EncodeDefault(NEVER)` would skip a field. Decoding rejects
-malformed or non-canonical input with `IllegalArgumentException`.
+so encoding fails when EncodeDefault(NEVER) would skip a field. Decoding rejects
+malformed or non-canonical input with an IllegalArgumentException.
 
 ## EncodedFormat
 
 Three layers: a binary format (PackedFormat, or ProtoBuf for cross-language
-use), an optional `PayloadTransform`, and a text codec (Base62 by default).
-Built-in transforms are `CompactZeros` (strips leading zeros) and checksums
-(`Crc8`, `Crc16`, `Crc32`); chain them with `then`.
+use), an optional PayloadTransform, and a text codec (Base62 by default).
+Built-in transforms are CompactZeros, which strips leading zeros, and the
+Crc8, Crc16, and Crc32 checksums. Chain them with then.
 
 ```kotlin
 val format = EncodedFormat {
@@ -94,7 +94,7 @@ val compacted = EncodedFormat {
 }
 ```
 
-Any byte transformation can be a `PayloadTransform`. The jvmTest sources have an
+Any byte transformation can be a PayloadTransform. The jvmTest sources have an
 [encryption example](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/EncryptionExample.kt)
 (BouncyCastle) and an
 [error-correction example](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
@@ -106,7 +106,7 @@ Each codec works standalone and accepts a custom alphabet. Base62 and Base36
 use fixed-size blocks for unpadded alphanumeric output. Base85 maps 4 bytes to
 5 characters. Base64 and Base64Url follow RFC 4648.
 
-Encoding `"any byte data"` (13 bytes):
+Encoding the 13 bytes of "any byte data":
 
 | Codec  | Output                  | Length | Alphabet         |
 |--------|-------------------------|--------|------------------|
@@ -117,7 +117,7 @@ Encoding `"any byte data"` (13 bytes):
 
 ### Large alphabets
 
-`BaseRadix(UnicodeRangeAlphabet())` uses BMP characters outside the surrogate
+BaseRadix with a UnicodeRangeAlphabet uses BMP characters outside the surrogate
 block; ranges must end at or before U+FFFF. Alphabets over 256 characters
 prefix partial blocks with a sentinel byte to keep the exact byte count. This
 large-alphabet format differs from 1.3.0, so tokens encoded with 1.3.0 must be

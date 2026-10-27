@@ -7,6 +7,7 @@ const val ASCII85 =
 /** Base85 codec: 4 bytes to 5 characters, and a final 1–3 bytes to 2–4 characters. */
 open class Base85(private val alphabet: CharArray) : ByteEncoding {
 
+    /** Codec with the [ASCII85] alphabet. */
     companion object Default : Base85(ASCII85.toCharArray())
 
     private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base85", 85)

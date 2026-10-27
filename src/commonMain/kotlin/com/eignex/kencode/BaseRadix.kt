@@ -16,8 +16,10 @@ object Base36 : BaseRadix(BASE_62.take(36))
 
 /** Maps digit values to characters and back. */
 interface Alphabet {
+    /** Number of digits. */
     val size: Int
 
+    /** Character for digit [index]. */
     operator fun get(index: Int): Char
 
     /** Index of [c], or `-1` if absent. */
@@ -66,6 +68,7 @@ class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: I
  * Base-N codec over any [Alphabet], converting [blockSize] bytes at a time. With more than 256
  * characters, partial blocks get a sentinel byte that preserves their length and leading zeros.
  *
+ * @param alphabet Digit characters.
  * @property blockSize Bytes per block; larger blocks pack tighter but cost more arithmetic.
  */
 open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : ByteEncoding {

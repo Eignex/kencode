@@ -17,6 +17,8 @@ data class EncodedConfiguration(
 /**
  * [StringFormat] that serializes with a [BinaryFormat], applies an optional [PayloadTransform],
  * and encodes the bytes with a [ByteEncoding]. Defaults to [PackedFormat] and [Base62].
+ *
+ * @property configuration Codec, transform, and binary format.
  */
 @OptIn(ExperimentalSerializationApi::class)
 open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat {
@@ -29,6 +31,7 @@ open class EncodedFormat(val configuration: EncodedConfiguration) : StringFormat
 
     override val serializersModule: SerializersModule get() = configuration.binaryFormat.serializersModule
 
+    /** [PackedFormat] and [Base62] with no transform. */
     companion object Default : EncodedFormat()
 
     override fun <T> encodeToString(serializer: SerializationStrategy<T>, value: T): String {
@@ -74,7 +77,7 @@ class EncodedFormatBuilder {
 }
 
 /**
- * Creates an [EncodedFormat]:
+ * Creates an [EncodedFormat].
  *
  * ```
  * val format = EncodedFormat {
@@ -84,6 +87,7 @@ class EncodedFormatBuilder {
  * ```
  *
  * @param from Instance to copy settings from.
+ * @param builderAction Configuration block.
  */
 fun EncodedFormat(
     from: EncodedFormat = EncodedFormat.Default,

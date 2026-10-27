@@ -11,9 +11,14 @@ const val BASE_64_URL =
 /** [Base64] with the [BASE_64_URL] alphabet. */
 object Base64Url : Base64(BASE_64_URL.toCharArray())
 
-/** Padded RFC 4648 Base64 codec. */
+/**
+ * Padded RFC 4648 Base64 codec.
+ *
+ * @property alphabet The 64 digit characters.
+ */
 open class Base64(val alphabet: CharArray) : ByteEncoding {
 
+    /** Codec with the [BASE_64] alphabet. */
     companion object Default : Base64(BASE_64.toCharArray())
 
     private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base64", 64).apply {

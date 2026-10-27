@@ -27,6 +27,7 @@ enum class IntPacking {
 @Target(AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.SOURCE)
 annotation class PackedType(
+    /** Encoding for the annotated field. */
     val type: IntPacking,
 )
 
