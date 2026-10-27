@@ -57,17 +57,18 @@ class PackedDecoder internal constructor(
     // Bitmask state for CLASSES only
     private lateinit var booleanValues: BooleanArray
     private lateinit var nullValues: BooleanArray
+    private lateinit var enumValues: BooleanArray
 
     private var collectionSize = -1
     private var collectionIndex = 0
 
-    // Bitmap state for nullable/boolean LIST elements
+    // Null bitmap followed by packed boolean/enum values for LIST elements.
     private var isNullableCollection: Boolean = false
-    private var isBooleanCollection: Boolean = false
+    private var isPackedCollection: Boolean = false
+    private var collectionValueWidth: Int = 0
     private var collectionNullBitmap: BooleanArray = booleanArrayOf()
-    private var collectionBoolBitmap: BooleanArray = booleanArrayOf()
+    private lateinit var collectionValueBits: BitInput
     private var nullBitmapIndex: Int = 0
-    private var boolBitmapIndex: Int = 0
 
     // When a nullable-collection parent intercepts the null check for a complex element it
     // primes the sub-decoder so that NullableSerializer's own decodeNotNullMark call is a no-op.
@@ -85,13 +86,18 @@ class PackedDecoder internal constructor(
             val isList = kind is StructureKind.LIST
             val elemDesc = descriptor.getElementDescriptor(0)
             isNullableCollection = isList && elemDesc.isNullable
-            isBooleanCollection =
-                isList && !isNullableCollection && elemDesc.kind == PrimitiveKind.BOOLEAN
+            isPackedCollection =
+                isList && (elemDesc.kind == PrimitiveKind.BOOLEAN || elemDesc.kind == SerialKind.ENUM)
+            collectionValueWidth = when (elemDesc.kind) {
+                PrimitiveKind.BOOLEAN -> 1
+                SerialKind.ENUM -> enumBitWidth(elemDesc)
+                else -> 0
+            }
             return this
         }
 
         isNullableCollection = false
-        isBooleanCollection = false
+        isPackedCollection = false
 
         bitmask = ClassBitmask(descriptor)
 
@@ -106,11 +112,13 @@ class PackedDecoder internal constructor(
             }
             booleanValues = BooleanArray(bitmask.boolCount) { ctx.read() }
             nullValues = BooleanArray(bitmask.nullCount) { ctx.read() }
+            enumValues = BooleanArray(bitmask.enumBitCount) { ctx.read() }
         } else {
             val totalFlags = bitmask.totalCount
             if (totalFlags == 0) {
                 booleanValues = BooleanArray(0)
                 nullValues = BooleanArray(0)
+                enumValues = BooleanArray(0)
             } else {
                 val numBytes = (totalFlags + 7) / 8
                 val allFlags =
@@ -120,6 +128,8 @@ class PackedDecoder internal constructor(
                     BooleanArray(bitmask.boolCount) { i -> allFlags[i] }
                 nullValues =
                     BooleanArray(bitmask.nullCount) { i -> allFlags[bitmask.boolCount + i] }
+                enumValues =
+                    BooleanArray(bitmask.enumBitCount) { i -> allFlags[bitmask.boolCount + bitmask.nullCount + i] }
             }
         }
 
@@ -128,23 +138,20 @@ class PackedDecoder internal constructor(
 
     override fun decodeCollectionSize(descriptor: SerialDescriptor): Int {
         val size = readVarInt()
+        require(size >= 0) { "Negative collection size" }
         collectionSize = size
         collectionIndex = 0
         nullBitmapIndex = 0
-        boolBitmapIndex = 0
-        if (size > 0) {
-            if (isNullableCollection) {
-                val numBytes = (size + 7) / 8
-                collectionNullBitmap =
-                    unpackFlags(input, position, numBytes)
-                position += numBytes
-            }
-            if (isBooleanCollection) {
-                val numBytes = (size + 7) / 8
-                collectionBoolBitmap =
-                    unpackFlags(input, position, numBytes)
-                position += numBytes
-            }
+        var valueCount = size
+        if (isNullableCollection) {
+            val numBytes = size / 8 + if (size % 8 == 0) 0 else 1
+            collectionNullBitmap = unpackFlags(input, position, numBytes)
+            position += numBytes
+            for (i in 0 until size) if (collectionNullBitmap[i]) valueCount--
+        }
+        if (isPackedCollection) {
+            collectionValueBits = BitInput(input, position, valueCount.toLong() * collectionValueWidth)
+            position += collectionValueBits.byteCount
         }
         return size
     }
@@ -165,12 +172,7 @@ class PackedDecoder internal constructor(
 
     override fun decodeBoolean(): Boolean {
         if (!inStructure || isCollection) {
-            if (isCollection && isBooleanCollection) {
-                val v =
-                    if (boolBitmapIndex < collectionBoolBitmap.size) collectionBoolBitmap[boolBitmapIndex] else false
-                boolBitmapIndex++
-                return v
-            }
+            if (isCollection && isPackedCollection) return collectionValueBits.read(1) != 0
             require(position < input.size)
             return input[position++].toInt() != 0
         }
@@ -219,7 +221,27 @@ class PackedDecoder internal constructor(
     }
 
     @ExperimentalSerializationApi
-    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int = readVarInt()
+    override fun decodeEnum(enumDescriptor: SerialDescriptor): Int {
+        val width = enumBitWidth(enumDescriptor)
+        val pos = if (inStructure && !isCollection) bitmask.enumPos(currentIndex) else -1
+        val index = when {
+            pos != -1 -> {
+                var value = 0
+                repeat(width) { bit -> if (enumValues[pos + bit]) value = value or (1 shl bit) }
+                value
+            }
+
+            isCollection && isPackedCollection -> collectionValueBits.read(width)
+
+            else -> {
+                val bits = BitInput(input, position, width.toLong())
+                position += bits.byteCount
+                bits.read(width)
+            }
+        }
+        require(index < enumDescriptor.elementsCount) { "Invalid enum ordinal $index for ${enumDescriptor.serialName}" }
+        return index
+    }
 
     @ExperimentalSerializationApi
     override fun decodeNull(): Nothing? = null
@@ -261,7 +283,7 @@ class PackedDecoder internal constructor(
         inStructure = false
         isCollection = false
         isNullableCollection = false
-        isBooleanCollection = false
+        isPackedCollection = false
         currentIndex = -1
     }
 

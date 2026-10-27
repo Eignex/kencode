@@ -62,7 +62,7 @@ enum class PayloadType { TYPE1, TYPE2, TYPE3 }
 val payload = Payload(123u, -2, true, null, PayloadType.TYPE1)
 
 val encoded = EncodedFormat.encodeToString(payload)
-// > 0fiXYI (that's it, this specific payload fits in 4 raw bytes)
+// > 00Xl1 (this payload fits in 3 raw bytes)
 val decoded = EncodedFormat.decodeFromString<Payload>(encoded)
 ```
 

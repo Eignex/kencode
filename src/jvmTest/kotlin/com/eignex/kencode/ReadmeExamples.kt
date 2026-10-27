@@ -3,6 +3,7 @@ package com.eignex.kencode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlin.test.Test
@@ -28,11 +29,9 @@ class ReadmeExamples {
 
         // these are packed into a bitset along with nullability flags
         val urgent: Boolean,
-        val sensitive: Boolean,
-        val external: Boolean,
         val handledAt: Instant?,
 
-        // encoded as varint ordinal
+        // two bits in the shared header for this three-entry enum
         val type: PayloadType,
     )
 
@@ -48,14 +47,12 @@ class ReadmeExamples {
             id = 123u,
             delta = -2,
             urgent = true,
-            sensitive = false,
-            external = true,
             handledAt = null,
             type = PayloadType.TYPE1,
         )
         val message = EncodedFormat.encodeToString(payload)
-        println(message)
-        // 0fiXYI
+        assertEquals("00Xl1", message)
+        assertEquals(3, PackedFormat.encodeToByteArray(payload).size)
 
         val result = EncodedFormat.decodeFromString<Payload>(message)
         assertEquals(result, payload)

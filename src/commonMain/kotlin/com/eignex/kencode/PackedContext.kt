@@ -8,9 +8,9 @@ import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 
 /**
- * Schema-derived boolean/nullable metadata for a single class descriptor.
+ * Schema-derived boolean/nullable/enum metadata for a single class descriptor.
  *
- * Encapsulates the two reverse-lookup arrays that both [PackedEncoder] and [PackedDecoder]
+ * Encapsulates the reverse-lookup arrays that both [PackedEncoder] and [PackedDecoder]
  * need to map a field index to its position in the bitmask, and the write path for inline
  * (non-merged) bitmasks used by polymorphic/enum structures.
  */
@@ -18,12 +18,16 @@ import kotlinx.serialization.descriptors.StructureKind
 internal class ClassBitmask(descriptor: SerialDescriptor) {
     val boolCount: Int
     val nullCount: Int
+    val enumBitCount: Int
 
     /** Maps field index -> boolean-bit position, or -1 if not a boolean field. */
     val booleanLookup: IntArray
 
     /** Maps field index -> nullable-bit position, or -1 if not a nullable field. */
     val nullableLookup: IntArray
+
+    /** Maps field index -> first enum bit, or -1 if not an enum field. */
+    private val enumLookup: IntArray
 
     init {
         val n = descriptor.elementsCount
@@ -38,19 +42,36 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
         }
         boolCount = bc
         nullCount = nc
+        var enumBits = 0
+        enumLookup = IntArray(n) { i ->
+            val e = descriptor.getElementDescriptor(i)
+            if (e.kind == SerialKind.ENUM) {
+                enumBits.also { enumBits += enumBitWidth(e) }
+            } else {
+                -1
+            }
+        }
+        enumBitCount = enumBits
     }
 
-    val totalCount: Int get() = boolCount + nullCount
+    val totalCount: Int get() = boolCount + nullCount + enumBitCount
 
     fun booleanPos(fieldIdx: Int): Int = booleanLookup.getOrElse(fieldIdx) { -1 }
 
     fun nullablePos(fieldIdx: Int): Int = nullableLookup.getOrElse(fieldIdx) { -1 }
 
+    fun enumPos(fieldIdx: Int): Int = enumLookup.getOrElse(fieldIdx) { -1 }
+
     /**
-     * Packs boolean values followed by null values into a fixed-width byte array.
+     * Packs booleans, null markers, then enum bits into a fixed-width byte array.
      * Used for inline (non-merged) bitmasks in polymorphic and other non-CLASS structures.
      */
-    fun writeInlineBitmask(booleanValues: BooleanArray, nullValues: BooleanArray, out: ByteOutput) {
+    fun writeInlineBitmask(
+        booleanValues: BooleanArray,
+        nullValues: BooleanArray,
+        out: ByteOutput,
+        enumValues: BooleanArray = booleanArrayOf(),
+    ) {
         val n = totalCount
         if (n == 0) return
         val bytes = ByteArray((n + 7) / 8)
@@ -65,6 +86,12 @@ internal class ClassBitmask(descriptor: SerialDescriptor) {
             if (v) {
                 bytes[bit / 8] =
                     (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
+            }
+        }
+        enumValues.forEachIndexed { i, v ->
+            val bit = boolCount + nullCount + i
+            if (v) {
+                bytes[bit / 8] = (bytes[bit / 8].toInt() or (1 shl (bit % 8))).toByte()
             }
         }
         out.write(bytes)
@@ -98,11 +125,12 @@ internal class HeaderContext {
     /** Reserves slots and returns the start index for a later set call. */
     fun reserve(count: Int): Int = bits.size.also { repeat(count) { bits.add(false) } }
 
-    /** Fills the slots starting at [start] with booleans immediately followed by nulls. */
-    fun set(start: Int, booleans: BooleanArray, nulls: BooleanArray) {
+    /** Fills the slots starting at [start] with booleans, null markers, then enum bits. */
+    fun set(start: Int, booleans: BooleanArray, nulls: BooleanArray, enums: BooleanArray = booleanArrayOf()) {
         var i = start
         booleans.forEach { bits[i++] = it }
         nulls.forEach { bits[i++] = it }
+        enums.forEach { bits[i++] = it }
     }
 
     /** Packs all reserved bits into a byte array. */
@@ -147,6 +175,7 @@ internal fun countAllBits(descriptor: SerialDescriptor): Int {
     for (i in 0 until descriptor.elementsCount) {
         val elem = descriptor.getElementDescriptor(i)
         if (elem.kind == PrimitiveKind.BOOLEAN) count++
+        if (elem.kind == SerialKind.ENUM) count += enumBitWidth(elem)
         if (elem.isNullable) {
             count++
         } else if (!elem.isInline && (elem.kind is StructureKind.CLASS || elem.kind is StructureKind.OBJECT)) {
