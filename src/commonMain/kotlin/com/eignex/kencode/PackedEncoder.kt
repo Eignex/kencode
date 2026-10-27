@@ -230,7 +230,11 @@ class PackedEncoder internal constructor(
                 writeVarLong(1L, dataBuffer)
             }
         } else if (inStructure) {
-            error("encodeNull should not be used inside Classes; use bitmask")
+            // Reached through a nullable serializer passed to encodeSerializableElement,
+            // e.g. a generic `T` bound to a nullable type, or Pair/Triple components.
+            val pos = bitmask.nullablePos(currentIndex)
+            if (pos == -1) error("Element $currentIndex is not declared nullable")
+            nullValues[pos] = true
         } else {
             writeVarLong(1L, output)
         }
@@ -244,7 +248,10 @@ class PackedEncoder internal constructor(
             } else {
                 writeVarLong(0L, dataBuffer)
             }
-        } else if (!inStructure) {
+        } else if (inStructure) {
+            val pos = bitmask.nullablePos(currentIndex)
+            if (pos != -1) nullValues[pos] = false
+        } else {
             writeVarLong(0L, output)
         }
     }
