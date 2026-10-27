@@ -105,5 +105,4 @@ Here is what the text "any byte data" (13 bytes) looks like in each:
 | Base85 | `@;^?5@X3',+Cno&@/`     | 17     | ASCII 33–117     |
 
 For even shorter strings, BaseRadix can use a large range of Unicode
-characters. If you used an alphabet with more than 256 characters in 1.3.0,
-you'll need to encode those strings again, since the format has changed.
+characters.
