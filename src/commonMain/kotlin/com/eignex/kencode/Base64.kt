@@ -76,6 +76,11 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
         if (input[len - 1] == '=') pad++
         if (input[len - 2] == '=') pad++
 
+        // Padding is only permitted in the final one or two character positions.
+        for (i in 0 until len - pad) {
+            require(input[i] != '=') { "Base64 padding is only allowed at the end of the final group" }
+        }
+
         val outLen = (len / 4) * 3 - pad
         val out = ByteArray(outLen)
 
