@@ -4,6 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
@@ -238,7 +239,21 @@ class PackedEncoder internal constructor(
     }
 
     @ExperimentalSerializationApi
-    override fun encodeInline(descriptor: SerialDescriptor): Encoder = this
+    override fun encodeInline(descriptor: SerialDescriptor): Encoder =
+        if (needsInlineBoundary(descriptor)) PackedEncoder(getBuffer(), config, serializersModule) else this
+
+    override fun <T> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+        // ContextualSerializer resolves the real serializer through this call. Its payload
+        // cannot contribute to a header derived from the parent's static descriptor.
+        val target = if (inStructure && currentIndex >= 0 &&
+            currentDescriptor.getElementDescriptor(currentIndex).kind == SerialKind.CONTEXTUAL
+        ) {
+            PackedEncoder(getBuffer(), config, serializersModule)
+        } else {
+            this
+        }
+        serializer.serialize(target, value)
+    }
 
     override fun endStructure(descriptor: SerialDescriptor) {
         if (!inStructure) return
@@ -279,6 +294,10 @@ class PackedEncoder internal constructor(
     }
 
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
+        if (isCollection) {
+            encodeBoolean(value)
+            return
+        }
         val pos = bitmask.booleanPos(index)
         if (pos == -1) error("Element $index is not a boolean")
         booleanValues[pos] = value
@@ -353,7 +372,7 @@ class PackedEncoder internal constructor(
     @ExperimentalSerializationApi
     override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
         currentIndex = index
-        return this
+        return encodeInline(descriptor.getElementDescriptor(index))
     }
 
     override fun <T> encodeSerializableElement(
