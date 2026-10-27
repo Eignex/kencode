@@ -46,7 +46,8 @@ fun PayloadTransform.then(next: PayloadTransform): PayloadTransform = object : P
  *
  * When the payload starts with a non-zero byte (k=0), the data is returned unchanged.
  * Otherwise a sentinel `0x00` byte followed by a varint count is prepended to the
- * stripped payload. Net overhead: 0 bytes for k=0, +1 byte for k=2, −(k−2) bytes for k≥3.
+ * stripped payload. Net overhead: 0 bytes for k=0, +1 byte for k=1, 0 bytes for k=2, and
+ * −(k−2) bytes for 3≤k≤127; longer runs need a wider count, saving a byte or two less.
  * At most 65,536 zeros are stripped; any further zeros stay in the payload.
  */
 object CompactZeros : PayloadTransform {
@@ -80,6 +81,10 @@ object CompactZeros : PayloadTransform {
         val k = readVarInt(data, cursor)
         require(k in 1..MAX_ZERO_RUN) { "Invalid CompactZeros zero count: $k" }
         val dataStart = cursor.value
+        // Encode strips every leading zero up to the limit, so a shorter run must end the zeros.
+        require(k == MAX_ZERO_RUN || dataStart == data.size || data[dataStart] != 0.toByte()) {
+            "Non-canonical CompactZeros prefix: payload continues with a zero byte"
+        }
         val result = ByteArray(k + data.size - dataStart)
         data.copyInto(result, destinationOffset = k, startIndex = dataStart)
         return result

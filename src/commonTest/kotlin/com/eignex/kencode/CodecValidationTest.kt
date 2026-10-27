@@ -92,4 +92,33 @@ class CodecValidationTest {
         }
         assertSame(CompactZeros, cleared.configuration.transform)
     }
+
+    @Test
+    fun `large alphabet partial blocks reject leading zero digits`() {
+        val alphabet = UnicodeRangeAlphabet()
+        val codec = BaseRadix(alphabet, blockSize = 8)
+        for (length in 1..20) {
+            val data = ByteArray(length) { (it * 37).toByte() }
+            val encoded = codec.encode(data)
+            assertContentEquals(data, codec.decode(encoded))
+            // A zero digit that pads a partial block to full length is a different, canonical full block.
+            val fullChars = encoded.length - codec.encode(data, 0, length % 8).length
+            if (length % 8 != 0) {
+                decodesOnlyCanonically(
+                    codec,
+                    encoded.substring(0, fullChars) + alphabet[0] + encoded.substring(fullChars),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `CompactZeros rejects a prefix that leaves leading zeros`() {
+        val bytes = { values: IntArray -> ByteArray(values.size) { values[it].toByte() } }
+        assertContentEquals(bytes(intArrayOf(0, 2, 5)), CompactZeros.encode(bytes(intArrayOf(0, 0, 5))))
+        assertContentEquals(bytes(intArrayOf(0, 0, 5)), CompactZeros.decode(bytes(intArrayOf(0, 2, 5))))
+        assertContentEquals(bytes(intArrayOf(0, 0)), CompactZeros.decode(bytes(intArrayOf(0, 2))))
+        assertFailsWith<IllegalArgumentException> { CompactZeros.decode(bytes(intArrayOf(0, 1, 0, 5))) }
+        assertFailsWith<IllegalArgumentException> { CompactZeros.decode(bytes(intArrayOf(0, 1, 0))) }
+    }
 }
