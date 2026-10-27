@@ -55,16 +55,16 @@ class CharAlphabet(private val chars: String) : Alphabet {
 /**
  * Alphabet backed by a contiguous Unicode range starting at [start].
  * Defaults to U+0020 – U+D7FF (55,264 characters), the largest BMP range
- * that avoids surrogate code points.
+ * that avoids surrogate code points. Only BMP ranges are supported because each digit is a [Char].
  */
 class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: Int = 0xD800 - 0x0020) : Alphabet {
     init {
         require(size > 1) { "Alphabet must contain at least 2 characters." }
-        require(start >= 0) { "Unicode range start must be non-negative." }
+        require(start in 0..0xFFFF) { "Unicode range start must fit in a BMP Char." }
+        require(size <= 0x10000 - start) { "Unicode range must fit in BMP Char values." }
         require(start + size <= 0xD800 || start >= 0xE000) {
             "Unicode range must not overlap surrogate block (U+D800–U+DFFF)."
         }
-        require(start + size <= 0x110000) { "Unicode range out of bounds." }
     }
 
     override fun get(index: Int): Char = (start + index).toChar()
@@ -76,6 +76,9 @@ class UnicodeRangeAlphabet(private val start: Int = 0x0020, override val size: I
 
 /**
  * Generic base-N encoder/decoder for binary data using arbitrary alphabets and block processing.
+ *
+ * For alphabets larger than 256 characters, partial blocks carry a leading sentinel byte
+ * before conversion to digits. This preserves their byte length, including leading zeros.
  *
  * @param alphabet The alphabet used to map digit values to characters.
  * @property blockSize Number of input bytes processed per block; larger blocks pack more
@@ -97,7 +100,7 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
     // Full block length must exceed any partial block's so the decoder can split unambiguously.
     private val massiveFullBlockLen: Int = maxOf(
         ceil((blockSize * 8) / logBase).toInt(),
-        ceil(((blockSize - 1) * 8) / logBase).toInt() + 1,
+        ceil(((blockSize - 1) * 8 + 1) / logBase).toInt() + 1,
     )
 
     private val lengths: IntArray = IntArray(blockSize) { blockIndex ->
@@ -220,13 +223,12 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
             return
         }
 
-        var lz = 0
-        while (lz < inLen && input[inPos + lz] == 0.toByte()) lz++
-        repeat(lz) { output.append(zeroChar) }
-
-        if (lz == inLen) return
-
-        var n = bigIntOf(input, inPos + lz, inLen - lz)
+        // A high sentinel bit records the byte count without one digit per zero byte.
+        // Its maximum digit count is included in massiveFullBlockLen above.
+        val framed = ByteArray(inLen + 1)
+        framed[0] = 1
+        input.copyInto(framed, destinationOffset = 1, startIndex = inPos, endIndex = inPos + inLen)
+        var n = bigIntOf(framed, 0, framed.size)
         val startPos = output.length
         while (n > bigZero) {
             val rem = n.rem(base)
@@ -285,31 +287,19 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         }
 
         if (lastBlockLen != 0) {
-            var lz = 0
-            while (lz < lastBlockLen && input[inPos + lz] == zeroChar) lz++
-
-            repeat(lz) { output[outPos++] = 0 }
-
-            if (lz < lastBlockLen) {
-                var n = bigZero
-                for (i in (inPos + lz) until (inPos + lastBlockLen)) {
-                    val index = alphabet.indexOf(input[i])
-                    require(index >= 0) { "Not an encoding char: '${input[i]}'" }
-                    n = n * base + BigInteger.fromLong(index.toLong())
-                }
-
-                val bytes = n.toByteArray()
-                val actualBytes = if (bytes.size > 1 && bytes[0] == 0.toByte()) {
-                    bytes.sliceArray(
-                        1 until bytes.size,
-                    )
-                } else {
-                    bytes
-                }
-
-                actualBytes.copyInto(output, outPos)
-                outPos += actualBytes.size
+            var n = bigZero
+            for (i in inPos until (inPos + lastBlockLen)) {
+                val index = alphabet.indexOf(input[i])
+                require(index >= 0) { "Not an encoding char: '${input[i]}'" }
+                n = n * base + BigInteger.fromLong(index.toLong())
             }
+
+            val framed = stripSignByte(n.toByteArray())
+            require(framed.size in 2..blockSize && framed[0] == 1.toByte()) {
+                "Invalid partial encoding block."
+            }
+            framed.copyInto(output, outPos, startIndex = 1)
+            outPos += framed.size - 1
         }
 
         return output.sliceArray(0 until outPos)

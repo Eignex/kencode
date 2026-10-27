@@ -146,3 +146,12 @@ examples live in the jvmTest source: an
 built on BouncyCastle, and an
 [error-correction transform](https://github.com/Eignex/kencode/blob/main/src/jvmTest/kotlin/com/eignex/kencode/ErrorCorrectionExample.kt)
 on zxing that recovers from simulated byte corruption.
+
+### Large custom alphabets
+
+`UnicodeRangeAlphabet` supports BMP characters outside the surrogate block;
+its ranges must end at or before U+FFFF. `BaseRadix` alphabets larger than 256
+characters encode partial blocks with a leading sentinel byte to preserve the
+original byte count, including leading zeros. This changes the large-alphabet
+wire format from 1.3.0: previously encoded tokens must be regenerated from the
+original bytes. Base36 and Base62 encodings are unchanged.
