@@ -289,6 +289,8 @@ open class BaseRadix(private val alphabet: Alphabet, val blockSize: Int = 32) : 
         }
 
         if (lastBlockLen != 0) {
+            // Partial blocks are written without leading zero digits; the sentinel keeps the first one non-zero.
+            require(alphabet.indexOf(input[inPos]) != 0) { "Non-canonical partial encoding block." }
             val n = parseDigits(input, inPos, lastBlockLen)
             val framed = stripSignByte(n.toByteArray())
             require(framed.size in 2..blockSize && framed[0] == 1.toByte()) {
