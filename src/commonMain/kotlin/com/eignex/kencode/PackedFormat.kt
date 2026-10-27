@@ -57,10 +57,16 @@ open class PackedFormat(
 
     /**
      * Decodes [bytes] produced by [PackedFormat] back into an object of type [T].
+     *
+     * @throws IllegalArgumentException if [bytes] is malformed or has data after the value.
      */
     override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T {
         val decoder = PackedDecoder(bytes, configuration, serializersModule)
-        return decoder.decodeSerializableValue(deserializer)
+        val value = decoder.decodeSerializableValue(deserializer)
+        require(decoder.position == bytes.size) {
+            "Unexpected trailing data: decoded ${decoder.position} of ${bytes.size} bytes"
+        }
+        return value
     }
 }
 

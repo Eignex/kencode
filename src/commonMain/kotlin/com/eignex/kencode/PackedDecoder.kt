@@ -432,10 +432,10 @@ class PackedDecoder internal constructor(
         while (true) {
             require(position < input.size) { "Unexpected EOF while decoding VarInt" }
             val b = input[position++].toInt() and 0xFF
+            requireVarIntByte(b, shift)
             result = result or ((b and 0x7F) shl shift)
             if (b and 0x80 == 0) return result
             shift += 7
-            require(shift <= 28) { "VarInt too long" }
         }
     }
 
@@ -445,10 +445,10 @@ class PackedDecoder internal constructor(
         while (true) {
             require(position < input.size) { "Unexpected EOF while decoding VarLong" }
             val b = input[position++].toInt() and 0xFF
+            requireVarLongByte(b, shift)
             result = result or ((b and 0x7F).toLong() shl shift)
             if (b and 0x80 == 0) return result
             shift += 7
-            require(shift <= 63) { "VarLong too long" }
         }
     }
 

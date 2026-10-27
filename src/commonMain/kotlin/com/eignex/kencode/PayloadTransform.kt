@@ -47,15 +47,20 @@ fun PayloadTransform.then(next: PayloadTransform): PayloadTransform = object : P
  * When the payload starts with a non-zero byte (k=0), the data is returned unchanged.
  * Otherwise a sentinel `0x00` byte followed by a varint count is prepended to the
  * stripped payload. Net overhead: 0 bytes for k=0, +1 byte for k=2, −(k−2) bytes for k≥3.
+ * At most 65,536 zeros are stripped; any further zeros stay in the payload.
  */
 object CompactZeros : PayloadTransform {
 
+    // Bounds how much a decoded payload can expand, so a short malicious token cannot
+    // request a huge allocation. Longer zero runs keep the rest in the stripped payload.
+    private const val MAX_ZERO_RUN = 1 shl 16
+
     override fun encode(data: ByteArray): ByteArray {
         var k = 0
-        while (k < data.size && data[k] == 0.toByte()) k++
+        while (k < data.size && k < MAX_ZERO_RUN && data[k] == 0.toByte()) k++
         if (k == 0) return data
         // Sentinel byte 0x00 signals that a compact prefix follows.
-        // Safe because the stripped data always starts with a non-zero byte.
+        // Safe because the stripped data starts with a non-zero byte unless k hit MAX_ZERO_RUN.
         val count = varintEncode(k)
         val result = ByteArray(1 + count.size + data.size - k)
         result[0] = 0x00
@@ -72,6 +77,7 @@ object CompactZeros : PayloadTransform {
         if (data.isEmpty()) return data
         if (data[0] != 0.toByte()) return data // k=0, no prefix was written
         val (k, prefixLen) = decodeVarInt(data, 1)
+        require(k in 1..MAX_ZERO_RUN) { "Invalid CompactZeros zero count: $k" }
         val dataStart = 1 + prefixLen
         val result = ByteArray(k + data.size - dataStart)
         data.copyInto(result, destinationOffset = k, startIndex = dataStart)

@@ -158,12 +158,12 @@ internal fun decodeVarInt(input: ByteArray, offset: Int): Pair<Int, Int> {
             "Unexpected EOF while decoding VarInt"
         }
         val b = input[pos++].toInt() and 0xFF
+        requireVarIntByte(b, shift)
         result = result or ((b and 0x7F) shl shift)
         if (b and 0x80 == 0) {
             return result to (pos - offset)
         }
         shift += 7
-        require(shift <= 28) { "VarInt too long" }
     }
 }
 
@@ -176,11 +176,25 @@ internal fun decodeVarLong(input: ByteArray, offset: Int): Pair<Long, Int> {
             "Unexpected EOF while decoding VarLong"
         }
         val b = input[pos++].toInt() and 0xFF
+        requireVarLongByte(b, shift)
         result = result or ((b and 0x7F).toLong() shl shift)
         if (b and 0x80 == 0) {
             return result to (pos - offset)
         }
         shift += 7
-        require(shift <= 63) { "VarLong too long" }
     }
+}
+
+/**
+ * Rejects varint bytes the encoder never writes: a zero final byte after the first, or a
+ * final group whose bits do not fit the target width. Each value then has a single encoding.
+ */
+internal fun requireVarIntByte(b: Int, shift: Int) {
+    require(shift == 0 || b != 0) { "Non-canonical VarInt" }
+    require(shift < 28 || (b and 0xF0) == 0) { "VarInt too long" }
+}
+
+internal fun requireVarLongByte(b: Int, shift: Int) {
+    require(shift == 0 || b != 0) { "Non-canonical VarLong" }
+    require(shift < 63 || (b and 0xFE) == 0) { "VarLong too long" }
 }
