@@ -1,6 +1,7 @@
 package com.eignex.kencode
 
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.CompositeEncoder
@@ -36,6 +37,9 @@ class PackedEncoder internal constructor(
     private lateinit var booleanValues: BooleanArray
     private lateinit var nullValues: BooleanArray
     private lateinit var enumValues: BooleanArray
+
+    // Elements written so far. The decoder reads every element in order, so none may be skipped.
+    private lateinit var encodedElements: BooleanArray
 
     // Start index in the shared HeaderContext for this class's reserved bits.
     private var headerStart: Int = -1
@@ -80,6 +84,7 @@ class PackedEncoder internal constructor(
             booleanValues = BooleanArray(bitmask.boolCount)
             nullValues = BooleanArray(bitmask.nullCount)
             enumValues = BooleanArray(bitmask.enumBitCount)
+            encodedElements = BooleanArray(descriptor.elementsCount)
             if (layout.isMergedKind) {
                 headerStart = ctx.reserve(bitmask.totalCount)
             }
@@ -206,10 +211,12 @@ class PackedEncoder internal constructor(
             collectionNullBits.writeTo(output)
             collectionValueBits.writeTo(output)
         } else if (layout.isMergedKind) {
+            requireAllElementsEncoded(descriptor)
             // CLASS/OBJECT: fill reserved bits; root writes the single merged header.
             ctx.set(headerStart, booleanValues, nullValues, enumValues)
             if (isRoot) output.write(ctx.toByteArray())
         } else {
+            requireAllElementsEncoded(descriptor)
             // Polymorphic/enum/other: write a local inline bitmask.
             bitmask.writeInlineBitmask(booleanValues, nullValues, output, enumValues)
         }
@@ -220,7 +227,23 @@ class PackedEncoder internal constructor(
         currentIndex = -1
     }
 
+    // @EncodeDefault(NEVER) makes the plugin skip an element; the layout has no way to mark that.
+    private fun requireAllElementsEncoded(descriptor: SerialDescriptor) {
+        val skipped = encodedElements.indexOfFirst { !it }
+        if (skipped != -1) {
+            throw SerializationException(
+                "Element '${descriptor.getElementName(skipped)}' of ${descriptor.serialName} was not encoded. " +
+                    "PackedFormat encodes every element, so @EncodeDefault(NEVER) is not supported.",
+            )
+        }
+    }
+
+    private fun markEncoded(index: Int) {
+        if (inClass && index >= 0) encodedElements[index] = true
+    }
+
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
+        markEncoded(index)
         if (layout.isCollection) {
             encodeBoolean(value)
             return
@@ -230,26 +253,49 @@ class PackedEncoder internal constructor(
         booleanValues[pos] = value
     }
 
-    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) =
+    override fun encodeIntElement(descriptor: SerialDescriptor, index: Int, value: Int) {
+        markEncoded(index)
         writePackedInt(value, resolveIntEncoding(descriptor.getElementAnnotations(index), config), dataBuffer)
+    }
 
-    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) =
+    override fun encodeLongElement(descriptor: SerialDescriptor, index: Int, value: Long) {
+        markEncoded(index)
         writePackedLong(value, resolveIntEncoding(descriptor.getElementAnnotations(index), config), dataBuffer)
+    }
 
-    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) = encodeByte(value)
+    override fun encodeByteElement(descriptor: SerialDescriptor, index: Int, value: Byte) {
+        markEncoded(index)
+        encodeByte(value)
+    }
 
-    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) = encodeShort(value)
+    override fun encodeShortElement(descriptor: SerialDescriptor, index: Int, value: Short) {
+        markEncoded(index)
+        encodeShort(value)
+    }
 
-    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) = encodeChar(value)
+    override fun encodeCharElement(descriptor: SerialDescriptor, index: Int, value: Char) {
+        markEncoded(index)
+        encodeChar(value)
+    }
 
-    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) = encodeFloat(value)
+    override fun encodeFloatElement(descriptor: SerialDescriptor, index: Int, value: Float) {
+        markEncoded(index)
+        encodeFloat(value)
+    }
 
-    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) = encodeDouble(value)
+    override fun encodeDoubleElement(descriptor: SerialDescriptor, index: Int, value: Double) {
+        markEncoded(index)
+        encodeDouble(value)
+    }
 
-    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) = encodeString(value)
+    override fun encodeStringElement(descriptor: SerialDescriptor, index: Int, value: String) {
+        markEncoded(index)
+        encodeString(value)
+    }
 
     @ExperimentalSerializationApi
     override fun encodeInlineElement(descriptor: SerialDescriptor, index: Int): Encoder {
+        markEncoded(index)
         currentIndex = index
         return encodeInline(descriptor.getElementDescriptor(index))
     }
@@ -260,6 +306,7 @@ class PackedEncoder internal constructor(
         serializer: SerializationStrategy<T>,
         value: T,
     ) {
+        markEncoded(index)
         currentIndex = index
         serializer.serialize(this, value)
         currentIndex = -1
@@ -272,6 +319,7 @@ class PackedEncoder internal constructor(
         serializer: SerializationStrategy<T>,
         value: T?,
     ) {
+        markEncoded(index)
         if (layout.isCollection) {
             encodeNullMark(isNull = value == null)
         } else {
