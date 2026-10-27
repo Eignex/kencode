@@ -76,9 +76,10 @@ object CompactZeros : PayloadTransform {
     override fun decode(data: ByteArray): ByteArray {
         if (data.isEmpty()) return data
         if (data[0] != 0.toByte()) return data // k=0, no prefix was written
-        val (k, prefixLen) = decodeVarInt(data, 1)
+        val cursor = PackedPosition(1)
+        val k = readVarInt(data, cursor)
         require(k in 1..MAX_ZERO_RUN) { "Invalid CompactZeros zero count: $k" }
-        val dataStart = 1 + prefixLen
+        val dataStart = cursor.value
         val result = ByteArray(k + data.size - dataStart)
         data.copyInto(result, destinationOffset = k, startIndex = dataStart)
         return result

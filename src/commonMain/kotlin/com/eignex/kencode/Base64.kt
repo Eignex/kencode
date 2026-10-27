@@ -21,25 +21,13 @@ open class Base64(val alphabet: CharArray) : ByteEncoding {
     /** Default Base64 instance using the standard [BASE_64] alphabet. */
     companion object Default : Base64(BASE_64.toCharArray())
 
-    init {
-        require(alphabet.size == 64) { "Base64 requires a 64 length alphabet" }
-        require(alphabet.all { it.code < 256 }) { "Base64 alphabet characters must be below U+0100" }
-        require(alphabet.toSet().size == alphabet.size) { "Base64 alphabet must not contain duplicate characters" }
+    private val decodeTable: IntArray = byteAlphabetTable(alphabet, "Base64", 64).apply {
         require('=' !in alphabet) { "Base64 alphabet must not contain the '=' padding character" }
-    }
-
-    private val decodeTable: IntArray = IntArray(256) { -1 }.apply {
-        for (i in alphabet.indices) {
-            this[alphabet[i].code] = i
-        }
         this['='.code] = 0
     }
 
     override fun encode(input: ByteArray, offset: Int, length: Int): String {
-        require(offset >= 0 && length >= 0 && offset + length <= input.size) {
-            "Invalid offset/length for input of size ${input.size}"
-        }
-
+        requireRange(input, offset, length)
         if (length == 0) return ""
 
         val end = offset + length

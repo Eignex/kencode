@@ -88,37 +88,36 @@ public final class com/eignex/kencode/CompactZeros : com/eignex/kencode/PayloadT
 	public fun encode ([B)[B
 }
 
-public class com/eignex/kencode/Crc16 : com/eignex/kencode/Checksum {
+public abstract class com/eignex/kencode/Crc : com/eignex/kencode/Checksum {
+	public fun digest ([B)[B
+	public fun getSize ()I
+}
+
+public class com/eignex/kencode/Crc16 : com/eignex/kencode/Crc {
 	public static final field Default Lcom/eignex/kencode/Crc16$Default;
 	public fun <init> ()V
 	public fun <init> (IIZZI)V
 	public synthetic fun <init> (IIZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun digest ([B)[B
-	public fun getSize ()I
 }
 
 public final class com/eignex/kencode/Crc16$Default : com/eignex/kencode/Crc16 {
 }
 
-public class com/eignex/kencode/Crc32 : com/eignex/kencode/Checksum {
+public class com/eignex/kencode/Crc32 : com/eignex/kencode/Crc {
 	public static final field Default Lcom/eignex/kencode/Crc32$Default;
 	public fun <init> ()V
 	public fun <init> (IIZZI)V
 	public synthetic fun <init> (IIZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun digest ([B)[B
-	public fun getSize ()I
 }
 
 public final class com/eignex/kencode/Crc32$Default : com/eignex/kencode/Crc32 {
 }
 
-public class com/eignex/kencode/Crc8 : com/eignex/kencode/Checksum {
+public class com/eignex/kencode/Crc8 : com/eignex/kencode/Crc {
 	public static final field Default Lcom/eignex/kencode/Crc8$Default;
 	public fun <init> ()V
 	public fun <init> (IIZZI)V
 	public synthetic fun <init> (IIZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun digest ([B)[B
-	public fun getSize ()I
 }
 
 public final class com/eignex/kencode/Crc8$Default : com/eignex/kencode/Crc8 {

@@ -5,114 +5,6 @@ import kotlin.test.*
 class PackedUtilsTest {
 
     @Test
-    fun `packFlags simple bit pattern`() {
-        val flags = booleanArrayOf(true, false, true)
-        val packed = packFlags(flags)
-
-        assertEquals(1, packed.size)
-        assertEquals(5.toByte(), packed[0])
-    }
-
-    @Test
-    fun `packFlags multi byte`() {
-        val flags = BooleanArray(16)
-        flags[0] = true
-        flags[10] = true
-
-        val packed = packFlags(flags)
-
-        assertEquals(2, packed.size)
-        assertEquals(1.toByte(), packed[0])
-        assertEquals(4.toByte(), packed[1])
-    }
-
-    @Test
-    fun `packFlags all false optimizes to empty`() {
-        val flags = booleanArrayOf(false, false, false, false)
-        val packed = packFlags(flags)
-
-        assertEquals(0, packed.size)
-    }
-
-    @Test
-    fun `packFlags empty input`() {
-        val flags = BooleanArray(0)
-        val packed = packFlags(flags)
-
-        assertEquals(0, packed.size)
-    }
-
-    @Test
-    fun `unpackFlags simple`() {
-        val input = byteArrayOf(5)
-        val unpacked = unpackFlags(input, 0, 1)
-
-        assertEquals(8, unpacked.size)
-        assertTrue(unpacked[0])
-        assertFalse(unpacked[1])
-        assertTrue(unpacked[2])
-        assertFalse(unpacked[3])
-    }
-
-    @Test
-    fun `unpackFlags with offset`() {
-        val input = byteArrayOf(0xFF.toByte(), 5, 0xFF.toByte())
-        val unpacked = unpackFlags(input, 1, 1)
-
-        assertEquals(8, unpacked.size)
-        assertTrue(unpacked[0])
-        assertFalse(unpacked[1])
-        assertTrue(unpacked[2])
-        assertFalse(unpacked[3])
-    }
-
-    @Test
-    fun `pack and unpack roundtrip exact boundary`() {
-        val flags = BooleanArray(16)
-        flags[0] = true
-        flags[7] = true
-        flags[8] = true
-        flags[15] = true
-
-        val packed = packFlags(flags)
-        assertEquals(2, packed.size)
-
-        val unpacked = unpackFlags(packed, 0, packed.size)
-        assertContentEquals(flags, unpacked)
-    }
-
-    @Test
-    fun `pack and unpack roundtrip padded boundary`() {
-        val flags = BooleanArray(10)
-        flags[0] = true
-        flags[9] = true
-
-        val packed = packFlags(flags)
-        val unpacked = unpackFlags(packed, 0, packed.size)
-
-        assertEquals(16, unpacked.size)
-
-        assertTrue(unpacked[0])
-        assertTrue(unpacked[9])
-        assertFalse(unpacked[1])
-
-        for (i in 10 until 16) {
-            assertFalse(unpacked[i], "Padding bit $i should be false")
-        }
-    }
-
-    @Test
-    fun `unpackFlags throws on OOB`() {
-        val input = byteArrayOf(1, 2)
-        assertFailsWith<IllegalArgumentException> {
-            unpackFlags(input, 0, 3)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            unpackFlags(input, 2, 1)
-        }
-    }
-
-    @Test
     fun `short roundtrip`() {
         val out = ByteOutput()
         writeShort(0x1234.toShort(), out)
@@ -206,7 +98,9 @@ class PackedUtilsTest {
             val out = ByteOutput()
             writeVarInt(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = decodeVarInt(bytes, 0)
+            val cursor = PackedPosition(0)
+            val decoded = readVarInt(bytes, cursor)
+            val consumed = cursor.value - 0
             assertEquals(v, decoded, "VarInt failed for $v")
             assertEquals(
                 bytes.size,
@@ -231,7 +125,9 @@ class PackedUtilsTest {
             out.write(1)
             writeVarInt(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = decodeVarInt(bytes, 1)
+            val cursor = PackedPosition(1)
+            val decoded = readVarInt(bytes, cursor)
+            val consumed = cursor.value - 1
             assertEquals(v, decoded, "VarInt failed for $v")
             assertEquals(
                 bytes.size,
@@ -255,7 +151,9 @@ class PackedUtilsTest {
             val out = ByteOutput()
             writeVarLong(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = decodeVarLong(bytes, 0)
+            val cursor = PackedPosition(0)
+            val decoded = readVarLong(bytes, cursor)
+            val consumed = cursor.value - 0
             assertEquals(v, decoded, "VarLong failed for $v")
             assertEquals(
                 bytes.size,
@@ -280,7 +178,9 @@ class PackedUtilsTest {
             out.write(1)
             writeVarLong(v, out)
             val bytes = out.toByteArray()
-            val (decoded, consumed) = decodeVarLong(bytes, 1)
+            val cursor = PackedPosition(1)
+            val decoded = readVarLong(bytes, cursor)
+            val consumed = cursor.value - 1
             assertEquals(v, decoded, "VarLong failed for $v")
             assertEquals(
                 bytes.size,
@@ -288,14 +188,6 @@ class PackedUtilsTest {
                 "VarLong consumed mismatch for $v",
             )
         }
-    }
-
-    @Test
-    fun `flags roundtrip`() {
-        val flags = booleanArrayOf(true, false, true, true, false)
-        val longFlags = packFlagsToLong(flags)
-        val unpacked = unpackFlagsFromLong(longFlags, flags.size)
-        assertContentEquals(flags, unpacked)
     }
 
     // --- ByteOutput ---
@@ -377,8 +269,8 @@ class PackedUtilsTest {
                     "Short" -> readShort(truncated, 0)
                     "Int" -> readInt(truncated, 0)
                     "Long" -> readLong(truncated, 0)
-                    "VarInt" -> decodeVarInt(truncated, 0)
-                    "VarLong" -> decodeVarLong(truncated, 0)
+                    "VarInt" -> readVarInt(truncated, PackedPosition())
+                    "VarLong" -> readVarLong(truncated, PackedPosition())
                 }
             }
         }
