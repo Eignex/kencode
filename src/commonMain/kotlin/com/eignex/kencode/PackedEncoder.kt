@@ -144,8 +144,13 @@ class PackedEncoder internal constructor(
         writeUtf8Char(value, getBuffer())
     }
 
+    // Unpaired surrogates have no UTF-8 form; encoding them would silently replace them with '?'.
     override fun encodeString(value: String) {
-        val bytes = value.encodeToByteArray()
+        val bytes = try {
+            value.encodeToByteArray(0, value.length, throwOnInvalidSequence = true)
+        } catch (e: CharacterCodingException) {
+            throw IllegalArgumentException("String contains an unpaired surrogate", e)
+        }
         val buf = getBuffer()
         writeVarInt(bytes.size, buf)
         buf.write(bytes)

@@ -101,6 +101,7 @@ class PackedDecoder internal constructor(
         booleanValues = BooleanArray(bitmask.boolCount) { next() }
         nullValues = BooleanArray(bitmask.nullCount) { next() }
         enumValues = BooleanArray(bitmask.enumBitCount) { next() }
+        bitmask.requireNullElementsClear(currentDescriptor, booleanValues, nullValues, enumValues)
     }
 
     // The size is read with the structure so decodeSequentially can see it before any allocation.
@@ -150,8 +151,14 @@ class PackedDecoder internal constructor(
 
     override fun decodeBoolean(): Boolean = when {
         inClass -> decodeBooleanElement(currentDescriptor, currentIndex)
+
         layout.isPackedCollection -> collectionValueBits.readBit()
-        else -> readByte().toInt() != 0
+
+        else -> {
+            val byte = readByte().toInt()
+            require(byte == 0 || byte == 1) { "Invalid Boolean byte: $byte" }
+            byte == 1
+        }
     }
 
     override fun decodeByte(): Byte = readByte()
@@ -172,9 +179,14 @@ class PackedDecoder internal constructor(
 
     override fun decodeString(): String {
         val len = readVarInt()
-        require(len >= 0 && position + len <= input.size)
-        return input.decodeToString(position, position + len)
-            .also { position += len }
+        require(len >= 0 && position + len <= input.size) { "Unexpected EOF while decoding String" }
+        val value = try {
+            input.decodeToString(position, position + len, throwOnInvalidSequence = true)
+        } catch (e: CharacterCodingException) {
+            throw IllegalArgumentException("Invalid UTF-8 in String", e)
+        }
+        position += len
+        return value
     }
 
     @ExperimentalSerializationApi
@@ -218,7 +230,9 @@ class PackedDecoder internal constructor(
             skipNextNullMark = false
             return true
         }
-        return (readVarLong() and 1L) == 0L
+        val mark = readVarLong()
+        require(mark == 0L || mark == 1L) { "Invalid null marker: $mark" }
+        return mark == 0L
     }
 
     private fun requireNullablePos(index: Int): Int {
@@ -373,7 +387,9 @@ class PackedDecoder internal constructor(
                 require(position + 2 <= input.size)
                 val b1 = input[position + 1].toInt() and 0xFF
                 require((b1 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
-                2 to (((b0 and 0x1F) shl 6) or (b1 and 0x3F))
+                val cp = ((b0 and 0x1F) shl 6) or (b1 and 0x3F)
+                require(cp >= 0x80) { "Overlong UTF-8 encoding" }
+                2 to cp
             }
 
             (b0 and 0b1111_0000) == 0b1110_0000 -> {
@@ -382,7 +398,9 @@ class PackedDecoder internal constructor(
                 val b2 = input[position + 2].toInt() and 0xFF
                 require((b1 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
                 require((b2 and 0b1100_0000) == 0b1000_0000) { "Invalid UTF-8 continuation byte" }
-                3 to (((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F))
+                val cp = ((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F)
+                require(cp >= 0x800) { "Overlong UTF-8 encoding" }
+                3 to cp
             }
 
             else -> throw IllegalArgumentException(

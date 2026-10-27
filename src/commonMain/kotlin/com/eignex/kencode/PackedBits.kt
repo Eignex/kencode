@@ -49,6 +49,12 @@ internal class BitInput(private val input: ByteArray, private val offset: Int, p
         val needed = bitCount / 8 + if (bitCount % 8 == 0L) 0 else 1
         require(needed <= input.size - offset) { "Unexpected EOF reading packed values: need $needed bytes" }
         byteCount = needed.toInt()
+        // Bits after bitCount in the final byte are padding, which the encoder leaves clear.
+        val usedBits = (bitCount % 8).toInt()
+        if (usedBits != 0) {
+            val last = input[offset + byteCount - 1].toInt() and 0xFF
+            require(last ushr usedBits == 0) { "Non-zero padding bits after $bitCount packed bits" }
+        }
     }
 
     fun read(count: Int): Int {
