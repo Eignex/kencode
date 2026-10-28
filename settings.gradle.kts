@@ -13,7 +13,7 @@ pluginManagement {
         mavenCentral()
     }
     resolutionStrategy.eachPlugin {
-        if (requested.id.namespace == "com.eignex") {
+        if (requested.id.id == "com.eignex.kmp") {
             useModule("com.eignex:kbuild:${requested.version ?: kbuildVersion}")
         }
     }
