@@ -28,7 +28,7 @@ works, read the [technical deep dive](https://eignex.com/posts/kencode-packing-d
 
 ```kotlin
 dependencies {
-    implementation("com.eignex:kencode:1.3.0")
+    implementation("com.eignex:kencode:1.4.0")
 }
 ```
 
