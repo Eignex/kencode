@@ -1,8 +1,17 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    id("com.eignex.kmp") version "1.3.5"
+    id("com.eignex.kmp")
     kotlin("plugin.serialization") version "2.4.21"
+}
+
+repositories {
+    ivy {
+        url = uri("https://github.com/Eignex/kbuild/releases/download")
+        patternLayout { artifact("v[revision]/[artifact]-[revision](-[classifier]).[ext]") }
+        metadataSources { gradleMetadata() }
+        content { includeModule("com.eignex", "kbuild-platform") }
+    }
 }
 
 eignexPublish {
