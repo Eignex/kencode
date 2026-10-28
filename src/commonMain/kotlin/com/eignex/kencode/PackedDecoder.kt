@@ -10,6 +10,9 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
 
+// Elements that need no input bits (Unit, objects, single-entry enums) beyond one per input bit.
+private const val MAX_ZERO_WIDTH_ELEMENTS = 1 shl 20
+
 /** [PackedFormat] decoder. */
 @Suppress("UNCHECKED_CAST")
 @OptIn(ExperimentalSerializationApi::class)
@@ -105,6 +108,11 @@ class PackedDecoder internal constructor(
         collectionSize = size
         collectionElementCount = size.toLong() * elementsPerEntry
         require(collectionElementCount <= Int.MAX_VALUE) { "Map size $size exceeds the element index range" }
+        // Every other element owns at least one input bit, so this bounds what a short input can allocate.
+        cursor.collectionElements += collectionElementCount
+        require(cursor.collectionElements <= 8L * input.size + MAX_ZERO_WIDTH_ELEMENTS) {
+            "Collection size $size exceeds what the input can hold"
+        }
         collectionIndex = 0
         nullBitmapIndex = 0
         var valueCount = size
@@ -137,7 +145,8 @@ class PackedDecoder internal constructor(
     }
 
     // A size larger than the remaining bytes decodes element by element, so a bogus size hits
-    // EOF instead of exhausting memory. Zero-byte elements (Unit, packed booleans) take this path too.
+    // EOF instead of exhausting memory. Zero-byte elements (Unit, packed booleans) take this path too,
+    // bounded by readCollectionHeader.
     override fun decodeSequentially(): Boolean = !layout.isCollection || collectionElementCount <= input.size - position
 
     private val inClass: Boolean get() = inStructure && !layout.isCollection
@@ -172,7 +181,7 @@ class PackedDecoder internal constructor(
 
     override fun decodeString(): String {
         val len = readVarInt()
-        require(len >= 0 && position + len <= input.size) { "Unexpected EOF while decoding String" }
+        require(len >= 0 && len <= input.size - position) { "Unexpected EOF while decoding String" }
         val value = try {
             input.decodeToString(position, position + len, throwOnInvalidSequence = true)
         } catch (e: CharacterCodingException) {
@@ -296,6 +305,9 @@ class PackedDecoder internal constructor(
         val parentTracksNull = layout.isNullableCollection || !layout.isCollection
 
         val value = when {
+            // Polymorphic wrappers pass the subclass serializer directly, bypassing decodeSerializableValue.
+            inClass && descriptor.isContextualElement(index) -> deserializer.deserialize(child())
+
             !isStructural -> deserializer.deserialize(this)
 
             parentTracksNull && childDescriptor.isNullable ->
