@@ -70,6 +70,9 @@ val bytes = format.encodeToByteArray(payload)
 Fields are written in the order you declare them, with no names or tags. So if
 you change a class, old strings may no longer decode.
 
+The encoded format only stays the same between patch versions. A new minor
+version may change it, so encode stored strings again after upgrading.
+
 ## EncodedFormat
 
 EncodedFormat serializes your object, optionally transforms the bytes, and
