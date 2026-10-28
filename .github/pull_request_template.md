@@ -1,12 +1,12 @@
 ## What changed
 
-<!-- Bullet list of changes. Simple sentences, no special formatting. -->
+<!-- Plain bullets. -->
 -
 
 ## Why
 
-<!-- Simple sentences. No headers, bullets, or code blocks unless load-bearing. -->
+<!-- Plain sentences. -->
 
 ## Testing
 
-<!-- Simple sentences. How you verified it. -->
+<!-- How you verified it. -->

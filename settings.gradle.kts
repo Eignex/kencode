@@ -23,6 +23,6 @@ pluginManagement {
 }
 
 plugins {
-    // Downloads the required JDK if missing.
+    // Auto-provisions the required JDK.
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
