@@ -214,5 +214,8 @@ internal class StructureLayout private constructor(
     }
 }
 
-/** Read cursor shared by an inline decoder and its parent. */
-internal class PackedPosition(var value: Int = 0)
+/** Read state shared by a decoder and its children. */
+internal class PackedPosition(var value: Int = 0) {
+    /** Collection elements declared so far in this decode. */
+    var collectionElements: Long = 0
+}

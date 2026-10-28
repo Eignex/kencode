@@ -4,6 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.EmptySerializersModule
@@ -45,6 +46,10 @@ class PackedEncoder internal constructor(
     private lateinit var collectionNullBits: BitOutput
     private lateinit var collectionValueBits: BitOutput
 
+    // A collection opened with beginStructure, not beginCollection, writes its own size at the end.
+    private var writesOwnSize = false
+    private var collectionElementCount = 0
+
     private val dataBuffer = ByteOutput()
 
     private fun child(headerCtx: HeaderContext? = null) =
@@ -67,7 +72,10 @@ class PackedEncoder internal constructor(
 
     override fun beginCollection(descriptor: SerialDescriptor, collectionSize: Int): CompositeEncoder {
         writeVarInt(collectionSize, getBuffer())
-        return child().also { it.initializeStructure(descriptor) }
+        return child().also {
+            it.initializeStructure(descriptor)
+            it.writesOwnSize = false
+        }
     }
 
     private fun initializeStructure(descriptor: SerialDescriptor) {
@@ -87,6 +95,8 @@ class PackedEncoder internal constructor(
         } else {
             collectionNullBits = BitOutput()
             collectionValueBits = BitOutput()
+            writesOwnSize = true
+            collectionElementCount = 0
         }
 
         dataBuffer.reset()
@@ -206,6 +216,10 @@ class PackedEncoder internal constructor(
         if (!inStructure) return
 
         if (layout.isCollection) {
+            if (writesOwnSize) {
+                val perEntry = if (descriptor.kind is StructureKind.MAP) 2 else 1
+                writeVarInt(collectionElementCount / perEntry, output)
+            }
             collectionNullBits.writeTo(output)
             collectionValueBits.writeTo(output)
         } else if (layout.isMergedKind) {
@@ -238,6 +252,7 @@ class PackedEncoder internal constructor(
 
     private fun markEncoded(index: Int) {
         if (inClass && index >= 0) encodedElements[index] = true
+        if (inStructure && layout.isCollection) collectionElementCount = maxOf(collectionElementCount, index + 1)
     }
 
     override fun encodeBooleanElement(descriptor: SerialDescriptor, index: Int, value: Boolean) {
@@ -306,7 +321,8 @@ class PackedEncoder internal constructor(
     ) {
         markEncoded(index)
         currentIndex = index
-        serializer.serialize(this, value)
+        // Polymorphic wrappers pass the subclass serializer directly, bypassing encodeSerializableValue.
+        serializer.serialize(if (inClass && descriptor.isContextualElement(index)) child() else this, value)
         currentIndex = -1
     }
 

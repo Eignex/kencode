@@ -150,4 +150,23 @@ class MalformedInputTest {
             PackedFormat.decodeFromByteArray(mapSerializer, PackedFormat.encodeToByteArray(mapSerializer, map)),
         )
     }
+
+    @Test
+    fun `huge collections of zero-width elements are rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(ListSerializer(Unit.serializer()), bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x07))
+        }
+        // Nesting must not multiply the limit: 1000 inner lists of 16384 Units each.
+        val nested = bytes(0xE8, 0x07) + ByteArray(3_000) { if (it % 3 == 2) 0x01 else 0x80.toByte() }
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(ListSerializer(ListSerializer(Unit.serializer())), nested)
+        }
+    }
+
+    @Test
+    fun `string lengths that overflow the position are rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            PackedFormat.decodeFromByteArray(String.serializer(), bytes(0xFF, 0xFF, 0xFF, 0xFF, 0x07, 0x41))
+        }
+    }
 }
