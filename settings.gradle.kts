@@ -13,12 +13,9 @@ pluginManagement {
         mavenCentral()
     }
     resolutionStrategy.eachPlugin {
-        if (requested.id.id == "com.eignex.kmp") {
-            useModule("com.eignex:kbuild:${requested.version ?: kbuildVersion}")
+        if (requested.id.id in setOf("com.eignex.kmp", "org.jetbrains.kotlin.plugin.serialization")) {
+            useModule("com.eignex:kbuild:$kbuildVersion")
         }
-    }
-    plugins {
-        id("com.eignex.kmp") version kbuildVersion
     }
 }
 
