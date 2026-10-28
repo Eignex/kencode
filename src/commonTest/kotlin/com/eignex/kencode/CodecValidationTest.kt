@@ -78,7 +78,7 @@ class CodecValidationTest {
         }
         val expected = CompactZeros.then(Crc16.asTransform()).encode(data)
         assertContentEquals(expected, format.configuration.transform!!.encode(data))
-        assertContentEquals(data, format.configuration.transform!!.decode(expected))
+        assertContentEquals(data, format.configuration.transform.decode(expected))
     }
 
     @Test
