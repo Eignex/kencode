@@ -7,12 +7,6 @@ on:
     branches: [main]
   push:
     tags: ['v*']
-  workflow_dispatch:
-    inputs:
-      dryRun:
-        description: Run the release build and publish nothing
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -36,7 +30,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is_snapshot: ${{ steps.version.outputs.is_snapshot }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
-      dry_run: ${{ steps.version.outputs.dry_run }}
+      test_release: ${{ steps.version.outputs.test_release }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
       revision: ${{ steps.version.outputs.revision }}
     steps:
       - name: Checkout
@@ -47,52 +42,18 @@ jobs:
           fetch-depth: 0
       - name: Resolve publication version
         id: version
-        env:
-          DRY_RUN: ${{ inputs.dryRun || false }}
-        run: |
-          next_patch() {
-            local tag major minor patch
-            while IFS= read -r tag; do
-              if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-                major=${BASH_REMATCH[1]}
-                minor=${BASH_REMATCH[2]}
-                patch=${BASH_REMATCH[3]}
-                printf '%s.%s.%s\n' "$major" "$minor" "$((10#$patch + 1))"
-                return
-              fi
-            done < <(git tag --list 'v*' --sort=-v:refname)
-            echo '0.0.1'
-          }
-          if [[ "$DRY_RUN" == true ]]; then
-            version=$(next_patch)
-          elif [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            version=${GITHUB_REF_NAME#v}
-          else
-            version="$(next_patch)-SNAPSHOT"
-          fi
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::invalid publication version: $version" >&2
-            exit 1
-          fi
-          is_snapshot=false
-          [[ "$version" != *-SNAPSHOT ]] || is_snapshot=true
-          is_prerelease=false
-          [[ "$version" != *-* ]] || is_prerelease=true
-          {
-            echo "version=$version"
-            echo "is_snapshot=$is_snapshot"
-            echo "is_prerelease=$is_prerelease"
-            echo "dry_run=$DRY_RUN"
-            echo "revision=$(git rev-parse HEAD)"
-          } >> "$GITHUB_OUTPUT"
+        run: python3 .github/scripts/release-version.py
 
-  # Automatic snapshots already passed this gate.
+  # Releases rerun Linux checks at the release version alongside macOS/iOS and Windows.
+  # Publication waits for every platform. Snapshots reuse the normal main build.
   validate:
     if: github.event_name != 'workflow_run'
     needs: prepare
     uses: ./.github/workflows/build.yml
     with:
       ref: ${{ needs.prepare.outputs.revision }}
+      ciVersion: ${{ needs.prepare.outputs.version }}
+      fullTargets: true
     secrets:
       GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -110,60 +71,70 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       IS_SNAPSHOT: ${{ needs.prepare.outputs.is_snapshot }}
-      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+      IS_TEST_RELEASE: ${{ needs.prepare.outputs.test_release }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.revision }}
           persist-credentials: false
-      - name: Set up JDK
-        uses: actions/setup-java@v6
+      - name: Set up build
+        uses: ./.github/actions/setup-build
         with:
-          distribution: temurin
-          java-version: 25
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-read-only: true
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-      - name: Restore Kotlin/Native toolchain
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.konan
-          key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('**/*.gradle.kts', '**/gradle.properties', '**/gradle-wrapper.properties', '**/*.versions.toml') }}
-          restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
+          gradle-cache-read-only: 'true'
+          target-profile: full
 
-      - name: Build and Test
+      # The reusable validation job already ran the full checks and uploaded test reports.
+      # Recheck the publication job's staged artifacts and consumer resolution before publishing.
+      - name: Verify release publication
         if: env.IS_SNAPSHOT == 'false'
-        run: ./gradlew build -PciVersion="$RELEASE_VERSION"
-      - name: Upload test reports
-        if: always() && env.IS_SNAPSHOT == 'false'
+        run: |
+          ./gradlew publishAllPublicationsToLocalStagingRepository -Ptargets.full -PciVersion="$RELEASE_VERSION"
+          python3 .github/scripts/verify-publication.py build/staging-repo "$RELEASE_VERSION" --full
+          bash .github/scripts/verify-consumer.sh "$RELEASE_VERSION"
+      - name: Stage and verify GitHub RC assets
+        if: env.IS_TEST_RELEASE == 'true'
+        run: |
+          ./gradlew githubReleaseAssets -Ptargets.full -PciVersion="$RELEASE_VERSION"
+          python3 .github/scripts/verify-publication.py build/github-release-assets "$RELEASE_VERSION" --full --github
+          bash .github/scripts/verify-consumer.sh "$RELEASE_VERSION" "$PWD/build/github-release-assets"
+      - name: Upload validated RC assets for inspection
+        if: env.IS_TEST_RELEASE == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: release-test-reports
-          path: |
-            **/build/reports/tests/
-            **/build/test-results/
-          if-no-files-found: ignore
+          name: test-release-assets
+          path: build/github-release-assets/
+          if-no-files-found: error
+      - name: Publish RC to GitHub only
+        if: env.IS_TEST_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./gradlew publishToGitHubRelease -Ptargets.full -PciVersion="$RELEASE_VERSION"
+      - name: Verify anonymous consumer from GitHub
+        if: env.IS_TEST_RELEASE == 'true'
+        run: >-
+          ./gradlew -p consumer run -Pconsumer.version="$RELEASE_VERSION"
+          -Pconsumer.githubRepository="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
       - name: Publish to Maven Central (Portal)
-        if: env.IS_SNAPSHOT == 'false' && env.DRY_RUN != 'true'
+        if: env.IS_SNAPSHOT == 'false' && env.IS_TEST_RELEASE != 'true'
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishToMavenCentral -PciVersion="$RELEASE_VERSION"
+        run: ./gradlew publishToMavenCentral -Ptargets.full -PciVersion="$RELEASE_VERSION"
       - name: Publish to Sonatype Snapshots
-        if: env.IS_SNAPSHOT == 'true' && env.DRY_RUN != 'true'
+        if: env.IS_SNAPSHOT == 'true'
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion="$RELEASE_VERSION"
+        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -Ptargets.full -PciVersion="$RELEASE_VERSION"
       - name: Create GitHub release
-        if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false' && env.DRY_RUN != 'true'
+        if: github.ref_type == 'tag' && env.IS_SNAPSHOT == 'false' && env.IS_TEST_RELEASE != 'true'
         uses: softprops/action-gh-release@v3
         with:
           prerelease: ${{ needs.prepare.outputs.is_prerelease }}

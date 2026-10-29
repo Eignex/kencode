@@ -109,3 +109,50 @@ Here is what the text "any byte data" (13 bytes) looks like in each:
 
 For even shorter strings, BaseRadix can use a large range of Unicode
 characters.
+
+## Build validation
+
+`./gradlew check lintDocs koverXmlReport` checks JVM and Linux x64.
+JS, Wasm, WASI and other native targets are configured only with `-Ptargets.full`. JVM checks also
+run the packaged JAR on Java 17 and 25. CI stages the configured publications,
+checks their metadata and artifacts, and runs an independent Java consumer using
+both Gradle metadata and POM-only resolution.
+
+Normal pull-request and main builds use one Linux job. Tagged stable and RC releases
+enable `-Ptargets.full`, with focused macOS ARM64, iOS simulator and Windows checks.
+The build workflow's manual `fullTargets` input runs the same gate without publishing.
+Automatic snapshots publish all targets without repeating the full runtime gate.
+Releases rerun the full Linux gate at the actual release version, in parallel with
+the macOS/iOS and Windows jobs. Publication waits for every platform to pass and
+rechecks its staged artifacts and independent consumers before publishing.
+
+ABI references live in `api/` for normal checks and `api-full/` for full checks.
+When intentionally updating the API, run `./gradlew updateKotlinAbi` and
+`./gradlew updateKotlinAbi -Ptargets.full`. JavaScript and Wasm dependency lockfiles
+under `kotlin-js-store/` must be committed; use
+`./gradlew kotlinUpgradeYarnLock kotlinWasmUpgradeYarnLock -Ptargets.full` to update them.
+
+CI caches Gradle dependency/task outputs, the host-specific Native toolchain, and
+Gradle-encrypted configuration state separately. Configuration state is persisted
+only when the encryption secret is available. The local CI publication uses a
+stable version so source-only commits can reuse configuration state; the consumer
+always refreshes that local module, while external dependencies remain cached.
+
+### Tagged releases
+
+Push an explicit SemVer RC tag to run the full parallel release gate and publish
+all 12 publications with `SHA256SUMS` to a GitHub prerelease:
+
+```sh
+git tag v1.4.1-rc.1
+git push origin v1.4.1-rc.1
+```
+
+The version comes directly from the tag. Release workflows never create tags or
+increment RC numbers. RCs publish to GitHub only; stable tags such as `v1.4.1`
+publish to Maven Central and create a GitHub release after validation.
+There is no manual release dispatch.
+
+GitHub RC assets include JVM/native/web artifacts, sources, documentation and
+Gradle metadata. They can be consumed anonymously using the flat Ivy repository
+pattern in [the independent consumer](consumer/settings.gradle.kts).

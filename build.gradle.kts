@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("com.eignex.kmp")
+    id("com.eignex.publish.github")
     kotlin("plugin.serialization")
 }
 
@@ -19,15 +20,34 @@ eignexPublish {
     githubRepo.set("Eignex/kencode")
 }
 
-@OptIn(ExperimentalWasmDsl::class)
+// Run the real JVM artifact on both the supported floor and the current LTS.
+eignexBuild {
+    packagedTestJdks.set(listOf(17, 25))
+}
+
+tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
+    // Do not reuse results produced with the old aggregate-only failure policy.
+    inputs.property("kotlin.tests.individualTaskReports", providers.gradleProperty("kotlin.tests.individualTaskReports"))
+}
+
+// Routine checks cover JVM + Linux x64; release validation opts into every target.
+val fullTargets = providers.gradleProperty("targets.full").isPresent
+
+@OptIn(ExperimentalWasmDsl::class, org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
 kotlin {
+    abiValidation {
+        referenceDumpDir.set(layout.projectDirectory.dir(if (fullTargets) "api-full" else "api"))
+    }
     jvm()
-    js { browser(); nodejs() }
-    wasmJs { browser(); nodejs() }
-    wasmWasi { nodejs() }
-    linuxX64(); linuxArm64()
-    macosArm64(); mingwX64()
-    iosX64(); iosArm64(); iosSimulatorArm64()
+    linuxX64()
+    if (fullTargets) {
+        js { browser(); nodejs() }
+        wasmJs { browser(); nodejs() }
+        wasmWasi { nodejs() }
+        linuxArm64()
+        macosArm64(); mingwX64()
+        iosX64(); iosArm64(); iosSimulatorArm64()
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -57,4 +77,9 @@ dokka {
             remoteLineSuffix.set("#L")
         }
     }
+}
+
+// Select an installed simulator in CI rather than relying on a particular iPhone model.
+tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest>().configureEach {
+    providers.gradleProperty("iosSimulatorDevice").orNull?.let { device.set(it) }
 }
