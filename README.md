@@ -112,47 +112,30 @@ characters.
 
 ## Build validation
 
-`./gradlew check lintDocs koverXmlReport` checks JVM and Linux x64.
-JS, Wasm, WASI and other native targets are configured only with `-Ptargets.full`. JVM checks also
-run the packaged JAR on Java 17 and 25. CI stages the configured publications,
-checks their metadata and artifacts, and runs an independent Java consumer using
-both Gradle metadata and POM-only resolution.
+Routine builds run `./gradlew check lintDocs koverXmlReport` on JDK 17 for JVM
+and Linux x64. Gradle runs on JDK 21, as required by kbuild 1.3.6.
+Tagged releases enable `-Ptargets.full`, rerunning Linux/web
+checks alongside Windows and macOS/iOS simulator tests in parallel. Publication
+waits for every platform to pass. The build workflow's `fullTargets` input runs
+the same checks without publishing.
 
-Normal pull-request and main builds use one Linux job. Tagged stable and RC releases
-enable `-Ptargets.full`, with focused macOS ARM64, iOS simulator and Windows checks.
-The build workflow's manual `fullTargets` input runs the same gate without publishing.
-Automatic snapshots publish all targets without repeating the full runtime gate.
-Releases rerun the full Linux gate at the actual release version, in parallel with
-the macOS/iOS and Windows jobs. Publication waits for every platform to pass and
-rechecks its staged artifacts and independent consumers before publishing.
+Gradle dependencies, task outputs, the host's Kotlin Native toolchain and encrypted
+configuration state are cached. Configuration state requires the encryption secret.
+Automatic main snapshots publish all targets after the routine build passes.
 
-ABI references live in `api/` for normal checks and `api-full/` for full checks.
-When intentionally updating the API, run `./gradlew updateKotlinAbi` and
-`./gradlew updateKotlinAbi -Ptargets.full`. JavaScript and Wasm dependency lockfiles
-under `kotlin-js-store/` must be committed; use
-`./gradlew kotlinUpgradeYarnLock kotlinWasmUpgradeYarnLock -Ptargets.full` to update them.
-
-CI caches Gradle dependency/task outputs, the host-specific Native toolchain, and
-Gradle-encrypted configuration state separately. Configuration state is persisted
-only when the encryption secret is available. The local CI publication uses a
-stable version so source-only commits can reuse configuration state; the consumer
-always refreshes that local module, while external dependencies remain cached.
+ABI references live in `api/` and `api-full/`. Update both with
+`./gradlew updateKotlinAbi` and `./gradlew updateKotlinAbi -Ptargets.full`.
+Commit JavaScript and Wasm lockfiles under `kotlin-js-store/`; update them with
+`./gradlew kotlinUpgradeYarnLock kotlinWasmUpgradeYarnLock -Ptargets.full`.
 
 ### Tagged releases
 
-Push an explicit SemVer RC tag to run the full parallel release gate and publish
-all 12 publications with `SHA256SUMS` to a GitHub prerelease:
+Push an explicit SemVer tag: `vX.Y.Z` publishes to Maven Central and creates a
+GitHub release; `vX.Y.Z-rc.N` publishes all targets and checksums to a GitHub
+prerelease only. RCs never publish to Maven. Versions come directly from tags;
+there is no manual release mode or automatic RC numbering.
 
 ```sh
 git tag v1.4.1-rc.1
 git push origin v1.4.1-rc.1
 ```
-
-The version comes directly from the tag. Release workflows never create tags or
-increment RC numbers. RCs publish to GitHub only; stable tags such as `v1.4.1`
-publish to Maven Central and create a GitHub release after validation.
-There is no manual release dispatch.
-
-GitHub RC assets include JVM/native/web artifacts, sources, documentation and
-Gradle metadata. They can be consumed anonymously using the flat Ivy repository
-pattern in [the independent consumer](consumer/settings.gradle.kts).

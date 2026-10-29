@@ -29,6 +29,3 @@ out/
 .specstory/
 .aider*
 *.local.md
-
-### Python CI helpers ###
-__pycache__/

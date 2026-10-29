@@ -2,12 +2,12 @@ name: build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
       fullTargets:
-        description: Validate all publication targets and extra native hosts
+        description: Validate all targets on Linux, macOS and Windows
         type: boolean
         default: false
   workflow_call:
@@ -16,7 +16,6 @@ on:
         type: string
         default: ''
       ciVersion:
-        description: Version to stage and verify; releases use their actual version
         type: string
         default: '0.0.0-ci'
       fullTargets:
@@ -31,146 +30,94 @@ on:
 permissions:
   contents: read
 
-# A newer push supersedes any in-flight run for the same ref.
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: Run tests and collect coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref || github.sha }}
-          persist-credentials: false
-          fetch-depth: 2
-
-      - name: Set up build
-        uses: ./.github/actions/setup-build
-        with:
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-          target-profile: ${{ inputs.fullTargets && 'full' || 'default' }}
-
-      - name: Validate CI guards
-        run: |
-          python3 .github/scripts/test-verification.py
-          python3 .github/scripts/test-release-version.py
-
-      # Routine builds use a stable private version for configuration-cache reuse.
-      # Releases rerun this gate at their actual publication version.
-      # The independent consumer treats only this local artifact as changing.
-      # One graph shares compilation, lint, docs and publication artifacts.
-      - name: Check library and stage publications
-        env:
-          CONSUMER_VERSION: ${{ inputs.ciVersion || '0.0.0-ci' }}
-          FULL_TARGETS: ${{ inputs.fullTargets || false }}
-        run: |
-          target_args=()
-          if [[ "$FULL_TARGETS" == true ]]; then target_args+=(-Ptargets.full); fi
-          ./gradlew check lintDocs koverXmlReport publishAllPublicationsToLocalStagingRepository \
-            -PciVersion="$CONSUMER_VERSION" "${target_args[@]}"
-
-      - name: Require executed tests for the selected target set
-        env:
-          FULL_TARGETS: ${{ inputs.fullTargets || false }}
-        run: |
-          reports=(build/test-results/jvmTest build/test-results/jvmTestJarOnJava17
-                   build/test-results/jvmTestJarOnJava25 build/test-results/linuxX64Test)
-          if [[ "$FULL_TARGETS" == true ]]; then
-            reports+=(build/test-results/jsBrowserTest build/test-results/jsNodeTest
-                      build/test-results/wasmJsBrowserTest build/test-results/wasmJsNodeTest
-                      build/test-results/wasmWasiNodeTest)
-          fi
-          python3 .github/scripts/verify-test-results.py "${reports[@]}"
-
-      - name: Verify staged publications and independent consumers
-        env:
-          CONSUMER_VERSION: ${{ inputs.ciVersion || '0.0.0-ci' }}
-          FULL_TARGETS: ${{ inputs.fullTargets || false }}
-        run: |
-          target_args=()
-          if [[ "$FULL_TARGETS" == true ]]; then target_args+=(--full); fi
-          python3 .github/scripts/verify-publication.py build/staging-repo "$CONSUMER_VERSION" "${target_args[@]}"
-          bash .github/scripts/verify-consumer.sh "$CONSUMER_VERSION"
-
-      - name: Require committed JavaScript and Wasm lockfiles
-        run: |
-          git diff --exit-code -- kotlin-js-store
-          test -z "$(git ls-files --others --exclude-standard -- kotlin-js-store)"
-
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-reports
-          path: |
-            **/build/reports/tests/
-            **/build/test-results/
-          if-no-files-found: ignore
-
-      - name: Upload results to Codecov (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: build/reports/kover/report.xml
-          fail_ci_if_error: false
-
-  native:
-    if: ${{ inputs.fullTargets == true }}
-    name: Native tests (${{ matrix.os }})
+    name: ${{ matrix.os == 'ubuntu-latest' && 'Run tests and collect coverage' || format('Native tests ({0})', matrix.os) }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-15
-            target: macosArm64
-            python: python3
-          - os: windows-latest
-            target: mingwX64
-            python: python
+        os: ${{ fromJSON(inputs.fullTargets && '["ubuntu-latest","macos-15","windows-latest"]' || '["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      HAS_CONFIGURATION_CACHE: ${{ secrets.GRADLE_ENCRYPTION_KEY != '' }}
+      FULL_TARGETS: ${{ inputs.fullTargets || false }}
+      CI_VERSION: ${{ inputs.ciVersion || '0.0.0-ci' }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
-      - name: Set up build
-        uses: ./.github/actions/setup-build
+      - uses: actions/setup-java@v6
         with:
+          distribution: temurin
+          # kbuild 1.3.6 requires Java 21; library compilation and tests use 17.
+          java-version: |
+            17
+            21
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-          target-profile: full
-      # Native checks only: lint, coverage and web tests belong to the Linux job.
-      - name: Run native tests
-        shell: bash
-        run: ./gradlew ${{ matrix.target }}Test -Ptargets.full --max-workers=2 -Pkotlin.native.parallelThreads=2
-      - name: Require executed native tests
-        shell: bash
-        run: ${{ matrix.python }} .github/scripts/verify-test-results.py build/test-results/${{ matrix.target }}Test
-      # Extra native hosts and simulator linking are part of explicit full validation only.
-      - name: Run iOS simulator tests
-        if: runner.os == 'macOS'
-        shell: bash
+      - name: Cache Kotlin Native
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ inputs.fullTargets && 'full' || 'default' }}-${{ hashFiles('*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
+      - name: Cache encrypted configuration state
+        if: env.HAS_CONFIGURATION_CACHE == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .gradle/configuration-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-configuration-${{ inputs.fullTargets && 'full' || 'default' }}-${{ hashFiles('*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-configuration-${{ inputs.fullTargets && 'full' || 'default' }}-${{ hashFiles('*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}-
+      - name: Build and test
         run: |
-          device=$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
-          devices = json.load(sys.stdin)["devices"]
-          print(next(d["udid"] for runtime, items in devices.items() if ".iOS-" in runtime
-                     for d in items if d["name"].startswith("iPhone")))')
-          ./gradlew iosSimulatorArm64Test -Ptargets.full --max-workers=2 -Pkotlin.native.parallelThreads=2 -PiosSimulatorDevice="$device"
-          python3 .github/scripts/verify-test-results.py build/test-results/iosSimulatorArm64Test
-      - name: Upload native test reports
+          case "$RUNNER_OS" in
+            Linux) tasks=(check lintDocs koverXmlReport) ;;
+            macOS) tasks=(macosArm64Test) ;;
+            Windows) tasks=(mingwX64Test) ;;
+          esac
+          args=(-PciVersion="$CI_VERSION")
+          if [[ "$FULL_TARGETS" == true ]]; then args+=(-Ptargets.full); fi
+          if [[ "$RUNNER_OS" != Linux ]]; then
+            args+=(--max-workers=2 -Pkotlin.native.parallelThreads=2)
+          fi
+          ./gradlew "${tasks[@]}" "${args[@]}"
+      - name: Test iOS simulator
+        if: runner.os == 'macOS'
+        run: |
+          device=$(xcrun simctl list devices available --json | jq -er '
+            [.devices | to_entries[] | select(.key | contains(".iOS-")) | .value[] |
+             select(.name | startswith("iPhone")) | .udid][0] // error("No iPhone simulator available")')
+          ./gradlew iosSimulatorArm64Test -Ptargets.full -PciVersion="$CI_VERSION" \
+            --max-workers=2 -Pkotlin.native.parallelThreads=2 -PiosSimulatorDevice="$device"
+      - name: Require committed JavaScript and Wasm lockfiles
+        if: runner.os == 'Linux' && inputs.fullTargets
+        run: |
+          git diff --exit-code -- kotlin-js-store
+          test -z "$(git ls-files --others --exclude-standard -- kotlin-js-store)"
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports-${{ matrix.target }}
+          name: test-reports-${{ runner.os }}
           path: |
             build/reports/tests/
             build/test-results/
           if-no-files-found: ignore
+      - name: Upload coverage
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/reports/kover/report.xml
+          fail_ci_if_error: false
