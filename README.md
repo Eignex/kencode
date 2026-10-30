@@ -123,8 +123,8 @@ Gradle dependencies, task outputs, the host's Kotlin Native toolchain and encryp
 configuration state are cached. Configuration state requires the encryption secret.
 Automatic main snapshots publish all targets after the routine build passes.
 
-ABI references live in `api/` and `api-full/`. Update both with
-`./gradlew updateKotlinAbi` and `./gradlew updateKotlinAbi -Ptargets.full`.
+ABI compatibility is checked only with `-Ptargets.full`. References live in `api/`;
+update them with `./gradlew updateKotlinAbi -Ptargets.full`.
 Commit JavaScript and Wasm lockfiles under `kotlin-js-store/`; update them with
 `./gradlew kotlinUpgradeYarnLock kotlinWasmUpgradeYarnLock -Ptargets.full`.
 

@@ -20,16 +20,16 @@ eignexPublish {
     githubRepo.set("Eignex/kencode")
 }
 
-eignexBuild { jvmToolchain.set(17) }
-
 // Routine checks cover JVM + Linux x64; release validation opts into every target.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
-@OptIn(ExperimentalWasmDsl::class, org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
+eignexBuild {
+    jvmToolchain.set(17)
+    abiValidationEnabled.set(fullTargets)
+}
+
+@OptIn(ExperimentalWasmDsl::class)
 kotlin {
-    abiValidation {
-        referenceDumpDir.set(layout.projectDirectory.dir(if (fullTargets) "api-full" else "api"))
-    }
     jvm()
     linuxX64()
     if (fullTargets) {
