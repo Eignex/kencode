@@ -58,7 +58,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          # kbuild 1.3.6 requires Java 21; library compilation and tests use 17.
+          # kbuild requires Java 21; library compilation and tests use 17.
           java-version: |
             17
             21
@@ -105,6 +105,8 @@ jobs:
         run: |
           git diff --exit-code -- kotlin-js-store
           test -z "$(git ls-files --others --exclude-standard -- kotlin-js-store)"
+      - name: Verify Kotlin sources are unchanged
+        run: git diff --exit-code -- '*.kt' '*.kts'
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
